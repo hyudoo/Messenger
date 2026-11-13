@@ -12,7 +12,7 @@ import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import ConversationBox from "./ConversationBox";
 import { FullConversationType, FullCallType } from "@/app/types";
-import RecipveCallModal from "@/app/components/modals/RecipveCallModal";
+import IncomingCallModal from "@/app/components/modals/IncomingCallModal";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
@@ -82,7 +82,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       }
     };
 
-    const recipveCall = (call: FullCallType) => {
+    const incomingCallHandler = (call: FullCallType) => {
       setOtherUser(call.user);
       setRoomId(call.id);
       setIsCallOpen(true);
@@ -91,19 +91,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
     socket.on("conversation:new", newHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
-    socket.on("recive-call", recipveCall);
+    socket.on("call:incoming", incomingCallHandler);
 
     return () => {
       socket.off("conversation:new", newHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
-      socket.off("recive-call", recipveCall);
+      socket.off("call:incoming", incomingCallHandler);
     };
   }, [router, conversationId]);
 
   return (
     <>
-      <RecipveCallModal
+      <IncomingCallModal
         user={otherUser!}
         roomId={roomId!}
         isOpen={isCallOpen}

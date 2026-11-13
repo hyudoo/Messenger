@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         return;
       }
       if (isCall === true && user.email !== currentUser.email) {
-        emitToUser(user.email, "recive-call", {
+        emitToUser(user.email, "call:incoming", {
           id: conversation.id,
           user: currentUser,
         });

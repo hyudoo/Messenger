@@ -17,7 +17,7 @@ export type ConversationWithUsers = Conversation & {
   users: SafeUser[];
 };
 
-// Payload of the "recive-call" socket event
+// Payload of the "call:incoming" socket event
 export type FullCallType = {
   id: string;
   user: SafeUser;
