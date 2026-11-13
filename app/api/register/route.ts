@@ -3,12 +3,18 @@ import { NextResponse } from "next/server";
 
 import { validatePassword } from "@/app/libs/password";
 import prisma from "@/app/libs/prismadb";
+import { clientIp, rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME_LENGTH = 100;
 
 export async function POST(request: Request) {
   try {
+    const limited = await rateLimit("register", clientIp(request.headers));
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
+    }
+
     const { email, name, password } = await request.json();
     const trimmedName = typeof name === "string" ? name.trim() : "";
 

@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { isUploadedFileUrl } from "@/app/libs/s3";
+import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 
 const MAX_MESSAGE_LENGTH = 5000;
 
@@ -13,6 +14,11 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentUser();
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = await rateLimit("message", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const { message, isCall, image, conversationId } = await request.json();
@@ -29,11 +35,21 @@ export async function POST(request: Request) {
     if (body.length > MAX_MESSAGE_LENGTH) {
       return new NextResponse("Message too long", { status: 400 });
     }
-    if (image !== undefined && !isUploadedFileUrl(image)) {
+    // only the sender's own uploads
+    if (image !== undefined && !isUploadedFileUrl(image, currentUser.id)) {
       return new NextResponse("Invalid image", { status: 400 });
     }
     if (!body && !image && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
+    }
+    if (image) {
+      // keeps the file from the pending-upload expiry; fails if it was never uploaded
+      try {
+        await markUploadsUsed([image]);
+      } catch (error) {
+        console.log(error, "ERROR_MARK_UPLOAD_USED");
+        return new NextResponse("Image not found", { status: 400 });
+      }
     }
 
     const newMessage = await prisma.message.create({
@@ -64,7 +80,7 @@ export async function POST(request: Request) {
         return;
       }
       if (isCall === true && user.email !== currentUser.email) {
-        emitToUser(user.email, "recive-call", {
+        emitToUser(user.email, "call:incoming", {
           id: conversation.id,
           user: currentUser,
         });

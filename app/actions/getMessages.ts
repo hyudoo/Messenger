@@ -1,8 +1,12 @@
 import prisma from "@/app/libs/prismadb";
 
-const getMessages = async (conversationId: string) => {
+export const MESSAGE_PAGE_SIZE = 50;
+
+// One page of a conversation's messages, oldest first: the latest page, or the
+// page just before message `before`. Callers must check membership first.
+const getMessages = async (conversationId: string, before?: string) => {
   try {
-    const messages = await prisma.message.findMany({
+    const page = await prisma.message.findMany({
       where: {
         conversationId: conversationId,
       },
@@ -10,13 +14,18 @@ const getMessages = async (conversationId: string) => {
         sender: true,
         seen: true,
       },
-      orderBy: {
-        createdAt: "asc",
-      },
+      // newest first so `take` keeps the latest; id breaks createdAt ties
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: MESSAGE_PAGE_SIZE + 1,
+      ...(before && { cursor: { id: before }, skip: 1 }),
     });
-    return messages;
+
+    return {
+      messages: page.slice(0, MESSAGE_PAGE_SIZE).reverse(),
+      hasMore: page.length > MESSAGE_PAGE_SIZE,
+    };
   } catch (error: any) {
-    return [];
+    return { messages: [], hasMore: false };
   }
 };
 

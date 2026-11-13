@@ -11,6 +11,8 @@ export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface PresignedUpload {
   uploadUrl: string;
+  // signed into the URL (content type, pending tag): must be sent as-is
+  headers: Record<string, string>;
   fileUrl: string;
 }
 
@@ -24,14 +26,22 @@ export const uploadImage = async (file: File) => {
     throw new Error("Ảnh tối đa 10MB");
   }
 
-  const { data } = await axios.post<PresignedUpload>("/api/uploads", {
-    contentType: file.type,
-    size: file.size,
-  });
+  const { data } = await axios
+    .post<PresignedUpload>("/api/uploads", {
+      contentType: file.type,
+      size: file.size,
+    })
+    .catch((error) => {
+      throw new Error(
+        error?.response?.status === 429
+          ? "Bạn tải ảnh lên quá nhiều, thử lại sau ít phút"
+          : "Tải ảnh lên thất bại"
+      );
+    });
 
   const response = await fetch(data.uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    headers: data.headers,
     body: file,
   });
   if (!response.ok) {

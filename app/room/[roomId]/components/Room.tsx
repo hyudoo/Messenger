@@ -2,7 +2,7 @@
 
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useMemo, useState } from "react";
 import Footer from "./Footer";
 import { toast } from "react-hot-toast";
 
@@ -19,24 +19,26 @@ interface BodyProps {
   conversation: Conversation & {
     users: SafeUser[];
   };
+  // STUN, plus TURN with short-lived credentials when configured (app/libs/ice-servers.ts)
+  iceServers: RTCIceServer[];
 }
 
-const ICE_SERVERS = {
-  // you can add TURN servers here too
-  iceServers: [
-    {
-      urls: "stun:openrelay.metered.ca:80",
-    },
-    {
-      urls: "stun:stun.l.google.com:19302",
-    },
-    {
-      urls: "stun:stun2.l.google.com:19302",
-    },
-  ],
-};
+interface CallHandlers {
+  handleRoomJoined: () => void;
+  initiateCall: () => void;
+  handleReceivedOffer: (offer: RTCSessionDescriptionInit) => void;
+  handleAnswerReceived: (answer: RTCSessionDescriptionInit) => void;
+  handlerNewIceCandidateMsg: (candidate: RTCIceCandidate) => void;
+  leaveRoom: () => void;
+  backToConversation: () => void;
+}
 
-const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
+const Body: React.FC<BodyProps> = ({
+  roomId,
+  user,
+  conversation,
+  iceServers,
+}) => {
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(true);
   const otherUser = useOtherUser(conversation);
@@ -57,37 +59,43 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
     getSocket().emit(event, String(roomId), payload);
   };
 
+  // The socket listeners below are registered once per room and reach the
+  // latest handlers through this ref (filled in a layout effect further down),
+  // so the effect depends on roomId only.
+  const handlersRef = useRef<CallHandlers | null>(null);
+
   useEffect(() => {
     const socket = getSocket();
     const id = String(roomId);
+    const handlers = () => handlersRef.current!;
 
     // offer is sent by the host, so only non-host should handle it
     const onOffer = (offer: RTCSessionDescriptionInit) => {
       if (!host.current) {
-        handleReceivedOffer(offer);
+        handlers().handleReceivedOffer(offer);
       }
     };
 
     // When the second peer tells host they are ready to start the call
     // This happens after the second peer has grabbed their media
     const onReady = () => {
-      initiateCall();
+      handlers().initiateCall();
     };
 
     // answer is sent by non-host, so only host should handle it
     const onAnswer = (answer: RTCSessionDescriptionInit) => {
       if (host.current) {
-        handleAnswerReceived(answer);
+        handlers().handleAnswerReceived(answer);
       }
     };
 
     const onIceCandidate = (iceCandidate: RTCIceCandidate) => {
-      handlerNewIceCandidateMsg(iceCandidate);
+      handlers().handlerNewIceCandidateMsg(iceCandidate);
     };
 
     // when the other peer leaves the call
     const onPeerLeft = () => {
-      leaveRoom();
+      handlers().leaveRoom();
     };
 
     socket.on("call:offer", onOffer);
@@ -102,11 +110,11 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
       id,
       (res: { ok: boolean; isHost?: boolean }) => {
         if (!res.ok) {
-          router.push(`/conversations/${id}`);
+          handlers().backToConversation();
           return;
         }
         host.current = !!res.isHost;
-        handleRoomJoined();
+        handlers().handleRoomJoined();
       }
     );
 
@@ -148,7 +156,7 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
 
   const createPeerConnection = () => {
     // We create a RTC Peer Connection
-    const connection = new RTCPeerConnection(ICE_SERVERS);
+    const connection = new RTCPeerConnection({ iceServers });
 
     // We implement our onicecandidate method for when we received a ICE candidate from the STUN server
     connection.onicecandidate = handleICECandidateEvent;
@@ -264,6 +272,20 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
     toggleMediaStream("video", cameraActive);
     setCameraActive((prev) => !prev);
   };
+
+  // Layout effects run before every passive effect, so the socket listeners
+  // above always find handlers here.
+  useLayoutEffect(() => {
+    handlersRef.current = {
+      handleRoomJoined,
+      initiateCall,
+      handleReceivedOffer,
+      handleAnswerReceived,
+      handlerNewIceCandidateMsg,
+      leaveRoom,
+      backToConversation: () => router.push(`/conversations/${roomId}`),
+    };
+  });
 
   return (
     <div>

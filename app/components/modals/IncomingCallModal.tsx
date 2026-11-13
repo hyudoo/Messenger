@@ -7,14 +7,14 @@ import Avatar from "../Avatar";
 import { HiPhone, HiXMark } from "react-icons/hi2";
 import { SafeUser } from "@/app/types";
 
-interface RecipveCallModalProps {
+interface IncomingCallModalProps {
   isOpen?: boolean;
   onClose: () => void;
   user: SafeUser;
   roomId: String;
 }
 
-const RecipveCallModal: React.FC<RecipveCallModalProps> = ({
+const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   isOpen,
   onClose,
   user,
@@ -61,4 +61,4 @@ const RecipveCallModal: React.FC<RecipveCallModalProps> = ({
   );
 };
 
-export default RecipveCallModal;
+export default IncomingCallModal;

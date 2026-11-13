@@ -3,7 +3,7 @@
 import axios from "axios";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
+import { FieldValues, SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { SafeUser } from "@/app/types";
 
 import Input from "../inputs/Input";
@@ -29,7 +29,7 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FieldValues>({
     defaultValues: {
@@ -38,7 +38,7 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
     },
   });
 
-  const members = watch("members");
+  const members = useWatch({ control, name: "members" });
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
 

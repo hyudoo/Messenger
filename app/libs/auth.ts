@@ -7,6 +7,8 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
 
 import prisma from "@/app/libs/prismadb"
+import { TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors"
+import { clientIp, rateLimit } from "@/app/libs/rate-limit"
 
 export const authOptions: AuthOptions = {
   // the adapter's types predate client options like `omit`; at runtime it only calls CRUD methods
@@ -26,9 +28,18 @@ export const authOptions: AuthOptions = {
         email: { label: 'email', type: 'text' },
         password: { label: 'password', type: 'password' }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Invalid credentials');
+        }
+
+        // slows down password guessing; the form shows a dedicated message for this error
+        const ip = clientIp(req?.headers)
+        if (
+          !(await rateLimit('loginIp', ip)).ok ||
+          !(await rateLimit('login', `${ip}:${credentials.email}`)).ok
+        ) {
+          throw new Error(TOO_MANY_ATTEMPTS)
         }
 
         // the only query that reads hashedPassword (omitted globally)

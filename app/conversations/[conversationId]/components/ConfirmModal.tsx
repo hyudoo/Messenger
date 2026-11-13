@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useState } from "react";
-import { Dialog } from "@headlessui/react";
+import { DialogTitle } from "@headlessui/react";
 import { FiAlertTriangle } from "react-icons/fi";
 import axios from "axios";
 import { useRouter } from "next/navigation";
@@ -62,11 +62,11 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose }) => {
             sm:mt-0
             sm:text-left
         ">
-          <Dialog.Title
+          <DialogTitle
             as="h3"
             className="text-base font-semibold leading-6 text-gray-900">
             Xoá cuộc trò chuyện
-          </Dialog.Title>
+          </DialogTitle>
           <div className="mt-2">
             <p className="text-sm text-gray-500">
               Bạn có chắc chắn muốn xoá cuộc trò chuyện này? Hành động này không

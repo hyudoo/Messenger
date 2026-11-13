@@ -25,14 +25,14 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
     );
   }
 
-  // only loaded once membership is confirmed
-  const messages = await getMessages(conversation.id);
+  // only loaded once membership is confirmed; older pages load on scroll
+  const { messages, hasMore } = await getMessages(conversation.id);
 
   return (
     <div className="lg:pl-80 h-full">
       <div className="h-full flex flex-col">
         <Header conversation={conversation} />
-        <Body initialMessages={messages} />
+        <Body initialMessages={messages} initialHasMore={hasMore} />
         <Form />
       </div>
     </div>

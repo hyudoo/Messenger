@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { isUploadedFileUrl } from "@/app/libs/s3";
+import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
+import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 import prisma from "@/app/libs/prismadb";
 
 const MAX_NAME_LENGTH = 100;
@@ -19,10 +20,19 @@ export async function POST(request: Request) {
     if (!trimmedName || trimmedName.length > MAX_NAME_LENGTH) {
       return new NextResponse("Invalid name", { status: 400 });
     }
-    // keep the current image (e.g. an OAuth avatar) or use a file from /api/uploads
+    // keep the current image (e.g. an OAuth avatar) or use the user's own upload
     const keepsImage = !image || image === currentUser.image;
-    if (!keepsImage && !isUploadedFileUrl(image)) {
+    if (!keepsImage && !isUploadedFileUrl(image, currentUser.id)) {
       return new NextResponse("Invalid image", { status: 400 });
+    }
+    if (!keepsImage) {
+      // keeps the file from the pending-upload expiry; fails if it was never uploaded
+      try {
+        await markUploadsUsed([image]);
+      } catch (error) {
+        console.log(error, "ERROR_MARK_UPLOAD_USED");
+        return new NextResponse("Image not found", { status: 400 });
+      }
     }
 
     const updatedUser = await prisma.user.update({
@@ -34,6 +44,12 @@ export async function POST(request: Request) {
         image: keepsImage ? currentUser.image : image,
       },
     });
+
+    // the replaced avatar, if it was an upload nothing else uses
+    if (!keepsImage) {
+      cleanUpUploads([currentUser.image]);
+    }
+
     return NextResponse.json(updatedUser);
   } catch (error) {
     console.log(error, "ERROR_SETTINGS");

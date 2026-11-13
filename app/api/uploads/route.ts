@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 
 import getCurrentUser from "@/app/actions/getCurrentUser";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { createPresignedUpload, publicUrlFor } from "@/app/libs/s3";
 import { IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/app/libs/upload";
 
@@ -10,6 +11,11 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentUser();
     if (!currentUser?.id) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = await rateLimit("upload", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const { contentType, size } = await request.json();
@@ -23,9 +29,9 @@ export async function POST(request: Request) {
     }
 
     const key = `uploads/${currentUser.id}/${randomUUID()}.${extension}`;
-    const uploadUrl = await createPresignedUpload(key, contentType, size);
+    const { uploadUrl, headers } = await createPresignedUpload(key, contentType, size);
 
-    return NextResponse.json({ uploadUrl, fileUrl: publicUrlFor(key) });
+    return NextResponse.json({ uploadUrl, headers, fileUrl: publicUrlFor(key) });
   } catch (error) {
     console.log(error, "ERROR_UPLOADS");
     return new NextResponse("Error", { status: 500 });
