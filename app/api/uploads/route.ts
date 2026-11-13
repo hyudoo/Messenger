@@ -29,9 +29,9 @@ export async function POST(request: Request) {
     }
 
     const key = `uploads/${currentUser.id}/${randomUUID()}.${extension}`;
-    const uploadUrl = await createPresignedUpload(key, contentType, size);
+    const { uploadUrl, headers } = await createPresignedUpload(key, contentType, size);
 
-    return NextResponse.json({ uploadUrl, fileUrl: publicUrlFor(key) });
+    return NextResponse.json({ uploadUrl, headers, fileUrl: publicUrlFor(key) });
   } catch (error) {
     console.log(error, "ERROR_UPLOADS");
     return new NextResponse("Error", { status: 500 });

@@ -11,6 +11,8 @@ export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 
 interface PresignedUpload {
   uploadUrl: string;
+  // signed into the URL (content type, pending tag): must be sent as-is
+  headers: Record<string, string>;
   fileUrl: string;
 }
 
@@ -39,7 +41,7 @@ export const uploadImage = async (file: File) => {
 
   const response = await fetch(data.uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    headers: data.headers,
     body: file,
   });
   if (!response.ok) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { isUploadedFileUrl } from "@/app/libs/s3";
+import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -41,6 +41,15 @@ export async function POST(request: Request) {
     }
     if (!body && !image && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
+    }
+    if (image) {
+      // keeps the file from the pending-upload expiry; fails if it was never uploaded
+      try {
+        await markUploadsUsed([image]);
+      } catch (error) {
+        console.log(error, "ERROR_MARK_UPLOAD_USED");
+        return new NextResponse("Image not found", { status: 400 });
+      }
     }
 
     const newMessage = await prisma.message.create({
