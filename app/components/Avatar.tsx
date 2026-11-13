@@ -3,6 +3,7 @@
 import { SafeUser } from "@/app/types";
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { useIsActive } from "../hooks/useActiveList";
 
 interface AvatarProps {
@@ -10,6 +11,7 @@ interface AvatarProps {
 }
 
 const Avatar: React.FC<AvatarProps> = ({ user }) => {
+  const t = useTranslations("common");
   const isActive = useIsActive(user?.email);
 
   return (
@@ -27,7 +29,7 @@ const Avatar: React.FC<AvatarProps> = ({ user }) => {
         <Image
           fill
           src={user?.image || "/images/placeholder.jpg"}
-          alt="Avatar"
+          alt={t("avatar")}
         />
       </div>
       {isActive && (

@@ -3,8 +3,9 @@
 import clsx from "clsx";
 import { useRef, useState } from "react";
 import { toast } from "react-hot-toast";
+import { useTranslations } from "next-intl";
 
-import { IMAGE_TYPES, uploadImage } from "../libs/upload";
+import { IMAGE_TYPES, UploadError, uploadImage } from "../libs/upload";
 
 interface ImageUploadButtonProps {
   onUpload: (url: string) => void;
@@ -18,6 +19,7 @@ const ImageUploadButton: React.FC<ImageUploadButtonProps> = ({
   disabled,
   children,
 }) => {
+  const t = useTranslations("upload");
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const isDisabled = disabled || isUploading;
@@ -32,8 +34,8 @@ const ImageUploadButton: React.FC<ImageUploadButtonProps> = ({
     setIsUploading(true);
     try {
       onUpload(await uploadImage(file));
-    } catch (error: any) {
-      toast.error(error?.message || "Tải ảnh lên thất bại");
+    } catch (error) {
+      toast.error(t(error instanceof UploadError ? error.code : "failed"));
     } finally {
       setIsUploading(false);
     }

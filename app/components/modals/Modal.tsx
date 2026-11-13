@@ -3,6 +3,7 @@
 import React, { Fragment } from "react";
 import { Dialog, DialogPanel, Transition, TransitionChild } from "@headlessui/react";
 import { IoClose } from "react-icons/io5";
+import { useTranslations } from "next-intl";
 
 interface ModalProps {
   isOpen?: boolean;
@@ -11,6 +12,8 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
+  const t = useTranslations("common");
+
   return (
     <Transition show={isOpen} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onClose}>
@@ -90,7 +93,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
                         focus:ring-offset-2
                         "
                     onClick={onClose}>
-                    <span className="sr-only">Close</span>
+                    <span className="sr-only">{t("close")}</span>
                     <IoClose className="h-6 w-6" aria-hidden="true" />
                   </button>
                 </div>

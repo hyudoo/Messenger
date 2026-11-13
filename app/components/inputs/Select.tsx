@@ -1,6 +1,7 @@
 "use client";
 
 import ReactSelect from "react-select";
+import { useTranslations } from "next-intl";
 
 interface SelectProps {
   label: string;
@@ -17,6 +18,8 @@ const Select: React.FC<SelectProps> = ({
   options,
   disabled,
 }) => {
+  const t = useTranslations("common");
+
   return (
     <div className="z-[100]">
       <label
@@ -34,6 +37,8 @@ const Select: React.FC<SelectProps> = ({
           value={value}
           onChange={onChange}
           isMulti
+          placeholder={t("select_placeholder")}
+          noOptionsMessage={() => t("no_options")}
           options={options}
           menuPortalTarget={document.body}
           styles={{

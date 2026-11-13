@@ -1,4 +1,8 @@
+import { useTranslations } from "next-intl";
+
 const EmptyState = () => {
+  const t = useTranslations("conversations");
+
   return (
     <div
       className="
@@ -15,7 +19,7 @@ const EmptyState = () => {
             ">
       <div className="text-center items-center flex flex-col">
         <h3 className="mt-2 text-2xl font-semibold text-foreground">
-          Chọn một cuộc trò chuyện hoặc bắt đầu một cuộc trò chuyện mới.
+          {t("empty")}
         </h3>
       </div>
     </div>

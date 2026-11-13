@@ -16,14 +16,23 @@ interface PresignedUpload {
   fileUrl: string;
 }
 
+// Why an upload failed; the UI shows it through the upload.<code> message
+export type UploadErrorCode = "unsupported_type" | "too_large" | "too_many" | "failed";
+
+export class UploadError extends Error {
+  constructor(readonly code: UploadErrorCode) {
+    super(code);
+  }
+}
+
 // Uploads an image straight from the browser to S3 with a presigned PUT URL
-// and returns its public URL.
+// and returns its public URL. Throws UploadError.
 export const uploadImage = async (file: File) => {
   if (!IMAGE_TYPES[file.type]) {
-    throw new Error("Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP");
+    throw new UploadError("unsupported_type");
   }
   if (file.size > MAX_IMAGE_SIZE) {
-    throw new Error("Ảnh tối đa 10MB");
+    throw new UploadError("too_large");
   }
 
   const { data } = await axios
@@ -32,11 +41,7 @@ export const uploadImage = async (file: File) => {
       size: file.size,
     })
     .catch((error) => {
-      throw new Error(
-        error?.response?.status === 429
-          ? "Bạn tải ảnh lên quá nhiều, thử lại sau ít phút"
-          : "Tải ảnh lên thất bại"
-      );
+      throw new UploadError(error?.response?.status === 429 ? "too_many" : "failed");
     });
 
   const response = await fetch(data.uploadUrl, {
@@ -45,7 +50,7 @@ export const uploadImage = async (file: File) => {
     body: file,
   });
   if (!response.ok) {
-    throw new Error("Tải ảnh lên thất bại");
+    throw new UploadError("failed");
   }
 
   return data.fileUrl;
