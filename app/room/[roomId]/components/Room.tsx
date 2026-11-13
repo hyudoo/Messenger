@@ -3,8 +3,7 @@
 import { Conversation, User } from "@prisma/client";
 import { useEffect, useRef, useMemo, useState } from "react";
 import Footer from "./Footer";
-import { Members, PresenceChannel } from "pusher-js";
-import { pusherClient } from "@/app/libs/pusher";
+import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "next/navigation";
 import Header from "./Header";
 import clsx from "clsx";
@@ -42,8 +41,6 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
   const router = useRouter();
 
   const host = useRef(false);
-  // Pusher specific refs
-  const channelRef = useRef<PresenceChannel>();
 
   // Webrtc refs
   const rtcConnection = useRef<RTCPeerConnection | null>();
@@ -52,64 +49,71 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
   const userVideo = useRef<HTMLVideoElement>(null);
   const partnerVideo = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    channelRef.current = pusherClient.subscribe(
-      `presence-${roomId}`
-    ) as PresenceChannel;
+  // Sends a signalling message to the other peer through the socket server
+  const signal = (event: string, payload?: unknown) => {
+    getSocket().emit(event, String(roomId), payload);
+  };
 
-    // when a users subscribe
-    channelRef.current.bind(
-      "pusher:subscription_succeeded",
-      (members: Members) => {
-        if (members.count === 1) {
-          // when subscribing, if you are the first member, you are the host
-          host.current = true;
+  useEffect(() => {
+    const socket = getSocket();
+    const id = String(roomId);
+
+    // offer is sent by the host, so only non-host should handle it
+    const onOffer = (offer: RTCSessionDescriptionInit) => {
+      if (!host.current) {
+        handleReceivedOffer(offer);
+      }
+    };
+
+    // When the second peer tells host they are ready to start the call
+    // This happens after the second peer has grabbed their media
+    const onReady = () => {
+      initiateCall();
+    };
+
+    // answer is sent by non-host, so only host should handle it
+    const onAnswer = (answer: RTCSessionDescriptionInit) => {
+      if (host.current) {
+        handleAnswerReceived(answer);
+      }
+    };
+
+    const onIceCandidate = (iceCandidate: RTCIceCandidate) => {
+      handlerNewIceCandidateMsg(iceCandidate);
+    };
+
+    // when the other peer leaves the call
+    const onPeerLeft = () => {
+      leaveRoom();
+    };
+
+    socket.on("call:offer", onOffer);
+    socket.on("call:ready", onReady);
+    socket.on("call:answer", onAnswer);
+    socket.on("call:ice-candidate", onIceCandidate);
+    socket.on("call:peer-left", onPeerLeft);
+
+    // the first peer to join the room is the host
+    socket.emit(
+      "call:join",
+      id,
+      (res: { ok: boolean; isHost?: boolean }) => {
+        if (!res.ok) {
+          router.push(`/conversations/${id}`);
+          return;
         }
+        host.current = !!res.isHost;
         handleRoomJoined();
       }
     );
 
-    // when a member leaves the chat
-    channelRef.current.bind("pusher:member_removed", () => {
-      leaveRoom();
-    });
-
-    channelRef.current.bind(
-      "client-offer",
-      (offer: RTCSessionDescriptionInit) => {
-        // offer is sent by the host, so only non-host should handle it
-        if (!host.current) {
-          handleReceivedOffer(offer);
-        }
-      }
-    );
-
-    // When the second peer tells host they are ready to start the call
-    // This happens after the second peer has grabbed their media
-    channelRef.current.bind("client-ready", () => {
-      initiateCall();
-    });
-
-    channelRef.current.bind(
-      "client-answer",
-      (answer: RTCSessionDescriptionInit) => {
-        // answer is sent by non-host, so only host should handle it
-        if (host.current) {
-          handleAnswerReceived(answer as RTCSessionDescriptionInit);
-        }
-      }
-    );
-
-    channelRef.current.bind(
-      "client-ice-candidate",
-      (iceCandidate: RTCIceCandidate) => {
-        // answer is sent by non-host, so only host should handle it
-        handlerNewIceCandidateMsg(iceCandidate);
-      }
-    );
-
     return () => {
-      pusherClient.unsubscribe(`presence-${roomId}`);
+      socket.off("call:offer", onOffer);
+      socket.off("call:ready", onReady);
+      socket.off("call:answer", onAnswer);
+      socket.off("call:ice-candidate", onIceCandidate);
+      socket.off("call:peer-left", onPeerLeft);
+      socket.emit("call:leave", id);
     };
   }, [roomId]);
 
@@ -128,7 +132,7 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
         };
         if (!host.current) {
           // the 2nd peer joining will tell to host they are ready
-          channelRef.current!.trigger("client-ready", {});
+          signal("call:ready");
         }
       })
       .catch((err) => {
@@ -161,10 +165,8 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
         .current!.createOffer()
         .then((offer) => {
           rtcConnection.current!.setLocalDescription(offer);
-          // 4. Send offer to other peer via pusher
-          // Note: 'client-' prefix means this event is not being sent directly from the client
-          // This options needs to be turned on in Pusher app settings
-          channelRef.current?.trigger("client-offer", offer);
+          // Send offer to the other peer via the socket server
+          signal("call:offer", offer);
         })
         .catch((error) => {
           console.log(error);
@@ -184,7 +186,7 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
       .createAnswer()
       .then((answer) => {
         rtcConnection.current!.setLocalDescription(answer);
-        channelRef.current?.trigger("client-answer", answer);
+        signal("call:answer", answer);
       })
       .catch((error) => {
         console.log(error);
@@ -199,8 +201,7 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
 
   const handleICECandidateEvent = async (event: RTCPeerConnectionIceEvent) => {
     if (event.candidate) {
-      // return sentToPusher('ice-candidate', event.candidate)
-      channelRef.current?.trigger("client-ice-candidate", event.candidate);
+      signal("call:ice-candidate", event.candidate);
     }
   };
 

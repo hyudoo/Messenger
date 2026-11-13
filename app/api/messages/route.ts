@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { pusherServer } from "@/app/libs/pusher";
+import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
 
 export async function POST(request: Request) {
@@ -63,14 +63,14 @@ export async function POST(request: Request) {
       },
     });
 
-    await pusherServer.trigger(conversationId, "messages:new", newMessage);
+    emitToConversation(conversationId, "messages:new", newMessage);
     const lastMessage =
       updatedConversation.messages[updatedConversation.messages.length - 1];
 
     if (isCall) {
       updatedConversation.users.map((user) => {
         if (user.email !== currentUser.email) {
-          pusherServer.trigger(user.email!, "recive-call", {
+          emitToUser(user.email!, "recive-call", {
             id: conversationId,
             user: currentUser,
           });
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     updatedConversation.users.map((user) => {
-      pusherServer.trigger(user.email!, "conversation:update", {
+      emitToUser(user.email!, "conversation:update", {
         id: conversationId,
         messages: [lastMessage],
       });
