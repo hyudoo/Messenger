@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import Modal from "./Modal";
 import Avatar from "../Avatar";
 import { HiPhone, HiXMark } from "react-icons/hi2";
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 
 interface RecipveCallModalProps {
   isOpen?: boolean;
   onClose: () => void;
-  user: User;
+  user: SafeUser;
   roomId: String;
 }
 

@@ -4,11 +4,12 @@ import { HiChevronLeft } from "react-icons/hi";
 import { HiEllipsisHorizontal, HiPhone, HiVideoCamera } from "react-icons/hi2";
 import { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import axios from "axios";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import useActiveList from "@/app/hooks/useActiveList";
+import { useIsActive } from "@/app/hooks/useActiveList";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -17,7 +18,7 @@ import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   conversation: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 
@@ -26,8 +27,7 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
   const otherUser = useOtherUser(conversation);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { members } = useActiveList();
-  const isActive = members.indexOf(otherUser?.email!) !== -1;
+  const isActive = useIsActive(otherUser?.email);
   const statusText = useMemo(() => {
     if (conversation.isGroup) {
       return `${conversation.userIds.length} thành viên`;

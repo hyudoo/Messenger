@@ -1,8 +1,9 @@
-import getCurrentUser from "@/app/actions/getCurrentUser";
 import { NextResponse } from "next/server";
 
+import getConversationForUser from "@/app/actions/getConversationForUser";
+import getCurrentUser from "@/app/actions/getCurrentUser";
+import { emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
-import { pusherServer } from "@/app/libs/pusher";
 
 interface IParams {
   conversationId?: string;
@@ -10,51 +11,40 @@ interface IParams {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: IParams }
+  { params }: { params: Promise<IParams> }
 ) {
   try {
-    const { conversationId } = params;
+    const { conversationId } = await params;
     const currentUser = await getCurrentUser();
 
     if (!currentUser?.id) {
-      // return NextResponse.json(null);
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const existingConversation = await prisma.conversation.findUnique({
-      where: {
-        id: conversationId,
-      },
-      include: {
-        users: true,
-      },
-    });
-
+    // only members may delete, and only then are the others notified
+    const existingConversation = await getConversationForUser(
+      conversationId,
+      currentUser.id
+    );
     if (!existingConversation) {
-      return new NextResponse("Invalid ID", { status: 400 });
+      return new NextResponse("Not found", { status: 404 });
     }
 
-    const deletedConversation = await prisma.conversation.deleteMany({
+    const deletedConversation = await prisma.conversation.delete({
       where: {
-        id: conversationId,
-        userIds: {
-          hasSome: [currentUser.id],
-        },
+        id: existingConversation.id,
       },
     });
 
     existingConversation.users.forEach((user) => {
       if (user.email) {
-        pusherServer.trigger(
-          user.email,
-          "conversation:remove",
-          existingConversation
-        );
+        emitToUser(user.email, "conversation:remove", existingConversation);
       }
     });
 
     return NextResponse.json(deletedConversation);
   } catch (error) {
-    return NextResponse.json(null);
+    console.log(error, "ERROR_CONVERSATION_DELETE");
+    return new NextResponse("Error", { status: 500 });
   }
 }

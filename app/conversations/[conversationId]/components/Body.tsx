@@ -3,7 +3,7 @@
 import axios from "axios";
 import { useEffect, useState, useRef } from "react";
 
-import { pusherClient } from "@/app/libs/pusher";
+import { getSocket, subscribeConversation } from "@/app/libs/socket-client";
 import useConversation from "@/app/hooks/useConversation";
 import MessageBox from "./MessageBox";
 import { FullMessageType } from "@/app/types";
@@ -24,7 +24,8 @@ const Body: React.FC<BodyProps> = ({ initialMessages = [] }) => {
   }, [conversationId]);
 
   useEffect(() => {
-    pusherClient.subscribe(conversationId);
+    const socket = getSocket();
+    const unsubscribe = subscribeConversation(conversationId);
     bottomRef?.current?.scrollIntoView();
 
     const messageHandler = (message: FullMessageType) => {
@@ -50,12 +51,12 @@ const Body: React.FC<BodyProps> = ({ initialMessages = [] }) => {
       );
     };
 
-    pusherClient.bind("messages:new", messageHandler);
-    pusherClient.bind("messages:update", updateMessagesHandler);
+    socket.on("messages:new", messageHandler);
+    socket.on("messages:update", updateMessagesHandler);
     return () => {
-      pusherClient.unsubscribe(conversationId);
-      pusherClient.unbind("messages:new", messageHandler);
-      pusherClient.unbind("messages:update", updateMessagesHandler);
+      unsubscribe();
+      socket.off("messages:new", messageHandler);
+      socket.off("messages:update", updateMessagesHandler);
     };
   }, [conversationId]);
 

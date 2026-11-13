@@ -1,25 +1,25 @@
 "use client";
 
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { useMemo, useState } from "react";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import useActiveList from "@/app/hooks/useActiveList";
+import { useIsActive } from "@/app/hooks/useActiveList";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
 
 interface HeaderProps {
   conversation: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 
 const Header: React.FC<HeaderProps> = ({ conversation }) => {
   const otherUser = useOtherUser(conversation);
 
-  const { members } = useActiveList();
-  const isActive = members.indexOf(otherUser?.email!) !== -1;
+  const isActive = useIsActive(otherUser?.email);
   const statusText = useMemo(() => {
     if (conversation.isGroup) {
       return `${conversation.userIds.length} thành viên`;

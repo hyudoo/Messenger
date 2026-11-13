@@ -4,7 +4,7 @@ import axios from "axios";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 
 import Input from "../inputs/Input";
 import Select from "../inputs/Select";
@@ -15,7 +15,7 @@ import { toast } from "react-hot-toast";
 interface GroupChatModalProps {
   isOpen?: boolean;
   onClose: () => void;
-  users: User[];
+  users: SafeUser[];
 }
 
 const GroupChatModal: React.FC<GroupChatModalProps> = ({
@@ -38,7 +38,7 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
     },
   });
 
-  const members = watch("member");
+  const members = watch("members");
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setIsLoading(true);
 

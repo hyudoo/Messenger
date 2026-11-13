@@ -1,18 +1,28 @@
-import getConversationById from "@/app/actions/getConversationById";
+import { redirect } from "next/navigation";
 
-import Room from "./components/Room";
+import getConversationById from "@/app/actions/getConversationById";
 import getCurrentUser from "@/app/actions/getCurrentUser";
+import Room from "./components/Room";
+
 interface IParams {
   roomId: string;
 }
 
-const RoomId = async ({ params }: { params: IParams }) => {
-  const conversation = await getConversationById(params.roomId);
-  const user = await getCurrentUser();
+const RoomId = async ({ params }: { params: Promise<IParams> }) => {
+  const { roomId } = await params;
+  const [conversation, user] = await Promise.all([
+    getConversationById(roomId),
+    getCurrentUser(),
+  ]);
+
+  // not a member (or no such conversation): no call room
+  if (!conversation || !user) {
+    redirect("/conversations");
+  }
 
   return (
     <div className="h-full w-full">
-      <Room roomId={params.roomId} conversation={conversation!} user={user!} />
+      <Room roomId={roomId} conversation={conversation} user={user} />
     </div>
   );
 };

@@ -8,11 +8,12 @@ export default async function ConversationLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const conversation = await getConversations();
-  const users = await getUsers();
+  const [conversation, users] = await Promise.all([
+    getConversations(),
+    getUsers(),
+  ]);
 
   return (
-    // @ts-expect-error Server Component
     <Sidebar>
       <div className="h-full">
         <ConversationList users={users} initialItems={conversation} />

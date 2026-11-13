@@ -1,42 +1,33 @@
-import { useEffect, useState } from "react";
-import { pusherClient } from "../libs/pusher";
-import { Channel, Members } from "pusher-js";
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
+
+import { getSocket } from "../libs/socket-client";
 import useActiveList from "./useActiveList";
 
+// Opens the shared socket connection once the user is signed in and keeps the
+// online list (emails) in sync with the server's presence events.
 const useActiveChannel = () => {
   const { set, add, remove } = useActiveList();
-  const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
-  useEffect(() => {
-    let channel = activeChannel;
+  const { status } = useSession();
 
-    if (!channel) {
-      channel = pusherClient.subscribe("presence-messenger");
-      setActiveChannel(channel);
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
     }
 
-    channel.bind("pusher:subscription_succeeded", (members: Members) => {
-      const initialMembers: string[] = [];
-      members.each((member: Record<string, any>) =>
-        initialMembers.push(member.id)
-      );
-      set(initialMembers);
-    });
-
-    channel.bind("pusher:member_added", (member: Record<string, any>) => {
-      add(member.id);
-    });
-
-    channel.bind("pusher:member_removed", (member: Record<string, any>) => {
-      remove(member.id);
-    });
+    const socket = getSocket();
+    socket.on("presence:list", set);
+    socket.on("presence:online", add);
+    socket.on("presence:offline", remove);
+    socket.connect();
 
     return () => {
-      if (activeChannel) {
-        pusherClient.unsubscribe("presence-messenger");
-        setActiveChannel(null);
-      }
+      socket.off("presence:list", set);
+      socket.off("presence:online", add);
+      socket.off("presence:offline", remove);
+      socket.disconnect();
     };
-  }, [activeChannel, set, add, remove]);
+  }, [status, set, add, remove]);
 };
 
 export default useActiveChannel;

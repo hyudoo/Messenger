@@ -20,7 +20,12 @@ const getConversations = async () => {
       },
       include: {
         users: true,
+        // the list only shows the last message
         messages: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
           include: {
             sender: true,
             seen: true,

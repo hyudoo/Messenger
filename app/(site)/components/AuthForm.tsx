@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import Input from "../../components/inputs/Input";
 import AuthSocialButton from "./AuthSocialButton";
 import Button from "@/app/components/Button";
+import { validatePassword } from "@/app/libs/password";
 import { toast } from "react-hot-toast";
 
 type Variant = "LOGIN" | "REGISTER";
@@ -50,35 +51,10 @@ const AuthForm = () => {
     setIsLoading(true);
 
     if (variant === "REGISTER") {
-      // Kiểm tra độ dài mật khẩu
-      if (data.password.length < 8) {
-        toast.error("Mật khẩu quá ngắn!");
-        setIsLoading(false);
-        return;
-      }
-      // Kiểm tra chứa ít nhất một chữ cái viết thường
-      if (!/[a-z]/.test(data.password)) {
-        toast.error("Mật khẩu phải chứa ít nhất một chữ cái viết thường!");
-        setIsLoading(false);
-        return;
-      }
-      // Kiểm tra chứa ít nhất một chữ cái viết hoa
-      if (!/[A-Z]/.test(data.password)) {
-        toast.error("Mật khẩu phải chứa ít nhất một chữ cái viết hoa");
-        setIsLoading(false);
-        return;
-      }
-
-      // Kiểm tra chứa ít nhất một số
-      if (!/\d/.test(data.password)) {
-        toast.error("Mật khẩu phải chứa ít nhất một số");
-        setIsLoading(false);
-        return;
-      }
-
-      // Kiểm tra chứa ít nhất một ký tự đặc biệt
-      if (!/[\W_]/.test(data.password)) {
-        toast.error("Mật khẩu phải chứa ít nhất một ký tự đặc biệt");
+      // same rules as /api/register
+      const passwordError = validatePassword(data.password);
+      if (passwordError) {
+        toast.error(passwordError);
         setIsLoading(false);
         return;
       }
@@ -104,7 +80,13 @@ const AuthForm = () => {
             router.push("/conversations");
           }
         })
-        .catch(() => toast.error("Đăng ký tài khoản không thành công!"))
+        .catch((error) =>
+          toast.error(
+            error?.response?.status === 409
+              ? "Email đã được sử dụng!"
+              : "Đăng ký tài khoản không thành công!"
+          )
+        )
         .finally(() => setIsLoading(false));
     }
 

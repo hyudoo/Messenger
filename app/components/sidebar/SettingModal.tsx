@@ -4,8 +4,8 @@ import axios from "axios";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
-import { User } from "@prisma/client";
-import { CldUploadButton } from "next-cloudinary";
+import { SafeUser } from "@/app/types";
+import ImageUploadButton from "../ImageUploadButton";
 
 import Input from "../inputs/Input";
 import Modal from "../modals/Modal";
@@ -16,7 +16,7 @@ import { toast } from "react-hot-toast";
 interface SettingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: SafeUser;
 }
 
 const SettingModal: React.FC<SettingModalProps> = ({
@@ -42,8 +42,8 @@ const SettingModal: React.FC<SettingModalProps> = ({
 
   const image = watch("image");
 
-  const handleUpload = (result: any) => {
-    setValue("image", result.info.secure_url, {
+  const handleUpload = (url: string) => {
+    setValue("image", url, {
       shouldValidate: true,
     });
   };
@@ -107,14 +107,13 @@ const SettingModal: React.FC<SettingModalProps> = ({
                     }
                     alt="Avatar"
                   />
-                  <CldUploadButton
-                    options={{ maxFiles: 1 }}
+                  <ImageUploadButton
                     onUpload={handleUpload}
-                    uploadPreset="zcoutnqf">
+                    disabled={isLoading}>
                     <Button disabled={isLoading} secondary type="button">
                       Thay đổi
                     </Button>
-                  </CldUploadButton>
+                  </ImageUploadButton>
                 </div>
               </div>
             </div>

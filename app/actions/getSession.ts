@@ -1,6 +1,9 @@
+import { cache } from "react";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../api/auth/[...nextauth]/route";
 
-export default async function getSession() {
-  return await getServerSession(authOptions);
-}
+import { authOptions } from "../libs/auth";
+
+// cache(): deduped per server request (layouts, pages and actions all ask for it)
+const getSession = cache(() => getServerSession(authOptions));
+
+export default getSession;

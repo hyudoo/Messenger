@@ -49,11 +49,13 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
           </div>
         </div>
         <div className={message}>
-          <ImageModal
-            src={data.image}
-            isOpen={imageModalOpen}
-            onClose={() => setImageModalOpen(false)}
-          />
+          {data.image && (
+            <ImageModal
+              src={data.image}
+              isOpen={imageModalOpen}
+              onClose={() => setImageModalOpen(false)}
+            />
+          )}
           {data.image && (
             <Image
               alt="Image"

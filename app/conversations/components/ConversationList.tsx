@@ -1,15 +1,14 @@
 "use client";
 
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { MdOutlineGroupAdd } from "react-icons/md";
 import clsx from "clsx";
 import { find } from "lodash";
 
 import useConversation from "@/app/hooks/useConversation";
-import { pusherClient } from "@/app/libs/pusher";
+import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import ConversationBox from "./ConversationBox";
 import { FullConversationType, FullCallType } from "@/app/types";
@@ -17,7 +16,7 @@ import RecipveCallModal from "@/app/components/modals/RecipveCallModal";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
-  users: User[];
+  users: SafeUser[];
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -27,24 +26,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCallOpen, setIsCallOpen] = useState(false);
-  const [otherUser, setOtherUser] = useState<User>();
+  const [otherUser, setOtherUser] = useState<SafeUser>();
   const [roomId, setRoomId] = useState<String>();
 
   const router = useRouter();
-  const session = useSession();
 
   const { conversationId, isOpen } = useConversation();
 
-  const pusherKey = useMemo(() => {
-    return session.data?.user?.email;
-  }, [session.data?.user?.email]);
-
+  // The server puts every socket in its user's room on connect, so these
+  // per-user events need no explicit subscription.
   useEffect(() => {
-    if (!pusherKey) {
-      return;
-    }
-
-    pusherClient.subscribe(pusherKey);
+    const socket = getSocket();
 
     const newHandler = (conversation: FullConversationType) => {
       setItems((current) => {
@@ -55,18 +47,30 @@ const ConversationList: React.FC<ConversationListProps> = ({
       });
     };
 
-    const updateHandler = (conversation: FullConversationType) => {
-      setItems((current) =>
-        current.map((currentConversation) => {
-          if (currentConversation.id === conversation.id) {
-            return {
-              ...currentConversation,
-              messages: conversation.messages,
-            };
-          }
-          return currentConversation;
-        })
-      );
+    // A new message also carries lastMessageAt: that conversation moves to the top.
+    // "Seen" updates don't, so the order stays put.
+    const updateHandler = (
+      conversation: Pick<FullConversationType, "id" | "messages"> & {
+        lastMessageAt?: string;
+      }
+    ) => {
+      setItems((current) => {
+        const target = current.find((item) => item.id === conversation.id);
+        if (!target) {
+          return current;
+        }
+        const updated = {
+          ...target,
+          messages: conversation.messages,
+          ...(conversation.lastMessageAt && {
+            lastMessageAt: new Date(conversation.lastMessageAt),
+          }),
+        };
+        if (!conversation.lastMessageAt) {
+          return current.map((item) => (item.id === updated.id ? updated : item));
+        }
+        return [updated, ...current.filter((item) => item.id !== updated.id)];
+      });
     };
 
     const removeHandler = (conversation: FullConversationType) => {
@@ -84,15 +88,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
       setIsCallOpen(true);
     };
 
-    pusherClient.bind("conversation:new", newHandler);
-    pusherClient.bind("conversation:update", updateHandler);
-    pusherClient.bind("conversation:remove", removeHandler);
-    pusherClient.bind("recive-call", recipveCall);
+    socket.on("conversation:new", newHandler);
+    socket.on("conversation:update", updateHandler);
+    socket.on("conversation:remove", removeHandler);
+    socket.on("recive-call", recipveCall);
 
     return () => {
-      pusherClient.unsubscribe(pusherKey);
+      socket.off("conversation:new", newHandler);
+      socket.off("conversation:update", updateHandler);
+      socket.off("conversation:remove", removeHandler);
+      socket.off("recive-call", recipveCall);
     };
-  }, [pusherKey, router, conversationId]);
+  }, [router, conversationId]);
 
   return (
     <>
