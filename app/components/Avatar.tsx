@@ -3,15 +3,14 @@
 import { SafeUser } from "@/app/types";
 
 import Image from "next/image";
-import useActiveList from "../hooks/useActiveList";
+import { useIsActive } from "../hooks/useActiveList";
 
 interface AvatarProps {
   user?: SafeUser;
 }
 
 const Avatar: React.FC<AvatarProps> = ({ user }) => {
-  const { members } = useActiveList();
-  const isActive = members.indexOf(user?.email!) !== -1;
+  const isActive = useIsActive(user?.email);
 
   return (
     <div className="relative">

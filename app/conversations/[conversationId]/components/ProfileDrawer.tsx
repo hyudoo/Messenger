@@ -8,7 +8,7 @@ import { SafeUser } from "@/app/types";
 import { format } from "date-fns";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import useActiveList from "@/app/hooks/useActiveList";
+import { useIsActive } from "@/app/hooks/useActiveList";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -38,8 +38,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     return data.name || otherUser.name;
   }, [data.name, otherUser.name]);
 
-  const { members } = useActiveList();
-  const isActive = members.indexOf(otherUser?.email!) !== -1;
+  const isActive = useIsActive(otherUser?.email);
 
   const statusText = useMemo(() => {
     if (data.isGroup) {
