@@ -1,6 +1,7 @@
 "use client";
 
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { useEffect, useRef, useMemo, useState } from "react";
 import Footer from "./Footer";
 import { getSocket } from "@/app/libs/socket-client";
@@ -12,9 +13,9 @@ import useOtherUser from "@/app/hooks/useOtherUser";
 
 interface BodyProps {
   roomId: String;
-  user: User;
+  user: SafeUser;
   conversation: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 

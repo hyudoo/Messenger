@@ -12,8 +12,8 @@ interface IParams {
 
 const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   const { conversationId } = await params;
+  // null when the conversation does not exist or the user is not a member
   const conversation = await getConversationById(conversationId);
-  const messages = await getMessages(conversationId);
 
   if (!conversation) {
     return (
@@ -24,6 +24,9 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
       </div>
     );
   }
+
+  // only loaded once membership is confirmed
+  const messages = await getMessages(conversation.id);
 
   return (
     <div className="lg:pl-80 h-full">

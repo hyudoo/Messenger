@@ -15,6 +15,10 @@ const publicBaseUrl = () =>
 
 export const publicUrlFor = (key: string) => `${publicBaseUrl()}/${key}`;
 
+// True for URLs produced by /api/uploads, so clients can't store arbitrary image URLs.
+export const isUploadedFileUrl = (url: unknown): url is string =>
+  typeof url === "string" && url.startsWith(`${publicBaseUrl()}/uploads/`);
+
 // Presigned PUT URL; content type and length are signed, so the browser must
 // upload exactly the file it announced.
 export const createPresignedUpload = (

@@ -1,6 +1,7 @@
 "use client";
 
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { useMemo, useState } from "react";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
@@ -11,7 +12,7 @@ import AvatarGroup from "@/app/components/AvatarGroup";
 
 interface HeaderProps {
   conversation: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 

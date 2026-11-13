@@ -1,17 +1,39 @@
 import { NextResponse } from "next/server";
 
+import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
+import { isUploadedFileUrl } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+
+const MAX_MESSAGE_LENGTH = 5000;
 
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
-    const body = await request.json();
-    const { message, isCall, image, conversationId } = body;
-
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const { message, isCall, image, conversationId } = await request.json();
+
+    const conversation = await getConversationForUser(
+      conversationId,
+      currentUser.id
+    );
+    if (!conversation) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    const body = typeof message === "string" ? message.trim() : "";
+    if (body.length > MAX_MESSAGE_LENGTH) {
+      return new NextResponse("Message too long", { status: 400 });
+    }
+    if (image !== undefined && !isUploadedFileUrl(image)) {
+      return new NextResponse("Invalid image", { status: 400 });
+    }
+    if (!body && !image && !isCall) {
+      return new NextResponse("Empty message", { status: 400 });
     }
 
     const newMessage = await prisma.message.create({
@@ -20,68 +42,38 @@ export async function POST(request: Request) {
         sender: true,
       },
       data: {
-        body: message,
-        image: image,
-        isCall: isCall,
-        conversation: {
-          connect: {
-            id: conversationId,
-          },
-        },
-        sender: {
-          connect: {
-            id: currentUser.id,
-          },
-        },
-        seen: {
-          connect: {
-            id: currentUser.id,
-          },
-        },
+        body: body || undefined,
+        image,
+        isCall: isCall === true ? true : undefined,
+        conversationId: conversation.id,
+        senderId: currentUser.id,
+        seenIds: [currentUser.id],
       },
     });
 
-    const updatedConversation = await prisma.conversation.update({
-      where: {
-        id: conversationId,
-      },
-      data: {
-        lastMessageAt: new Date(),
-        messages: {
-          connect: {
-            id: newMessage.id,
-          },
-        },
-      },
-      include: {
-        users: true,
-        messages: {
-          include: {
-            seen: true,
-          },
-        },
-      },
+    const { lastMessageAt } = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: newMessage.createdAt },
+      select: { lastMessageAt: true },
     });
 
-    emitToConversation(conversationId, "messages:new", newMessage);
-    const lastMessage =
-      updatedConversation.messages[updatedConversation.messages.length - 1];
+    emitToConversation(conversation.id, "messages:new", newMessage);
 
-    if (isCall) {
-      updatedConversation.users.map((user) => {
-        if (user.email !== currentUser.email) {
-          emitToUser(user.email!, "recive-call", {
-            id: conversationId,
-            user: currentUser,
-          });
-        }
-      });
-    }
-
-    updatedConversation.users.map((user) => {
-      emitToUser(user.email!, "conversation:update", {
-        id: conversationId,
-        messages: [lastMessage],
+    conversation.users.forEach((user) => {
+      if (!user.email) {
+        return;
+      }
+      if (isCall === true && user.email !== currentUser.email) {
+        emitToUser(user.email, "recive-call", {
+          id: conversation.id,
+          user: currentUser,
+        });
+      }
+      // the new message is the conversation's last message
+      emitToUser(user.email, "conversation:update", {
+        id: conversation.id,
+        lastMessageAt,
+        messages: [newMessage],
       });
     });
 

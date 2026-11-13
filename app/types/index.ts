@@ -1,16 +1,24 @@
 import { Conversation, Message, User } from "@prisma/client";
 
+// What Prisma returns for a user: hashedPassword is omitted globally (app/libs/prismadb.ts).
+export type SafeUser = Omit<User, "hashedPassword">;
+
 export type FullMessageType = Message & {
-  sender: User;
-  seen: User[];
+  sender: SafeUser;
+  seen: SafeUser[];
 };
 
 export type FullConversationType = Conversation & {
-  users: User[];
+  users: SafeUser[];
   messages: FullMessageType[];
 };
 
-export type FullCallType = User & {
+export type ConversationWithUsers = Conversation & {
+  users: SafeUser[];
+};
+
+// Payload of the "recive-call" socket event
+export type FullCallType = {
   id: string;
-  user: User;
+  user: SafeUser;
 };

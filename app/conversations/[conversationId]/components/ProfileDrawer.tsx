@@ -3,7 +3,8 @@
 import { Fragment, useMemo, useState } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { IoClose, IoTrash } from "react-icons/io5";
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { format } from "date-fns";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
@@ -17,7 +18,7 @@ interface ProfileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   data: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 

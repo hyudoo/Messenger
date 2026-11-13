@@ -3,12 +3,12 @@
 import DesktopItem from "./DesktopItem";
 import useRoutes from "@/app/hooks/useRoutes";
 import { useState } from "react";
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import Avatar from "../Avatar";
 import SettingModal from "./SettingModal";
 
 interface DesktopSidebarProps {
-  currentUser: User;
+  currentUser: SafeUser;
 }
 
 const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ currentUser }) => {

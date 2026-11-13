@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
@@ -8,7 +9,10 @@ interface IParams {
   conversationId?: string;
 }
 
-export async function POST(request: Request, { params }: { params: Promise<IParams> }) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<IParams> }
+) {
   try {
     const currentUser = await getCurrentUser();
     const { conversationId } = await params;
@@ -17,33 +21,25 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Find existing conversation
-    const conversation = await prisma.conversation.findUnique({
-      where: {
-        id: conversationId,
-      },
-      include: {
-        messages: {
-          include: {
-            seen: true,
-          },
-        },
-        users: true,
-      },
+    const conversation = await getConversationForUser(
+      conversationId,
+      currentUser.id
+    );
+    if (!conversation) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    const lastMessage = await prisma.message.findFirst({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, seenIds: true },
     });
 
-    if (!conversation) {
-      return new NextResponse("Invalid ID", { status: 400 });
+    // nothing to mark, or already seen by this user
+    if (!lastMessage || lastMessage.seenIds.includes(currentUser.id)) {
+      return new NextResponse("Success");
     }
 
-    // Find last message
-    const lastMessage = conversation.messages[conversation.messages.length - 1];
-
-    if (!lastMessage) {
-      return NextResponse.json(conversation);
-    }
-
-    // Update seen of last message
     const updatedMessage = await prisma.message.update({
       where: {
         id: lastMessage.id,
@@ -61,19 +57,14 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
       },
     });
 
-    // Update all connection with new seen
+    // the user's own conversation list shows the message as seen
     emitToUser(currentUser.email, "conversation:update", {
-      id: conversationId,
+      id: conversation.id,
       messages: [updatedMessage],
     });
 
-    // If user has already seen the message, no need to go further
-    if (lastMessage.seenIds.indexOf(currentUser.id) !== -1) {
-      return NextResponse.json(conversation);
-    }
-
-    // Update last message seen
-    emitToConversation(conversationId!, "messages:update", updatedMessage);
+    // other members see the "seen by" list update
+    emitToConversation(conversation.id, "messages:update", updatedMessage);
 
     return new NextResponse("Success");
   } catch (error) {

@@ -4,7 +4,7 @@ import axios from "axios";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import ImageUploadButton from "../ImageUploadButton";
 
 import Input from "../inputs/Input";
@@ -16,7 +16,7 @@ import { toast } from "react-hot-toast";
 interface SettingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: User;
+  currentUser: SafeUser;
 }
 
 const SettingModal: React.FC<SettingModalProps> = ({

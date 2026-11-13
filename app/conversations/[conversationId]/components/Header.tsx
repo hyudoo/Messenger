@@ -4,7 +4,8 @@ import { HiChevronLeft } from "react-icons/hi";
 import { HiEllipsisHorizontal, HiPhone, HiVideoCamera } from "react-icons/hi2";
 import { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { Conversation, User } from "@prisma/client";
+import { Conversation } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import axios from "axios";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
@@ -17,7 +18,7 @@ import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   conversation: Conversation & {
-    users: User[];
+    users: SafeUser[];
   };
 }
 

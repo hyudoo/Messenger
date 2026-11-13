@@ -1,6 +1,6 @@
 "use client";
 
-import { User } from "@prisma/client";
+import { SafeUser } from "@/app/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MdOutlineGroupAdd } from "react-icons/md";
@@ -16,7 +16,7 @@ import RecipveCallModal from "@/app/components/modals/RecipveCallModal";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
-  users: User[];
+  users: SafeUser[];
 }
 
 const ConversationList: React.FC<ConversationListProps> = ({
@@ -26,7 +26,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCallOpen, setIsCallOpen] = useState(false);
-  const [otherUser, setOtherUser] = useState<User>();
+  const [otherUser, setOtherUser] = useState<SafeUser>();
   const [roomId, setRoomId] = useState<String>();
 
   const router = useRouter();

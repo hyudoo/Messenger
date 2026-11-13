@@ -4,11 +4,13 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import GithubProvider from "next-auth/providers/github"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import { PrismaClient } from "@prisma/client"
 
 import prisma from "@/app/libs/prismadb"
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  // the adapter's types predate client options like `omit`; at runtime it only calls CRUD methods
+  adapter: PrismaAdapter(prisma as unknown as PrismaClient),
   providers: [
     GithubProvider({
       clientId: process.env.GITHUB_ID as string,
@@ -29,10 +31,12 @@ export const authOptions: AuthOptions = {
           throw new Error('Invalid credentials');
         }
 
+        // the only query that reads hashedPassword (omitted globally)
         const user = await prisma.user.findUnique({
           where: {
             email: credentials.email
-          }
+          },
+          omit: { hashedPassword: false }
         });
 
         if (!user || !user?.hashedPassword) {
@@ -48,7 +52,8 @@ export const authOptions: AuthOptions = {
           throw new Error('Invalid credentials');
         }
 
-        return user;
+        const { hashedPassword, ...safeUser } = user;
+        return safeUser;
       }
     })
   ],

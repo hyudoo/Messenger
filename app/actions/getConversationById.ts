@@ -1,27 +1,15 @@
-import prisma from "@/app/libs/prismadb";
+import getConversationForUser from "./getConversationForUser";
 import getCurrentUser from "./getCurrentUser";
 
+// Returns null unless the signed-in user is a member of the conversation.
 const getConversationById = async (conversationId: string) => {
-  try {
-    const currentUser = await getCurrentUser();
+  const currentUser = await getCurrentUser();
 
-    if (!currentUser?.email) {
-      return null;
-    }
-
-    const conversation = await prisma.conversation.findUnique({
-      where: {
-        id: conversationId,
-      },
-      include: {
-        users: true,
-      },
-    });
-    return conversation;
-  } catch (error: any) {
-    console.log(error, "SERVER_ERROR");
+  if (!currentUser?.id) {
     return null;
   }
+
+  return getConversationForUser(conversationId, currentUser.id);
 };
 
 export default getConversationById;
