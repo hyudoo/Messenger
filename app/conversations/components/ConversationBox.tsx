@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { useSession } from "next-auth/react";
 import clsx from "clsx";
 
@@ -100,7 +100,10 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
                 className="text-xs
                 text-gray-400
                 font-light">
-                {format(new Date(lastMessage.createdAt), "p")}
+                {/* time for today's messages, date for older ones */}
+                {isToday(new Date(lastMessage.createdAt))
+                  ? format(new Date(lastMessage.createdAt), "p")
+                  : format(new Date(lastMessage.createdAt), "dd/MM/yyyy")}
               </p>
             )}
           </div>

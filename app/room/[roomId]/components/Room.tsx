@@ -4,6 +4,8 @@ import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
 import { useEffect, useRef, useMemo, useState } from "react";
 import Footer from "./Footer";
+import { toast } from "react-hot-toast";
+
 import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "next/navigation";
 import Header from "./Header";
@@ -137,8 +139,10 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
         }
       })
       .catch((err) => {
-        /* handle the error */
+        // permission denied or no camera/mic: leave instead of a silent black screen
         console.log(err);
+        toast.error("Không thể truy cập camera hoặc micro!");
+        router.push(`/conversations/${roomId}`);
       });
   };
 

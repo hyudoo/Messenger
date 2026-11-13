@@ -47,18 +47,30 @@ const ConversationList: React.FC<ConversationListProps> = ({
       });
     };
 
-    const updateHandler = (conversation: FullConversationType) => {
-      setItems((current) =>
-        current.map((currentConversation) => {
-          if (currentConversation.id === conversation.id) {
-            return {
-              ...currentConversation,
-              messages: conversation.messages,
-            };
-          }
-          return currentConversation;
-        })
-      );
+    // A new message also carries lastMessageAt: that conversation moves to the top.
+    // "Seen" updates don't, so the order stays put.
+    const updateHandler = (
+      conversation: Pick<FullConversationType, "id" | "messages"> & {
+        lastMessageAt?: string;
+      }
+    ) => {
+      setItems((current) => {
+        const target = current.find((item) => item.id === conversation.id);
+        if (!target) {
+          return current;
+        }
+        const updated = {
+          ...target,
+          messages: conversation.messages,
+          ...(conversation.lastMessageAt && {
+            lastMessageAt: new Date(conversation.lastMessageAt),
+          }),
+        };
+        if (!conversation.lastMessageAt) {
+          return current.map((item) => (item.id === updated.id ? updated : item));
+        }
+        return [updated, ...current.filter((item) => item.id !== updated.id)];
+      });
     };
 
     const removeHandler = (conversation: FullConversationType) => {
