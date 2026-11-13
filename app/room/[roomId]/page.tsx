@@ -6,13 +6,14 @@ interface IParams {
   roomId: string;
 }
 
-const RoomId = async ({ params }: { params: IParams }) => {
-  const conversation = await getConversationById(params.roomId);
+const RoomId = async ({ params }: { params: Promise<IParams> }) => {
+  const { roomId } = await params;
+  const conversation = await getConversationById(roomId);
   const user = await getCurrentUser();
 
   return (
     <div className="h-full w-full">
-      <Room roomId={params.roomId} conversation={conversation!} user={user!} />
+      <Room roomId={roomId} conversation={conversation!} user={user!} />
     </div>
   );
 };

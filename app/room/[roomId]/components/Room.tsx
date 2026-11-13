@@ -43,8 +43,8 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
   const host = useRef(false);
 
   // Webrtc refs
-  const rtcConnection = useRef<RTCPeerConnection | null>();
-  const userStream = useRef<MediaStream>();
+  const rtcConnection = useRef<RTCPeerConnection | null>(null);
+  const userStream = useRef<MediaStream | undefined>(undefined);
 
   const userVideo = useRef<HTMLVideoElement>(null);
   const partnerVideo = useRef<HTMLVideoElement>(null);

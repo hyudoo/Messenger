@@ -9,19 +9,13 @@ const s3PublicHost = process.env.NEXT_PUBLIC_S3_PUBLIC_URL
   : null;
 
 const nextConfig = {
-  experimental: {
-    appDir: true,
-    swcPlugins: [["next-superjson-plugin", {}]],
-  },
+  serverExternalPackages: ["bcrypt"],
   images: {
-    domains: ["avatars.githubusercontent.com", "lh3.googleusercontent.com"],
-    remotePatterns: s3PublicHost
-      ? [{ protocol: "https", hostname: s3PublicHost }]
-      : [],
-  },
-  webpack: (config) => {
-    config.externals = [...config.externals, "bcrypt"];
-    return config;
+    remotePatterns: [
+      ...(s3PublicHost ? [{ protocol: "https", hostname: s3PublicHost }] : []),
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
+      { protocol: "https", hostname: "lh3.googleusercontent.com" },
+    ],
   },
 };
 
