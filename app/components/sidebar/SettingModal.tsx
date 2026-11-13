@@ -3,7 +3,7 @@
 import axios from "axios";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
+import { FieldValues, SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { SafeUser } from "@/app/types";
 import ImageUploadButton from "../ImageUploadButton";
 
@@ -31,7 +31,7 @@ const SettingModal: React.FC<SettingModalProps> = ({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FieldValues>({
     defaultValues: {
@@ -40,7 +40,7 @@ const SettingModal: React.FC<SettingModalProps> = ({
     },
   });
 
-  const image = watch("image");
+  const image = useWatch({ control, name: "image" });
 
   const handleUpload = (url: string) => {
     setValue("image", url, {
