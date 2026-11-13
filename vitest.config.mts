@@ -23,5 +23,8 @@ export default defineConfig({
     },
     // socket tests open real servers and connections
     testTimeout: 15_000,
+    // next-intl's ESM imports "next/server" without an extension, which Node can't
+    // resolve (next has no exports map); let Vite transform and resolve it instead
+    server: { deps: { inline: ["next-intl"] } },
   },
 });

@@ -1,3 +1,8 @@
+const createNextIntlPlugin = require("next-intl/plugin");
+
+// loads i18n/request.ts (locale + messages for each request)
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+
 /** @type {import('next').NextConfig} */
 
 // Host serving uploads: NEXT_PUBLIC_S3_PUBLIC_URL (e.g. CloudFront) or the bucket's
@@ -19,4 +24,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withNextIntl(nextConfig);

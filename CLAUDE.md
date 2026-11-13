@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npx prisma db push` — sync `prisma/schema.prisma` to MongoDB, including its `@@index`es (no migrations; MongoDB provider)
 - `npx prisma generate` — regenerate the client (also runs on `postinstall`)
 
-Tests live in `tests/`: `unit/` (libs), `api/` (route handlers called directly, with Prisma, `getCurrentUser`, socket emits and S3 calls mocked; `tests/helpers.ts` has the Prisma mock and fixtures), `socket/` (a real socket.io server from `initSocketServer` on a random port, real `socket.io-client`s; only `getToken` and Prisma are mocked). Tests needing Redis are skipped unless `TEST_REDIS_URL` is set: `docker run --rm -p 6390:6379 redis:7-alpine`, then `TEST_REDIS_URL=redis://localhost:6390 npm test`. Test env vars (fake AWS, bucket) are in `vitest.config.mts`. Vitest stays on 3.x: Vitest 5 fails every file with "Cannot read properties of undefined (reading 'config')" when the shell reports the drive as `e:\` instead of `E:\`, which is how this workspace opens.
+Tests live in `tests/`: `unit/` (libs, `proxy.ts`, message-file parity and the theme init script), `api/` (route handlers called directly, with Prisma, `getCurrentUser`, socket emits and S3 calls mocked; `tests/helpers.ts` has the Prisma mock and fixtures), `socket/` (a real socket.io server from `initSocketServer` on a random port, real `socket.io-client`s; only `getToken` and Prisma are mocked). Tests needing Redis are skipped unless `TEST_REDIS_URL` is set: `docker run --rm -p 6390:6379 redis:7-alpine`, then `TEST_REDIS_URL=redis://localhost:6390 npm test`. Test env vars (fake AWS, bucket) are in `vitest.config.mts`, which also inlines `next-intl` (its ESM imports `next/server` without an extension, which Node can't resolve). Vitest stays on 3.x: Vitest 5 fails every file with "Cannot read properties of undefined (reading 'config')" when the shell reports the drive as `e:\` instead of `E:\`, which is how this workspace opens.
 
 Both `package-lock.json` and `yarn.lock` are committed (npm keeps both in sync).
 
@@ -23,6 +23,18 @@ Copy `.env.example` to `.env`: `DATABASE_URL` (MongoDB), `NEXTAUTH_SECRET`, AWS 
 ## Architecture
 
 Next.js 16 App Router messenger app (React 19), TypeScript, Tailwind 3, Prisma 6 + MongoDB, NextAuth v4, socket.io for realtime, WebRTC for 1:1 video calls, S3 for uploads. UI strings are partly in Vietnamese. Path alias `@/*` maps to the repo root.
+
+**i18n (next-intl, same setup as the portfolio CMS)**
+- Locales `vi` (default) and `en`; URLs are always prefixed (`/vi/conversations`). `i18n/routing.ts`, `i18n/request.ts` (loads `i18n/messages/<locale>.json`), `i18n/navigation.ts`. Every page lives under `app/[locale]/`, whose `layout.tsx` is the root layout (`<html lang>`, providers). `app/api` and the shared folders (`components`, `hooks`, `libs`, `actions`…) stay outside `[locale]`.
+- **Every visible string goes through `t()`** and into both `vi.json` and `en.json` (same keys, same ICU placeholders — `tests/unit/i18n-theme.test.ts` enforces it; plurals as `{count, plural, one {# member} other {# members}}`). `global.d.ts` types `t()` keys from `vi.json`, so a missing key fails `tsc`. Client: `useTranslations("ns")`; server: `getTranslations`. Libs return codes, not text (`validatePassword` → `auth.password_rules.<code>`, `UploadError.code` → `upload.<code>`).
+- **Navigation:** use `Link`, `useRouter`, `usePathname`, `redirect` from `@/i18n/navigation`, never `next/link` / `next/navigation` (they drop the locale). `usePathname()` returns the path without the locale. `useParams` from `next/navigation` is fine.
+- Dates: `format(date, "p", { locale: useDateLocale() })` (`app/hooks/useDateLocale.ts`).
+- `proxy.ts` runs the next-intl middleware and, for `/conversations`, `/users`, `/room`, checks the NextAuth JWT (`getToken`) and redirects signed-out users to `/<locale>` (the login page). Its matcher skips `api`, `socket.io`, `_next` and files.
+- The language is switched by `LanguageToggle` (sidebar, mobile footer, login page) and in the settings modal; next-intl remembers it in the `NEXT_LOCALE` cookie.
+
+**Theme (dark mode, same provider as the portfolio FE/CMS)**
+- `app/components/providers/ThemeProvider.tsx`: `light` / `dark` / `system` (default), stored in `localStorage.theme`, applied as the `dark` class on `<html>` (Tailwind `darkMode: "class"`). `THEME_INIT_SCRIPT` runs in `<head>` before paint so dark users get no light flash — keep it in the `[locale]` layout. `ThemeToggle` flips light/dark; the settings modal offers all three.
+- Colors are tokens (CSS variables in `app/globals.css`, light in `:root`, dark in `.dark`; wired in `tailwind.config.js`): `bg-background`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border` (also the default for plain `border`), `ring-input`. **Use tokens, not raw grays/white/black**, so both themes work; brand colors (sky, rose, green, purple) are fine. The call screen (`app/[locale]/room`) is always dark (video) and keeps raw colors. react-select (`Select.tsx`) and toasts (`ToasterContext`) are themed explicitly.
 
 Next 15/16 rules that bite here: `params` in pages and route handlers is a `Promise` (`const { id } = await params`); route files may only export handlers/config, so shared values such as `authOptions` live in `app/libs/`; route protection is `proxy.ts` (Next 16's name for middleware); `useRef` needs an initial value under React 19 types; with react-hook-form use `useWatch({ control, name })`, not `watch()` (the React Compiler lint rule flags it).
 
@@ -40,7 +52,7 @@ Next 15/16 rules that bite here: `params` in pages and route handlers is a `Prom
 
 **Auth**
 - `authOptions` lives in `app/libs/auth.ts` (GitHub, Google, Credentials with bcrypt; JWT sessions; Prisma adapter, cast because its types predate Prisma's `omit`); `app/api/auth/[...nextauth]/route.ts` only wraps it. `bcrypt` is listed in `serverExternalPackages`.
-- `proxy.ts` (`withAuth` from next-auth) protects `/conversations`, `/users`, `/room`; unauthenticated users go to `/` (the `(site)` route group with `AuthForm`).
+- `proxy.ts` protects `/conversations`, `/users`, `/room` (see i18n above); unauthenticated users go to `/<locale>`, the `(site)` route group with `AuthForm`.
 - Socket connections are authenticated in `server/socket.ts` by decoding the NextAuth session cookie with `getToken` (`token.email`, `token.sub` = user id).
 
 **Realtime (socket.io)**
@@ -52,9 +64,9 @@ Next 15/16 rules that bite here: `params` in pages and route handlers is a `Prom
 - Presence: `presence:online` is sent on every connection (clients add idempotently, so concurrent tabs can't race) and `presence:offline` once `fetchSockets` finds no socket left for that user; `presence:list` on connect. They carry emails into the zustand store `useActiveList`; components read it through `useIsActive(email)` so only the affected avatar re-renders.
 
 **Video calls**
-- Starting a call (`conversations/[conversationId]/components/Header.tsx`) posts a message with `isCall: true` to `/api/messages`, which also emits `call:incoming` to the other participants. Accepting navigates to `/room/<conversationId>` (room id == conversation id).
+- Starting a call (`app/[locale]/conversations/[conversationId]/components/Header.tsx`) posts a message with `isCall: true` to `/api/messages`, which also emits `call:incoming` to the other participants. Accepting navigates to `/room/<conversationId>` (room id == conversation id).
 - `call:join` (with ack) admits at most 2 conversation members and picks the host: the socket stamps itself (strictly increasing `nextJoinStamp`, not raw `Date.now()` — ties made both peers host), joins and snapshots the room in one synchronous step, then ranks peers by stamp. Keep those three steps free of `await`. Signalling events `call:ready`, `call:offer`, `call:answer`, `call:ice-candidate` are relayed as-is to the other peer; `call:leave` or a disconnect sends `call:peer-left`.
-- `app/room/[roomId]/components/Room.tsx` does peer-to-peer WebRTC. Its socket listeners are registered once per room and call the latest handlers through `handlersRef` (filled in a `useLayoutEffect`), so the effect depends on `roomId` only — don't add the handlers to its deps.
+- `app/[locale]/room/[roomId]/components/Room.tsx` does peer-to-peer WebRTC. Its socket listeners are registered once per room and call the latest handlers through `handlersRef` (filled in a `useLayoutEffect`), so the effect depends on `roomId` only — don't add the handlers to its deps.
 - ICE servers come from `getIceServers(userId)` (`app/libs/ice-servers.ts`), passed in by the room page: STUN, plus TURN when `TURN_URLS` and `TURN_SECRET` are set, with short-lived credentials in coturn's `use-auth-secret` scheme (no static TURN password in the browser).
 
 **Uploads (S3)**

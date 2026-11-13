@@ -2,7 +2,8 @@
 
 import axios from "axios";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { FieldValues, SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { SafeUser } from "@/app/types";
 
@@ -23,6 +24,7 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
   onClose,
   users = [],
 }) => {
+  const t = useTranslations();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const {
@@ -51,30 +53,30 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
         router.refresh();
         onClose();
       })
-      .catch(() => toast.error("Có lỗi xảy ra!"))
+      .catch(() => toast.error(t("common.error")))
       .finally(() => setIsLoading(false));
   };
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-12">
-          <div className="border-b border-gray-900/10 pb-12">
+          <div className="border-b border-border pb-12">
             <h2
               className="
                  text-base
                  font-semibold
                  leading-7
-                 text-gray-900
+                 text-foreground
                  ">
-              Tạo nhóm chat mới
+              {t("group.title")}
             </h2>
-            <p className="mt-1 text-sm leading-6 text-gray-600">
-              Tạo cuộc trò chuyện với nhiều hơn hai người
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {t("group.description")}
             </p>
             <div className="mt-10 flex flex-col gap-y-8">
               <Input
                 disabled={isLoading}
-                label="Tên nhóm"
+                label={t("group.name")}
                 id="name"
                 errors={errors}
                 required
@@ -82,7 +84,7 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
               />
               <Select
                 disabled={isLoading}
-                label="Thành viên"
+                label={t("group.members")}
                 options={users.map((user) => ({
                   value: user.id,
                   label: user.name,
@@ -103,10 +105,10 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
             onClick={onClose}
             type="button"
             secondary>
-            Hủy
+            {t("common.cancel")}
           </Button>
           <Button disabled={isLoading} type="submit">
-            Tạo
+            {t("common.create")}
           </Button>
         </div>
       </form>

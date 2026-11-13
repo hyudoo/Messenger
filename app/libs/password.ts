@@ -1,24 +1,33 @@
 // Password rules shared by the register form and /api/register.
-// Returns the first broken rule as a message, or null when the password is valid.
-export const validatePassword = (password: unknown): string | null => {
+// Returns the first broken rule as a code (shown through auth.password_rules.<code>),
+// or null when the password is valid.
+export type PasswordError =
+  | "too_short"
+  | "too_long"
+  | "no_lowercase"
+  | "no_uppercase"
+  | "no_digit"
+  | "no_special";
+
+export const validatePassword = (password: unknown): PasswordError | null => {
   if (typeof password !== "string" || password.length < 8) {
-    return "Mật khẩu quá ngắn!";
+    return "too_short";
   }
   if (password.length > 72) {
     // bcrypt ignores everything after 72 bytes
-    return "Mật khẩu tối đa 72 ký tự!";
+    return "too_long";
   }
   if (!/[a-z]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất một chữ cái viết thường!";
+    return "no_lowercase";
   }
   if (!/[A-Z]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất một chữ cái viết hoa";
+    return "no_uppercase";
   }
   if (!/\d/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất một số";
+    return "no_digit";
   }
   if (!/[\W_]/.test(password)) {
-    return "Mật khẩu phải chứa ít nhất một ký tự đặc biệt";
+    return "no_special";
   }
   return null;
 };

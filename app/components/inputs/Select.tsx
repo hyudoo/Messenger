@@ -1,6 +1,7 @@
 "use client";
 
 import ReactSelect from "react-select";
+import { useTranslations } from "next-intl";
 
 interface SelectProps {
   label: string;
@@ -17,6 +18,8 @@ const Select: React.FC<SelectProps> = ({
   options,
   disabled,
 }) => {
+  const t = useTranslations("common");
+
   return (
     <div className="z-[100]">
       <label
@@ -25,7 +28,7 @@ const Select: React.FC<SelectProps> = ({
              text-sm
              font-medium
              leading-6
-             text-gray-900">
+             text-foreground">
         {label}
       </label>
       <div className="mt-2">
@@ -34,13 +37,23 @@ const Select: React.FC<SelectProps> = ({
           value={value}
           onChange={onChange}
           isMulti
+          placeholder={t("select_placeholder")}
+          noOptionsMessage={() => t("no_options")}
           options={options}
           menuPortalTarget={document.body}
           styles={{
             menuPortal: (base) => ({ ...base, zIndex: 9999 }),
           }}
+          // theme tokens, so the menu and chips follow light / dark mode
           classNames={{
-            control: () => "text-sm",
+            control: () => "text-sm !bg-background !border-input",
+            menu: () => "!bg-background border border-border",
+            option: ({ isFocused }) =>
+              isFocused ? "!bg-muted !text-foreground" : "!bg-background !text-foreground",
+            multiValue: () => "!bg-muted",
+            multiValueLabel: () => "!text-foreground",
+            input: () => "!text-foreground",
+            placeholder: () => "!text-muted-foreground",
           }}
         />
       </div>

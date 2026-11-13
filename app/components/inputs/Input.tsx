@@ -31,7 +31,7 @@ const Input: React.FC<InputProps> = ({
           text-sm 
           font-medium 
           leading-6 
-          text-gray-900
+          text-foreground
         ">
         {label}
       </label>
@@ -45,17 +45,18 @@ const Input: React.FC<InputProps> = ({
           className={clsx(
             `
             form-input
+            bg-background
             block 
             w-full 
             rounded-md 
             border-0 
             py-1.5 
-            text-gray-900 
+            text-foreground 
             shadow-sm 
             ring-1 
             ring-inset 
-            ring-gray-300 
-            placeholder:text-gray-400 
+            ring-input 
+            placeholder:text-muted-foreground 
             focus:ring-2 
             focus:ring-inset 
             focus:ring-sky-600 

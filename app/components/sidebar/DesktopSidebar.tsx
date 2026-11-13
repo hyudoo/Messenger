@@ -6,12 +6,16 @@ import { useState } from "react";
 import { SafeUser } from "@/app/types";
 import Avatar from "../Avatar";
 import SettingModal from "./SettingModal";
+import LanguageToggle from "../toggles/LanguageToggle";
+import ThemeToggle from "../toggles/ThemeToggle";
+import { useTranslations } from "next-intl";
 
 interface DesktopSidebarProps {
   currentUser: SafeUser;
 }
 
 const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ currentUser }) => {
+  const t = useTranslations("nav");
   const routes = useRoutes();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -21,7 +25,7 @@ const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ currentUser }) => {
         currentUser={currentUser}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-      />{" "}
+      />
       <div
         className="
             hidden
@@ -32,7 +36,7 @@ const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ currentUser }) => {
             lg:w-20
             xl:px-6
             lg:overflow-y-auto
-            lg:bg-white
+            lg:bg-background
             lg:border-r-[1px]
             lg:pb-4
             lg:flex
@@ -53,12 +57,17 @@ const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ currentUser }) => {
             ))}
           </ul>
         </nav>
-        <nav className="mt-4 flex flex-col justify-between items-center">
-          <div
+        <nav className="mt-4 flex flex-col justify-between items-center gap-3">
+          <LanguageToggle />
+          <ThemeToggle />
+          <button
+            type="button"
             onClick={() => setIsOpen(true)}
+            aria-label={t("settings")}
+            title={t("settings")}
             className="cursor-pointer hover:opacity-75 transition">
             <Avatar user={currentUser} />
-          </div>
+          </button>
         </nav>
       </div>
     </>

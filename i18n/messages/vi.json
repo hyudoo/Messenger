@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "description": "Nhắn tin và gọi video theo thời gian thực"
+  },
+  "common": {
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "create": "Tạo",
+    "delete": "Xoá",
+    "close": "Đóng",
+    "loading": "Đang tải...",
+    "error": "Có lỗi xảy ra!",
+    "avatar": "Ảnh đại diện",
+    "image": "Hình ảnh",
+    "online": "Đang hoạt động",
+    "offline": "Ngoại tuyến",
+    "members": "{count} thành viên",
+    "select_placeholder": "Chọn...",
+    "no_options": "Không có lựa chọn"
+  },
+  "theme": {
+    "toggle": "Đổi giao diện sáng / tối",
+    "light": "Sáng",
+    "dark": "Tối",
+    "system": "Theo hệ thống"
+  },
+  "language": {
+    "toggle": "Chuyển sang tiếng Anh",
+    "vi": "Tiếng Việt",
+    "en": "English"
+  },
+  "nav": {
+    "chat": "Trò chuyện",
+    "users": "Mọi người",
+    "logout": "Đăng xuất",
+    "settings": "Cài đặt"
+  },
+  "auth": {
+    "title": "Đăng nhập vào tài khoản",
+    "name": "Họ và tên",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "repassword": "Nhập lại mật khẩu",
+    "login": "Đăng nhập",
+    "register": "Đăng ký",
+    "or_continue_with": "Hoặc đăng nhập với",
+    "no_account": "Chưa có tài khoản?",
+    "have_account": "Đã có tài khoản?",
+    "create_account": "Tạo tài khoản mới",
+    "login_success": "Đăng nhập thành công!",
+    "login_failed": "Đăng nhập không thành công!",
+    "login_too_many": "Bạn đăng nhập sai quá nhiều lần, thử lại sau 15 phút!",
+    "register_failed": "Đăng ký tài khoản không thành công!",
+    "register_too_many": "Bạn đăng ký quá nhiều lần, thử lại sau ít phút!",
+    "email_taken": "Email đã được sử dụng!",
+    "password_mismatch": "Mật khẩu nhập lại chưa đúng!",
+    "password_rules": {
+      "too_short": "Mật khẩu quá ngắn!",
+      "too_long": "Mật khẩu tối đa 72 ký tự!",
+      "no_lowercase": "Mật khẩu phải chứa ít nhất một chữ cái viết thường!",
+      "no_uppercase": "Mật khẩu phải chứa ít nhất một chữ cái viết hoa",
+      "no_digit": "Mật khẩu phải chứa ít nhất một số",
+      "no_special": "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
+    }
+  },
+  "conversations": {
+    "title": "Hộp thư",
+    "new_group": "Tạo nhóm chat",
+    "empty": "Chọn một cuộc trò chuyện hoặc bắt đầu một cuộc trò chuyện mới.",
+    "last_image": "Đã gửi một hình ảnh.",
+    "last_call": "Cuộc trò chuyện bằng video",
+    "no_messages": "Bắt đầu cuộc trò chuyện."
+  },
+  "chat": {
+    "placeholder": "Nhập tin nhắn",
+    "send": "Gửi",
+    "attach_image": "Gửi ảnh",
+    "back": "Quay lại hộp thư",
+    "video_call": "Gọi video",
+    "details": "Thông tin cuộc trò chuyện",
+    "load_older": "Xem tin nhắn cũ hơn",
+    "load_older_failed": "Không tải được tin nhắn cũ hơn!",
+    "send_failed": "Gửi tin nhắn không thành công!",
+    "send_too_fast": "Bạn gửi tin quá nhanh, chờ vài giây rồi thử lại!",
+    "seen_by": "{names} đã xem.",
+    "outgoing_call": "Cuộc gọi đi",
+    "incoming_call": "Cuộc gọi đến"
+  },
+  "profile": {
+    "close": "Đóng bảng thông tin",
+    "delete": "Xoá",
+    "email": "Email",
+    "emails": "Email",
+    "joined": "Tham gia"
+  },
+  "confirm_delete": {
+    "title": "Xoá cuộc trò chuyện",
+    "description": "Bạn có chắc chắn muốn xoá cuộc trò chuyện này? Hành động này không thể khôi phục."
+  },
+  "group": {
+    "title": "Tạo nhóm chat mới",
+    "description": "Tạo cuộc trò chuyện với nhiều hơn hai người",
+    "name": "Tên nhóm",
+    "members": "Thành viên"
+  },
+  "users": {
+    "title": "Mọi người"
+  },
+  "settings": {
+    "profile_title": "Hồ sơ",
+    "profile_description": "Chỉnh sửa thông tin cá nhân.",
+    "name": "Họ và tên",
+    "photo": "Ảnh đại diện",
+    "change_photo": "Thay đổi",
+    "appearance_title": "Giao diện",
+    "appearance_description": "Áp dụng ngay trên trình duyệt này.",
+    "theme": "Chế độ màu",
+    "language": "Ngôn ngữ"
+  },
+  "upload": {
+    "unsupported_type": "Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP",
+    "too_large": "Ảnh tối đa 10MB",
+    "too_many": "Bạn tải ảnh lên quá nhiều, thử lại sau ít phút",
+    "failed": "Tải ảnh lên thất bại"
+  },
+  "call": {
+    "is_calling": "đang gọi cho bạn.",
+    "hint": "Cuộc gọi sẽ bắt đầu ngay sau khi bạn chấp nhận",
+    "decline": "Từ chối",
+    "accept": "Chấp nhận",
+    "media_error": "Không thể truy cập camera hoặc micro!",
+    "camera_off": "Tắt camera",
+    "camera_on": "Bật camera",
+    "mic_off": "Tắt micro",
+    "mic_on": "Bật micro",
+    "leave": "Rời cuộc gọi"
+  }
+}

@@ -39,3 +39,6 @@ next-env.d.ts
 .claude/
 
 note/
+
+# Playwright MCP screenshots / snapshots
+.playwright-mcp/

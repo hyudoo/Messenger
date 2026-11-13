@@ -2,12 +2,14 @@
 
 import { SafeUser } from "@/app/types";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 
 interface AvatarGroupProps {
   users?: SafeUser[];
 }
 
 const AvatarGroup: React.FC<AvatarGroupProps> = ({ users = [] }) => {
+  const t = useTranslations("common");
   const slicedUser = users.slice(0, 3);
   const positionMap = {
     0: "top-0 left-[12px]",
@@ -29,7 +31,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({ users = [] }) => {
           <Image
             fill
             src={user?.image || "/images/placeholder.jpg"}
-            alt="Avatar"
+            alt={t("avatar")}
           />
         </div>
       ))}
