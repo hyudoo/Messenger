@@ -57,7 +57,7 @@ const Form = () => {
       className="
     py-4
     px-4
-    bg-white
+    bg-background
     border-t
     flex
     items-center

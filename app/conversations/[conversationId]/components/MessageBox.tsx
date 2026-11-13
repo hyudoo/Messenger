@@ -32,7 +32,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
   const body = clsx("flex flex-col gap-2", isOwn && "items-end");
   const message = clsx(
     "text-sm w-fit overflow-hidden",
-    isOwn ? "bg-sky-500 text-white" : "bg-gray-100",
+    isOwn ? "bg-sky-500 text-white" : "bg-muted",
     data.image ? "rounded-md p-0" : "rounded-full py-2 px-3"
   );
 
@@ -43,8 +43,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
       </div>
       <div className={body}>
         <div className="flex items-center gap-1">
-          <div className="text-sm text-gray-500">{data.sender.name}</div>
-          <div className="text-xs text-gray-400">
+          <div className="text-sm text-muted-foreground">{data.sender.name}</div>
+          <div className="text-xs text-muted-foreground">
             {format(new Date(data.createdAt), "p")}
           </div>
         </div>
@@ -82,7 +82,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
           )}
           {data.isCall && !isOwn && (
             <div className="flex gap-3">
-              <div className="bg-gray-300 p-1 rounded-full">
+              <div className="bg-muted-foreground p-1 rounded-full">
                 <HiPhoneArrowDownLeft size={10} className="text-white" />
               </div>
               Cuộc gọi đến
@@ -94,7 +94,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
             className="
            text-xs
            font-light
-           text-gray-500">
+           text-muted-foreground">
             {`${seenList} đã xem.`}
           </div>
         )}

@@ -136,7 +136,7 @@ const Body: React.FC<BodyProps> = ({
             type="button"
             onClick={loadOlder}
             disabled={isLoadingOlder}
-            className="text-xs text-gray-500 hover:underline disabled:opacity-50">
+            className="text-xs text-muted-foreground hover:underline disabled:opacity-50">
             {isLoadingOlder ? "Đang tải..." : "Xem tin nhắn cũ hơn"}
           </button>
         </div>

@@ -64,11 +64,11 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose }) => {
         ">
           <DialogTitle
             as="h3"
-            className="text-base font-semibold leading-6 text-gray-900">
+            className="text-base font-semibold leading-6 text-foreground">
             Xoá cuộc trò chuyện
           </DialogTitle>
           <div className="mt-2">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Bạn có chắc chắn muốn xoá cuộc trò chuyện này? Hành động này không
               thể khôi phục.
             </p>

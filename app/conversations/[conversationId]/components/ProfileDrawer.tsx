@@ -76,13 +76,13 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                   leaveFrom="translate-x-0"
                   leaveTo="translate-x-full">
                   <DialogPanel className="pointer-events-auto w-screen max-w-md">
-                    <div className="flex h-full flex-col overflow-y-scroll bg-white py-6 shadow-xl">
+                    <div className="flex h-full flex-col overflow-y-scroll bg-background py-6 shadow-xl">
                       <div className="px-4 sm:px-6">
                         <div className="flex items-start justify-end">
                           <div className="ml-3 flex h-7 items-center">
                             <button
                               type="button"
-                              className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
+                              className="rounded-md bg-background text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2"
                               onClick={onClose}>
                               <span className="sr-only">Close panel</span>
                               <IoClose size={24} aria-hidden="true" />
@@ -100,17 +100,17 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                             )}
                           </div>
                           <div>{title}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             {statusText}
                           </div>
                           <div className="flex gap-10 my-8">
                             <div
                               onClick={() => setConfirmOpen(true)}
                               className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75">
-                              <div className="w-10 h-10 bg-neutral-100 rounded-full flex items-center justify-center">
+                              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
                                 <IoTrash size={20} />
                               </div>
-                              <div className="text-sm font-light text-neutral-600">
+                              <div className="text-sm font-light text-muted-foreground">
                                 Xoá
                               </div>
                             </div>
@@ -122,7 +122,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                   <dt
                                     className="text-sm
                                      font-medium
-                                     text-gray-500
+                                     text-muted-foreground
                                      sm:w-40
                                      sm:flex-shrink-0">
                                     Emails
@@ -131,7 +131,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                     className="
                                    mt-1
                                    text-sm
-                                   text-gray-900
+                                   text-foreground
                                    sm:col-span-2">
                                     {data.users
                                       .map((user) => user.email)
@@ -144,7 +144,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                   <dt
                                     className="text-sm
                                    font-medium
-                                   text-gray-500
+                                   text-muted-foreground
                                    sm:w-40
                                    sm:flex-shrink-0">
                                     Email
@@ -152,7 +152,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                   <dd
                                     className="mt-1
                                     text-sm
-                                    text-gray-900
+                                    text-foreground
                                     sm:col-span-2">
                                     {otherUser.email}
                                   </dd>
@@ -162,14 +162,14 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                 <>
                                   <hr />
                                   <div>
-                                    <dt className="text-sm font-medium text-gray-500 sm:w-40 sm:flex-shrink-0">
+                                    <dt className="text-sm font-medium text-muted-foreground sm:w-40 sm:flex-shrink-0">
                                       Joined
                                     </dt>
                                     <dd
                                       className="
                                      mt-1
                                      text-sm
-                                     text-gray-900
+                                     text-foreground
                                      sm:col-span-2">
                                       <time dateTime={joinedDate}>
                                         {joinedDate}

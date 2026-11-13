@@ -3,6 +3,7 @@
 import useRoutes from "@/app/hooks/useRoutes";
 import useConversation from "@/app/hooks/useConversation";
 import MobileItem from "./MobileItem";
+import ThemeToggle from "../toggles/ThemeToggle";
 
 const MobileFooter = () => {
   const routes = useRoutes();
@@ -22,7 +23,7 @@ const MobileFooter = () => {
             z-10
             flex
             items-center
-            bg-white
+            bg-background
             border-t-[1px]
             lg:hidden
         ">
@@ -35,6 +36,9 @@ const MobileFooter = () => {
           onClick={route.onclick}
         />
       ))}
+      <div className="flex shrink-0 px-3">
+        <ThemeToggle />
+      </div>
     </div>
   );
 };

@@ -35,7 +35,7 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
         <h3 className="mt-3 font-bold text-2xl text-center">
           đang gọi cho bạn.
         </h3>
-        <p className="mt-2 mb-5 text-sm leading-6 text-gray-600">
+        <p className="mt-2 mb-5 text-sm leading-6 text-muted-foreground">
           Cuộc gọi sẽ bắt đầu ngay sau khi bạn chấp nhận
         </p>
         <div>

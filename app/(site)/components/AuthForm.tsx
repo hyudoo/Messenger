@@ -135,7 +135,7 @@ const AuthForm = () => {
 
   return (
     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+      <div className="bg-background py-8 px-4 shadow sm:rounded-lg sm:px-10">
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {variant === "REGISTER" && (
             <Input
@@ -194,10 +194,10 @@ const AuthForm = () => {
               flex
               items-center
              ">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">
+              <span className="bg-background px-2 text-muted-foreground">
                 Hoặc đăng nhập với
               </span>
             </div>
@@ -222,7 +222,7 @@ const AuthForm = () => {
             text-sm
             mt-6
             px-2
-            text-gray-500
+            text-muted-foreground
           ">
           <div>
             {variant === "LOGIN" ? "Chưa có tài khoản?" : "Đã có tài khoản?"}

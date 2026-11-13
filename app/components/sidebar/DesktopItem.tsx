@@ -34,11 +34,11 @@ const DesktopItem: React.FC<DesktopItemProps> = ({
         text-sm
         leading-6
         font-semibold
-        text-gray-500
-        hover:text-black
-        hover:bg-gray-100
+        text-muted-foreground
+        hover:text-foreground
+        hover:bg-muted
         `,
-          active && "bg-gray-100 text-black"
+          active && "bg-muted text-foreground"
         )}>
         <Icon className="h-6 w-6 shrink-0" aria-hidden="true" />
         <span className="sr-only">{label}</span>
