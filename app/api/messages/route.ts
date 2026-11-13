@@ -35,7 +35,8 @@ export async function POST(request: Request) {
     if (body.length > MAX_MESSAGE_LENGTH) {
       return new NextResponse("Message too long", { status: 400 });
     }
-    if (image !== undefined && !isUploadedFileUrl(image)) {
+    // only the sender's own uploads
+    if (image !== undefined && !isUploadedFileUrl(image, currentUser.id)) {
       return new NextResponse("Invalid image", { status: 400 });
     }
     if (!body && !image && !isCall) {

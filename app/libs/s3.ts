@@ -1,4 +1,8 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectsCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const region = process.env.AWS_REGION!;
@@ -15,9 +19,43 @@ const publicBaseUrl = () =>
 
 export const publicUrlFor = (key: string) => `${publicBaseUrl()}/${key}`;
 
-// True for URLs produced by /api/uploads, so clients can't store arbitrary image URLs.
-export const isUploadedFileUrl = (url: unknown): url is string =>
-  typeof url === "string" && url.startsWith(`${publicBaseUrl()}/uploads/`);
+// Exactly the keys /api/uploads creates: uploads/<userId>/<uuid>.<ext>
+const UPLOAD_KEY =
+  /^uploads\/([a-f\d]{24})\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.(jpg|png|gif|webp)$/;
+
+const uploadKeyOf = (url: unknown) => {
+  const prefix = `${publicBaseUrl()}/`;
+  if (typeof url !== "string" || !url.startsWith(prefix)) {
+    return null;
+  }
+  const key = url.slice(prefix.length);
+  const match = UPLOAD_KEY.exec(key);
+  return match ? { key, ownerId: match[1] } : null;
+};
+
+// True for URLs produced by /api/uploads for `ownerId`, so clients can store neither
+// arbitrary image URLs nor someone else's upload (which a later cleanup would delete).
+export const isUploadedFileUrl = (url: unknown, ownerId: string): url is string =>
+  uploadKeyOf(url)?.ownerId === ownerId;
+
+// Deletes the S3 objects behind these URLs; anything not from /api/uploads is ignored.
+export const deleteUploadedObjects = async (urls: string[]) => {
+  const keys = Array.from(
+    new Set(urls.map((url) => uploadKeyOf(url)?.key).filter((key): key is string => !!key))
+  );
+  // DeleteObjects takes at most 1000 keys per request
+  for (let i = 0; i < keys.length; i += 1000) {
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: {
+          Objects: keys.slice(i, i + 1000).map((Key) => ({ Key })),
+          Quiet: true,
+        },
+      })
+    );
+  }
+};
 
 // Presigned PUT URL; content type and length are signed, so the browser must
 // upload exactly the file it announced.

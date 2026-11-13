@@ -4,6 +4,7 @@ import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 
 interface IParams {
   conversationId?: string;
@@ -30,11 +31,19 @@ export async function DELETE(
       return new NextResponse("Not found", { status: 404 });
     }
 
+    // images go with their messages (cascade); collect them first to clean up S3
+    const imageMessages = await prisma.message.findMany({
+      where: { conversationId: existingConversation.id, image: { not: null } },
+      select: { image: true },
+    });
+
     const deletedConversation = await prisma.conversation.delete({
       where: {
         id: existingConversation.id,
       },
     });
+
+    cleanUpUploads(imageMessages.map((message) => message.image));
 
     existingConversation.users.forEach((user) => {
       if (user.email) {
