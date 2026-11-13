@@ -19,7 +19,7 @@ const handle = app.getRequestHandler();
 
 app
   .prepare()
-  .then(() => {
+  .then(async () => {
     const httpServer = createServer((req, res) => {
       // x-client-ip is what rate limiting keys on (app/libs/rate-limit.ts); any
       // value the client sent is overwritten here.
@@ -32,7 +32,8 @@ app
       handle(req, res, parse(req.url!, true));
     });
 
-    initSocketServer(httpServer);
+    // connects to Redis first when REDIS_URL is set
+    await initSocketServer(httpServer);
 
     httpServer.listen(port, () => {
       console.log(`> Ready on http://${hostname}:${port}`);

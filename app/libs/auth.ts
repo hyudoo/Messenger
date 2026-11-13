@@ -36,8 +36,8 @@ export const authOptions: AuthOptions = {
         // slows down password guessing; the form shows a dedicated message for this error
         const ip = clientIp(req?.headers)
         if (
-          !rateLimit('loginIp', ip).ok ||
-          !rateLimit('login', `${ip}:${credentials.email}`).ok
+          !(await rateLimit('loginIp', ip)).ok ||
+          !(await rateLimit('login', `${ip}:${credentials.email}`)).ok
         ) {
           throw new Error(TOO_MANY_ATTEMPTS)
         }

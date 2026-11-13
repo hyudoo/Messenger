@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const limited = rateLimit("message", currentUser.id);
+    const limited = await rateLimit("message", currentUser.id);
     if (!limited.ok) {
       return tooManyRequests(limited.retryAfter);
     }

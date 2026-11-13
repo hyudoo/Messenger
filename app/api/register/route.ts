@@ -10,7 +10,7 @@ const MAX_NAME_LENGTH = 100;
 
 export async function POST(request: Request) {
   try {
-    const limited = rateLimit("register", clientIp(request.headers));
+    const limited = await rateLimit("register", clientIp(request.headers));
     if (!limited.ok) {
       return tooManyRequests(limited.retryAfter);
     }
