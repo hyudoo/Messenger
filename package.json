@@ -6,7 +6,7 @@
     "dev": "tsx server.ts",
     "build": "next build",
     "start": "cross-env NODE_ENV=production tsx server.ts",
-    "lint": "next lint",
+    "lint": "eslint .",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -25,8 +25,6 @@
     "cookie": "^1.1.1",
     "cross-env": "^7.0.3",
     "date-fns": "^2.29.3",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.29",
     "lodash": "^4.17.21",
     "next": "^15.5.29",
     "next-auth": "^4.24.15",
@@ -47,9 +45,12 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@tailwindcss/forms": "^0.5.3",
     "@types/bcrypt": "^6.0.0",
     "@types/lodash": "^4.14.194",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.29",
     "prisma": "^6.19.3"
   }
 }
