@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "cross-env NODE_ENV=production tsx server.ts",
     "lint": "eslint .",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1168.0",
@@ -53,6 +55,7 @@
     "@types/lodash": "^4.14.194",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.29",
-    "prisma": "^6.19.3"
+    "prisma": "^6.19.3",
+    "vitest": "^3.2.7"
   }
 }
