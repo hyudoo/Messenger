@@ -37,11 +37,19 @@ export async function DELETE(
       select: { image: true },
     });
 
-    const deletedConversation = await prisma.conversation.delete({
-      where: {
-        id: existingConversation.id,
-      },
-    });
+    // On MongoDB a delete leaves the id in every member's User.conversationIds;
+    // disconnecting the members first updates both sides of the many-to-many.
+    const [, deletedConversation] = await prisma.$transaction([
+      prisma.conversation.update({
+        where: { id: existingConversation.id },
+        data: { users: { set: [] } },
+      }),
+      prisma.conversation.delete({
+        where: {
+          id: existingConversation.id,
+        },
+      }),
+    ]);
 
     cleanUpUploads(imageMessages.map((message) => message.image));
 
