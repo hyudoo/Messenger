@@ -10,10 +10,16 @@ import { useRouter } from "next/navigation";
 import Input from "../../components/inputs/Input";
 import AuthSocialButton from "./AuthSocialButton";
 import Button from "@/app/components/Button";
+import { TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors";
 import { validatePassword } from "@/app/libs/password";
 import { toast } from "react-hot-toast";
 
 type Variant = "LOGIN" | "REGISTER";
+
+const loginErrorMessage = (error: string) =>
+  error === TOO_MANY_ATTEMPTS
+    ? "Bạn đăng nhập sai quá nhiều lần, thử lại sau 15 phút!"
+    : "Đăng nhập không thành công!";
 
 const AuthForm = () => {
   const session = useSession();
@@ -74,7 +80,7 @@ const AuthForm = () => {
         )
         .then((callback) => {
           if (callback?.error) {
-            toast.error("Đăng nhập không thành công!");
+            toast.error(loginErrorMessage(callback.error));
           }
           if (callback?.ok) {
             router.push("/conversations");
@@ -84,6 +90,8 @@ const AuthForm = () => {
           toast.error(
             error?.response?.status === 409
               ? "Email đã được sử dụng!"
+              : error?.response?.status === 429
+              ? "Bạn đăng ký quá nhiều lần, thử lại sau ít phút!"
               : "Đăng ký tài khoản không thành công!"
           )
         )
@@ -97,7 +105,7 @@ const AuthForm = () => {
       })
         .then((callback) => {
           if (callback?.error) {
-            toast.error("Đăng nhập không thành công!");
+            toast.error(loginErrorMessage(callback.error));
           }
 
           if (callback?.ok && !callback?.error) {

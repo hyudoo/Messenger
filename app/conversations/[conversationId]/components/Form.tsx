@@ -4,6 +4,7 @@ import { HiPaperAirplane, HiPhoto } from "react-icons/hi2";
 import MessageInput from "./MessageInput";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 import ImageUploadButton from "@/app/components/ImageUploadButton";
 import useConversation from "@/app/hooks/useConversation";
 
@@ -21,19 +22,34 @@ const Form = () => {
     },
   });
 
+  const sendError = (error: any) =>
+    toast.error(
+      error?.response?.status === 429
+        ? "Bạn gửi tin quá nhanh, chờ vài giây rồi thử lại!"
+        : "Gửi tin nhắn không thành công!"
+    );
+
   const onSubmit: SubmitHandler<FieldValues> = (data) => {
     setValue("message", "", { shouldValidate: true });
-    axios.post("/api/messages", {
-      ...data,
-      conversationId,
-    });
+    axios
+      .post("/api/messages", {
+        ...data,
+        conversationId,
+      })
+      .catch((error) => {
+        // give the text back so it isn't lost
+        setValue("message", data.message);
+        sendError(error);
+      });
   };
 
   const handleUpload = (url: string) => {
-    axios.post("/api/messages", {
-      image: url,
-      conversationId,
-    });
+    axios
+      .post("/api/messages", {
+        image: url,
+        conversationId,
+      })
+      .catch(sendError);
   };
 
   return (

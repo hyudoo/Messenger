@@ -5,6 +5,7 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { isUploadedFileUrl } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 
 const MAX_MESSAGE_LENGTH = 5000;
 
@@ -13,6 +14,11 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentUser();
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = rateLimit("message", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const { message, isCall, image, conversationId } = await request.json();
