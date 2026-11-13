@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import getConversationById from "@/app/actions/getConversationById";
 import getCurrentUser from "@/app/actions/getCurrentUser";
+import { getIceServers } from "@/app/libs/ice-servers";
 import Room from "./components/Room";
 
 interface IParams {
@@ -22,7 +23,12 @@ const RoomId = async ({ params }: { params: Promise<IParams> }) => {
 
   return (
     <div className="h-full w-full">
-      <Room roomId={roomId} conversation={conversation} user={user} />
+      <Room
+        roomId={roomId}
+        conversation={conversation}
+        user={user}
+        iceServers={getIceServers(user.id)}
+      />
     </div>
   );
 };

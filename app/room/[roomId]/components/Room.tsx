@@ -19,6 +19,8 @@ interface BodyProps {
   conversation: Conversation & {
     users: SafeUser[];
   };
+  // STUN, plus TURN with short-lived credentials when configured (app/libs/ice-servers.ts)
+  iceServers: RTCIceServer[];
 }
 
 interface CallHandlers {
@@ -31,22 +33,12 @@ interface CallHandlers {
   backToConversation: () => void;
 }
 
-const ICE_SERVERS = {
-  // you can add TURN servers here too
-  iceServers: [
-    {
-      urls: "stun:openrelay.metered.ca:80",
-    },
-    {
-      urls: "stun:stun.l.google.com:19302",
-    },
-    {
-      urls: "stun:stun2.l.google.com:19302",
-    },
-  ],
-};
-
-const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
+const Body: React.FC<BodyProps> = ({
+  roomId,
+  user,
+  conversation,
+  iceServers,
+}) => {
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(true);
   const otherUser = useOtherUser(conversation);
@@ -164,7 +156,7 @@ const Body: React.FC<BodyProps> = ({ roomId, user, conversation }) => {
 
   const createPeerConnection = () => {
     // We create a RTC Peer Connection
-    const connection = new RTCPeerConnection(ICE_SERVERS);
+    const connection = new RTCPeerConnection({ iceServers });
 
     // We implement our onicecandidate method for when we received a ICE candidate from the STUN server
     connection.onicecandidate = handleICECandidateEvent;
