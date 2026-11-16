@@ -160,6 +160,37 @@ describe("POST /api/messages", () => {
       .filter(([, event]) => event === "call:incoming")
       .map(([email]) => email);
     expect(ringed).toEqual([other.email]);
+    // the call log starts here; the socket server moves it on (server/call-log.ts)
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isCall: true, callStatus: "ringing" }),
+      })
+    );
+  });
+
+  it("stores and rings with the call type, video by default", async () => {
+    asMember();
+    await send({ isCall: true, callType: "audio" });
+    await send({ isCall: true });
+    const types = prisma.message.create.mock.calls.map(([args]: any) => args.data.callType);
+    expect(types).toEqual(["audio", "video"]);
+    const rung = mocks.emitToUser.mock.calls
+      .filter(([, event]) => event === "call:incoming")
+      .map(([, , payload]) => (payload as any).callType);
+    expect(rung).toEqual(["audio", "video"]);
+  });
+
+  it("rejects an unknown call type", async () => {
+    asMember();
+    expect((await send({ isCall: true, callType: "hologram" })).status).toBe(400);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("gives plain messages no call status", async () => {
+    asMember();
+    await send({ message: "hi" });
+    const { data } = prisma.message.create.mock.calls[0][0] as any;
+    expect(data.callStatus).toBeUndefined();
   });
 
   it("rate limits a user who sends too fast", async () => {

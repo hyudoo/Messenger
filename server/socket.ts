@@ -7,6 +7,8 @@ import { parse as parseCookie } from "cookie";
 import { getToken } from "next-auth/jwt";
 
 import prisma from "../app/libs/prismadb";
+import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
+import { moveCallSafely } from "./call-log";
 import { getRedisUrl } from "../app/libs/redis-url";
 import { setIO } from "../app/libs/socket-server";
 import {
@@ -30,6 +32,8 @@ const CALL_SIGNALS = [
   "call:offer",
   "call:answer",
   "call:ice-candidate",
+  // { mic, camera } of the sender, so the other side can show it muted / camera off
+  "call:media",
 ] as const;
 
 const MAX_CALL_PEERS = 2;
@@ -119,6 +123,46 @@ const isMember = async (conversationId: unknown, userId: string) => {
   }
 };
 
+// call:incoming is a one-off emit to the callee's user room: a callee whose socket was down at that
+// moment (page loading, reconnecting after sleep or a network change) or who opens the app while it
+// rings would never hear it. So on every connection, re-send this socket the calls still ringing for
+// its user: a call message from someone else, started within the ring time, whose call room holds
+// exactly one peer and that peer is the caller (alone, waiting). Answered (two peers), declined or
+// abandoned (caller gone) calls are not re-sent.
+const resendRingingCalls = async (io: AppServer, socket: AppSocket) => {
+  const { userId } = socket.data;
+  const calls = await prisma.message.findMany({
+    where: {
+      isCall: true,
+      createdAt: { gte: new Date(Date.now() - CALL_RING_TIMEOUT_MS) },
+      senderId: { not: userId },
+      conversation: { userIds: { has: userId } },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { conversationId: true, senderId: true, sender: true, callType: true },
+  });
+
+  const latestPerConversation = new Map<string, (typeof calls)[number]>();
+  calls.forEach((call) => {
+    if (!latestPerConversation.has(call.conversationId)) {
+      latestPerConversation.set(call.conversationId, call);
+    }
+  });
+
+  await Promise.all(
+    Array.from(latestPerConversation.values()).map(async (call) => {
+      const peers = await io.in(callRoom(call.conversationId)).fetchSockets();
+      if (peers.length === 1 && peers[0].data.userId === call.senderId) {
+        socket.emit("call:incoming", {
+          id: call.conversationId,
+          user: call.sender,
+          callType: call.callType ?? "video",
+        });
+      }
+    })
+  );
+};
+
 // With Redis configured (REDIS_URL or REDIS_HOST), sockets on every instance
 // share rooms through Redis, so emits (including emitToUser/emitToConversation
 // from route handlers) reach all of them. Without it everything stays in this
@@ -169,6 +213,10 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 
     socket.join(userRoom(email));
 
+    resendRingingCalls(io, socket).catch((error) =>
+      console.log(error, "ERROR_RESEND_RINGING_CALLS")
+    );
+
     socket.on("conversation:join", async (conversationId: unknown) => {
       if (await isMember(conversationId, userId)) {
         socket.join(conversationRoom(conversationId as string));
@@ -204,7 +252,8 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         socket.join(room);
         const snapshot = io.in(room).fetchSockets();
 
-        const peers = (await snapshot)
+        const inRoom = await snapshot;
+        const peers = inRoom
           .map((peer) => ({ id: peer.id, joinedAt: peer.data.callJoinedAt ?? 0 }))
           .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
         const position = peers.findIndex((peer) => peer.id === socket.id);
@@ -224,6 +273,11 @@ export const initSocketServer = async (httpServer: HttpServer) => {
           }
         }
         ack({ ok: true, isHost });
+        // the second peer is in and it's another user (not the caller's own second tab): the call was
+        // answered (call log, after the ack so it never delays it)
+        if (position === 1 && new Set(inRoom.map((peer) => peer.data.userId)).size > 1) {
+          void moveCallSafely(io, roomId as string, "answer");
+        }
       }
     );
 
@@ -240,6 +294,84 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       });
     });
 
+    // The callee declined a ringing call. 1:1: every member's tabs hear it (the
+    // caller's call screen leaves, the callee's other tabs stop ringing). Group:
+    // the others may still answer, so only the decliner's own tabs hear it.
+    socket.on("call:decline", async (roomId: unknown) => {
+      if (typeof roomId !== "string") {
+        return;
+      }
+      const conversation = await prisma.conversation
+        .findFirst({
+          where: { id: roomId, userIds: { has: userId } },
+          select: { isGroup: true, users: { select: { email: true } } },
+        })
+        .catch(() => null); // malformed ObjectId
+      if (!conversation) {
+        return;
+      }
+      // logged before call:declined goes out: the caller's call screen leaves on it, and that leave
+      // must find the call already declined (not still ringing, which would log it as missed)
+      if (!conversation.isGroup) {
+        await moveCallSafely(io, roomId, "decline");
+      }
+      const emails = conversation.isGroup
+        ? [email]
+        : conversation.users.flatMap((user) => (user.email ? [user.email] : []));
+      io.to(emails.map(userRoom)).emit("call:declined", { roomId, by: email });
+    });
+
+    // Stops the ringing for this call on the other members' tabs (call:cancelled;
+    // IncomingCall closes the modal). Also not re-sent on reconnect afterwards:
+    // resendRingingCalls needs the caller in the call room.
+    const notifyCancelled = async (roomId: string) => {
+      const conversation = await prisma.conversation
+        .findFirst({
+          where: { id: roomId, userIds: { has: userId } },
+          select: { users: { select: { email: true } } },
+        })
+        .catch(() => null); // malformed ObjectId
+      if (!conversation) {
+        return;
+      }
+      const others = conversation.users.flatMap((user) =>
+        user.email && user.email !== email ? [user.email] : []
+      );
+      if (others.length > 0) {
+        io.to(others.map(userRoom)).emit("call:cancelled", { roomId, by: email });
+      }
+    };
+
+    // Whenever the last peer leaves a call room, nobody is left to answer, so stop
+    // any ringing for it: covers a caller who closes the tab, goes Back or loses
+    // the connection while waiting (no call:cancel then). After a call that was
+    // answered it is a no-op for the other side (nothing rings) and stops members
+    // of a group who were still ringing.
+    // Call log: either peer leaving ends an answered call (the other one leaves too, see Room.tsx);
+    // a call still ringing when nobody is left was missed.
+    const cancelIfLastInCall = async (roomId: string) => {
+      try {
+        await moveCallSafely(io, roomId, "end");
+        const peers = await io.in(callRoom(roomId)).fetchSockets();
+        if (peers.every((peer) => peer.id === socket.id)) {
+          await notifyCancelled(roomId);
+          await moveCallSafely(io, roomId, "miss");
+        }
+      } catch (error) {
+        console.log(error, "ERROR_CALL_CANCEL");
+      }
+    };
+
+    // The caller hung up (or gave up, no answer) before anyone picked up. Only a
+    // socket in the call room may cancel (checked before any await).
+    socket.on("call:cancel", (roomId: unknown) => {
+      if (typeof roomId !== "string" || !socket.rooms.has(callRoom(roomId))) {
+        return;
+      }
+      notifyCancelled(roomId).catch((error) => console.log(error, "ERROR_CALL_CANCEL"));
+      void moveCallSafely(io, roomId, "miss");
+    });
+
     socket.on("call:leave", (roomId: unknown) => {
       if (typeof roomId !== "string") {
         return;
@@ -248,6 +380,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       if (socket.rooms.has(room)) {
         socket.to(room).emit("call:peer-left");
         socket.leave(room);
+        void cancelIfLastInCall(roomId);
       }
     });
 
@@ -255,6 +388,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       socket.rooms.forEach((room) => {
         if (room.startsWith("call:")) {
           socket.to(room).emit("call:peer-left");
+          void cancelIfLastInCall(room.slice("call:".length));
         }
       });
     });

@@ -2,6 +2,7 @@ import { getLocale } from "next-intl/server";
 
 import { redirect } from "@/i18n/navigation";
 
+import getCallType from "@/app/actions/getCallType";
 import getConversationById from "@/app/actions/getConversationById";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { getIceServers } from "@/app/libs/ice-servers";
@@ -13,9 +14,10 @@ interface IParams {
 
 const RoomId = async ({ params }: { params: Promise<IParams> }) => {
   const { roomId } = await params;
-  const [conversation, user] = await Promise.all([
+  const [conversation, user, callType] = await Promise.all([
     getConversationById(roomId),
     getCurrentUser(),
+    getCallType(roomId),
   ]);
 
   // not a member (or no such conversation): no call room
@@ -30,6 +32,7 @@ const RoomId = async ({ params }: { params: Promise<IParams> }) => {
         roomId={roomId}
         conversation={conversation}
         user={user}
+        audioOnly={callType === "audio"}
         iceServers={getIceServers(user.id)}
       />
     </div>

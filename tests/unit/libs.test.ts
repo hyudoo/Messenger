@@ -1,11 +1,12 @@
 import { createHmac } from "crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { getIceServers } from "@/app/libs/ice-servers";
 import { validatePassword } from "@/app/libs/password";
 import { LIMITS, clientIp, rateLimit } from "@/app/libs/rate-limit";
-import { createPresignedUpload, isUploadedFileUrl } from "@/app/libs/s3";
 import { getRedisUrl } from "@/app/libs/redis-url";
+import { createPresignedUpload, isUploadedFileUrl } from "@/app/libs/s3";
 import { ME, OTHER, S3_BASE, resetRateLimits, uploadUrl } from "../helpers";
 
 describe("validatePassword", () => {
@@ -100,7 +101,6 @@ describe("rateLimit (in memory)", () => {
   });
 });
 
-// needs a real Redis: TEST_REDIS_URL=redis://localhost:6390 npm test
 describe("getRedisUrl", () => {
   afterEach(() => vi.unstubAllEnvs());
 
@@ -127,6 +127,7 @@ describe("getRedisUrl", () => {
   });
 });
 
+// needs a real Redis: TEST_REDIS_URL=redis://localhost:6390 npm test
 describe.skipIf(!process.env.TEST_REDIS_URL)("rateLimit (Redis)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -198,5 +199,32 @@ describe("getIceServers", () => {
     expect(turn.credential).toBe(
       createHmac("sha1", "shared-secret").update(String(turn.username)).digest("base64")
     );
+  });
+});
+
+describe("call duration", () => {
+  it("is the time from answer to hang-up, from Dates or ISO strings (socket.io)", () => {
+    const answered = new Date("2026-11-16T10:00:00Z");
+    expect(
+      callDurationSeconds({ callAnsweredAt: answered, callEndedAt: new Date("2026-11-16T10:03:25.400Z") })
+    ).toBe(205);
+    expect(
+      callDurationSeconds({
+        callAnsweredAt: "2026-11-16T10:00:00.000Z",
+        callEndedAt: "2026-11-16T10:00:07.000Z",
+      })
+    ).toBe(7);
+  });
+
+  it("is null for a call that was never answered or hasn't ended", () => {
+    expect(callDurationSeconds({ callEndedAt: new Date() })).toBeNull();
+    expect(callDurationSeconds({ callAnsweredAt: new Date(), callEndedAt: null })).toBeNull();
+  });
+
+  it("formats like a phone's call log", () => {
+    expect(formatCallDuration(0)).toBe("0:00");
+    expect(formatCallDuration(7)).toBe("0:07");
+    expect(formatCallDuration(205)).toBe("3:25");
+    expect(formatCallDuration(3729)).toBe("1:02:09");
   });
 });

@@ -2,11 +2,10 @@
 
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
-import { useMemo } from "react";
+import { FaMicrophoneSlash } from "react-icons/fa";
 import { useTranslations } from "next-intl";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import { useIsActive } from "@/app/hooks/useActiveList";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -15,47 +14,41 @@ interface HeaderProps {
   conversation: Conversation & {
     users: SafeUser[];
   };
+  // call status, or the call duration once connected
+  status: React.ReactNode;
+  remoteMuted: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation }) => {
-  const t = useTranslations("common");
+const Header: React.FC<HeaderProps> = ({
+  conversation,
+  status,
+  remoteMuted,
+}) => {
+  const t = useTranslations("call");
   const otherUser = useOtherUser(conversation);
 
-  const isActive = useIsActive(otherUser?.email);
-  const statusText = useMemo(() => {
-    if (conversation.isGroup) {
-      return t("members", { count: conversation.userIds.length });
-    }
-
-    return isActive ? t("online") : t("offline");
-  }, [conversation, isActive, t]);
   return (
-    <div
-      className="
-            backdrop-opacity-10
-            bg-white/20
-            fixed
-            w-full
-            flex
-            sm:px-4
-            py-3
-            px-4
-            lg:px-6
-            justify-between
-            items-center
-            shadow-sm
-            ">
-      <div className="flex gap-3 items-center">
-        {conversation.isGroup ? (
-          <AvatarGroup users={conversation.users} />
-        ) : (
-          <Avatar user={otherUser} />
-        )}
-        <div className="flex flex-col">
-          <div className="text-slate-50">
+    <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] lg:px-6">
+      {conversation.isGroup ? (
+        <AvatarGroup users={conversation.users} />
+      ) : (
+        <Avatar user={otherUser} />
+      )}
+      <div className="flex min-w-0 flex-col">
+        <div className="flex items-center gap-2 font-medium text-white">
+          <span className="truncate">
             {conversation.name || otherUser.name}
-          </div>
-          <div className="text-sm font-light text-slate-200">{statusText}</div>
+          </span>
+          {remoteMuted && (
+            <FaMicrophoneSlash
+              size={14}
+              className="shrink-0 text-red-400"
+              aria-label={t("muted")}
+            />
+          )}
+        </div>
+        <div className="text-sm tabular-nums text-white/70" aria-live="polite">
+          {status}
         </div>
       </div>
     </div>

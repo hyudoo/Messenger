@@ -1,4 +1,4 @@
-import { Conversation, Message, User } from "@prisma/client";
+import { CallType, Conversation, Message, User } from "@prisma/client";
 
 // What Prisma returns for a user: hashedPassword is omitted globally (app/libs/prismadb.ts).
 export type SafeUser = Omit<User, "hashedPassword">;
@@ -21,4 +21,6 @@ export type ConversationWithUsers = Conversation & {
 export type FullCallType = {
   id: string;
   user: SafeUser;
+  // missing from servers older than audio calls: video
+  callType?: CallType | null;
 };

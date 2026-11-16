@@ -68,8 +68,11 @@
     "new_group": "New group chat",
     "empty": "Select a chat or start a new conversation.",
     "last_image": "Sent an image.",
-    "last_call": "Video call",
-    "no_messages": "Started a conversation."
+    "last_call": "{kind, select, audio {Audio call} other {Video call}}",
+    "no_messages": "Started a conversation.",
+    "last_call_declined": "{kind, select, audio {Audio call declined} other {Video call declined}}",
+    "last_call_missed": "{kind, select, audio {Missed audio call} other {Missed video call}}",
+    "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -83,8 +86,14 @@
     "send_failed": "Couldn't send the message!",
     "send_too_fast": "You're sending too fast, wait a few seconds and try again!",
     "seen_by": "Seen by {names}.",
-    "outgoing_call": "Outgoing call",
-    "incoming_call": "Incoming call"
+    "outgoing_call": "{kind, select, audio {Outgoing audio call} other {Outgoing video call}}",
+    "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
+    "call_declined_by_other": "Call declined",
+    "call_declined_by_you": "You declined the call",
+    "call_no_answer": "No answer",
+    "call_missed": "Missed call",
+    "call_duration": "Duration {duration}",
+    "audio_call": "Audio call"
   },
   "profile": {
     "close": "Close panel",
@@ -113,7 +122,7 @@
     "photo": "Photo",
     "change_photo": "Change",
     "appearance_title": "Appearance",
-    "appearance_description": "Applies right away in this browser.",
+    "appearance_description": "Color mode applies right away in this browser; the language applies when you save.",
     "theme": "Color mode",
     "language": "Language"
   },
@@ -124,7 +133,7 @@
     "failed": "Upload failed"
   },
   "call": {
-    "is_calling": "is calling you.",
+    "incoming": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
     "hint": "The call starts as soon as you accept",
     "decline": "Decline",
     "accept": "Accept",
@@ -133,6 +142,17 @@
     "camera_on": "Turn camera on",
     "mic_off": "Mute",
     "mic_on": "Unmute",
-    "leave": "Leave call"
+    "leave": "Leave call",
+    "status_waiting": "Waiting for {name}…",
+    "status_connecting": "Connecting…",
+    "status_reconnecting": "Connection lost, retrying…",
+    "status_failed": "Couldn't connect",
+    "camera_is_off": "{name} turned off the camera",
+    "muted": "Muted",
+    "you": "You",
+    "declined": "{name} declined the call",
+    "no_answer": "{name} didn't answer",
+    "audio_call": "Audio call",
+    "camera_error": "Can't turn the camera on!"
   }
 }

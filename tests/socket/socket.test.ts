@@ -18,6 +18,25 @@ const MEMBERS: Record<string, string[]> = {
 };
 
 const emailOf = (id: string) => `${id.slice(0, 4)}@example.com`;
+const userOf = (id: string) => ({ id, email: emailOf(id) });
+
+// call messages started within the ring time (what resendRingingCalls finds in the database)
+const RECENT_CALLS: {
+  conversationId: string;
+  senderId: string;
+  callType?: "audio" | "video";
+}[] = [];
+
+// conversation id -> its latest call message, the one server/call-log.ts moves along
+type CallRow = {
+  id: string;
+  senderId: string;
+  callStatus: string;
+  callAnsweredAt?: Date;
+  callEndedAt?: Date;
+};
+const CALLS: Record<string, CallRow> = {};
+const callById = (id: string) => Object.values(CALLS).find((call) => call.id === id);
 
 // The session cookie value is the user id; getToken turns it into a token.
 vi.mock("next-auth/jwt", () => ({
@@ -31,7 +50,46 @@ vi.mock("@/app/libs/prismadb", () => ({
   default: {
     conversation: {
       findFirst: vi.fn(async ({ where }: any) =>
-        MEMBERS[where.id]?.includes(where.userIds.has) ? { id: where.id } : null
+        MEMBERS[where.id]?.includes(where.userIds.has)
+          ? {
+              id: where.id,
+              isGroup: where.id === GROUP,
+              users: MEMBERS[where.id].map((id) => ({ email: emailOf(id) })),
+            }
+          : null
+      ),
+      // call-log: the members and the conversation's last message (the call)
+      findUnique: vi.fn(async ({ where }: any) =>
+        MEMBERS[where.id]
+          ? {
+              users: MEMBERS[where.id].map((id) => ({ email: emailOf(id) })),
+              messages: CALLS[where.id] ? [{ id: CALLS[where.id].id }] : [],
+            }
+          : null
+      ),
+    },
+    message: {
+      findFirst: vi.fn(async ({ where }: any) => CALLS[where.conversationId] ?? null),
+      // atomic "move only from the expected status"
+      updateMany: vi.fn(async ({ where, data }: any) => {
+        const call = callById(where.id);
+        if (!call || call.callStatus !== where.callStatus) {
+          return { count: 0 };
+        }
+        Object.assign(call, data);
+        return { count: 1 };
+      }),
+      findUnique: vi.fn(async ({ where }: any) => {
+        const call = callById(where.id);
+        return call ? { ...call, isCall: true, sender: userOf(call.senderId), seen: [] } : null;
+      }),
+      // the recent call messages, filtered like the real query (member, not sent by me)
+      findMany: vi.fn(async ({ where }: any) =>
+        RECENT_CALLS.filter(
+          (call) =>
+            call.senderId !== where.senderId.not &&
+            MEMBERS[call.conversationId]?.includes(where.conversation.userIds.has)
+        ).map((call) => ({ ...call, sender: userOf(call.senderId) }))
       ),
     },
   },
@@ -82,6 +140,8 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
   );
 
 afterEach(async () => {
+  RECENT_CALLS.length = 0;
+  Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
   await Promise.all(
     servers.splice(0).map(
@@ -170,6 +230,265 @@ describe("socket server", () => {
     const left = next(host, "call:peer-left");
     guest.emit("call:leave", GROUP);
     await left;
+  });
+
+  it("tells a 1:1 caller and the callee's tabs about a decline, never strangers", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    const calleeTab1 = (await connected(url, OTHER)).socket;
+    const calleeTab2 = (await connected(url, OTHER)).socket;
+    const stranger = (await connected(url, STRANGER)).socket;
+
+    const strangerGot = vi.fn();
+    stranger.on("call:declined", strangerGot);
+    const expected = { roomId: CONVERSATION, by: emailOf(OTHER) };
+    const callerGot = next(caller, "call:declined");
+    const tab2Got = next(calleeTab2, "call:declined");
+    stranger.emit("call:decline", CONVERSATION); // not a member: ignored
+    calleeTab1.emit("call:decline", CONVERSATION);
+
+    expect(await callerGot).toEqual(expected);
+    expect(await tab2Got).toEqual(expected);
+    expect(strangerGot).not.toHaveBeenCalled();
+  });
+
+  it("keeps a group call ringing for the others when one member declines", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    const decliner = (await connected(url, OTHER)).socket;
+
+    const callerGot = vi.fn();
+    caller.on("call:declined", callerGot);
+    const ownTab = next(decliner, "call:declined");
+    decliner.emit("call:decline", GROUP);
+
+    expect(await ownTab).toEqual({ roomId: GROUP, by: emailOf(OTHER) });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(callerGot).not.toHaveBeenCalled();
+  });
+
+  it("tells the other members when the caller cancels, only from the call room", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    const callee = (await connected(url, OTHER)).socket;
+    const third = (await connected(url, THIRD)).socket;
+
+    const calleeGot = vi.fn();
+    const callerGot = vi.fn();
+    callee.on("call:cancelled", calleeGot);
+    caller.on("call:cancelled", callerGot);
+
+    // not in the call room (never joined): ignored
+    third.emit("call:cancel", GROUP);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(calleeGot).not.toHaveBeenCalled();
+
+    expect(await joinCall(caller, GROUP)).toEqual({ ok: true, isHost: true });
+    const calleeHeard = next(callee, "call:cancelled");
+    const thirdHeard = next(third, "call:cancelled");
+    caller.emit("call:cancel", GROUP);
+
+    const expected = { roomId: GROUP, by: emailOf(ME) };
+    expect(await calleeHeard).toEqual(expected);
+    expect(await thirdHeard).toEqual(expected);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(callerGot).not.toHaveBeenCalled(); // not back to the caller
+  });
+
+  it("stops the ringing when a waiting caller closes the tab", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    const callee = (await connected(url, OTHER)).socket;
+
+    expect(await joinCall(caller, CONVERSATION)).toEqual({ ok: true, isHost: true });
+    const cancelled = next(callee, "call:cancelled");
+    caller.close(); // no call:cancel, no call:leave
+
+    expect(await cancelled).toEqual({ roomId: CONVERSATION, by: emailOf(ME) });
+  });
+
+  it("stops the ringing only once the last peer leaves the call room", async () => {
+    const { url } = await startServer();
+    const host = (await connected(url, ME)).socket;
+    const guest = (await connected(url, OTHER)).socket;
+    const third = (await connected(url, THIRD)).socket;
+
+    await joinCall(host, GROUP);
+    await joinCall(guest, GROUP);
+    const thirdGot = vi.fn();
+    third.on("call:cancelled", thirdGot);
+
+    // the host is still in the room: the call goes on
+    guest.emit("call:leave", GROUP);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(thirdGot).not.toHaveBeenCalled();
+
+    // room empty now: a member still ringing stops
+    const cancelled = next(third, "call:cancelled");
+    host.emit("call:leave", GROUP);
+    expect(await cancelled).toEqual({ roomId: GROUP, by: emailOf(ME) });
+  });
+
+  it("re-sends a call that is still ringing to a callee who connects late", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    await joinCall(caller, CONVERSATION);
+    RECENT_CALLS.push({ conversationId: CONVERSATION, senderId: ME });
+
+    // e.g. the callee's page was loading or its socket reconnecting when call:incoming went out
+    const callee = client(url, OTHER);
+    const ringing = next(callee, "call:incoming");
+
+    // a call from before audio calls has no callType: re-sent as video
+    expect(await ringing).toEqual({ id: CONVERSATION, user: userOf(ME), callType: "video" });
+  });
+
+  it("re-sends an audio call as audio", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    await joinCall(caller, CONVERSATION);
+    RECENT_CALLS.push({ conversationId: CONVERSATION, senderId: ME, callType: "audio" });
+
+    const ringing = next(client(url, OTHER), "call:incoming");
+    expect(await ringing).toEqual({ id: CONVERSATION, user: userOf(ME), callType: "audio" });
+  });
+
+  it("does not re-send a call that was answered or abandoned, nor to the caller or strangers", async () => {
+    const { url } = await startServer();
+    const caller = (await connected(url, ME)).socket;
+    const calleeTab = (await connected(url, OTHER)).socket;
+    RECENT_CALLS.push({ conversationId: CONVERSATION, senderId: ME });
+
+    const connectsQuietly = async (userId: string) => {
+      const socket = client(url, userId);
+      const got = vi.fn();
+      socket.on("call:incoming", got);
+      await next(socket, "presence:list");
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(got).not.toHaveBeenCalled();
+    };
+
+    await joinCall(caller, CONVERSATION);
+    await connectsQuietly(ME); // the caller's own other tab
+    await connectsQuietly(STRANGER);
+
+    // answered: two peers in the call room
+    await joinCall(calleeTab, CONVERSATION);
+    await connectsQuietly(OTHER);
+
+    // abandoned: the caller hung up before an answer
+    calleeTab.emit("call:leave", CONVERSATION);
+    caller.emit("call:leave", CONVERSATION);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await connectsQuietly(OTHER);
+  });
+
+  describe("call log (callStatus on the call message)", () => {
+    const ringing = () => {
+      CALLS[CONVERSATION] = { id: "call-1", senderId: ME, callStatus: "ringing" };
+    };
+
+    // a member watching the chat (conversation room), as Body.tsx does
+    const watching = async (io: Server, socket: ClientSocket) => {
+      socket.emit("conversation:join", CONVERSATION);
+      await vi.waitFor(async () => {
+        const inRoom = await io.in(conversationRoom(CONVERSATION)).fetchSockets();
+        expect(inRoom.map((peer) => peer.id)).toContain(socket.id);
+      });
+    };
+
+    const updated = (socket: ClientSocket, status: string) =>
+      new Promise<any>((resolve) => {
+        const handler = (message: any) => {
+          if (message.callStatus === status) {
+            socket.off("messages:update", handler);
+            resolve(message);
+          }
+        };
+        socket.on("messages:update", handler);
+      });
+
+    it("logs an answered call, then its end, with both times", async () => {
+      ringing();
+      const { io, url } = await startServer();
+      const caller = (await connected(url, ME)).socket;
+      const callee = (await connected(url, OTHER)).socket;
+      await watching(io, caller);
+
+      await joinCall(caller, CONVERSATION);
+      const answered = updated(caller, "answered");
+      const listUpdate = next<any>(callee, "conversation:update");
+      await joinCall(callee, CONVERSATION);
+      expect((await answered).callAnsweredAt).toBeTruthy();
+      // the call is the last message: the conversation lists update too, in place
+      expect(await listUpdate).toMatchObject({ id: CONVERSATION, messages: [{ id: "call-1" }] });
+      expect((await listUpdate).lastMessageAt).toBeUndefined();
+
+      const ended = updated(caller, "ended");
+      callee.emit("call:leave", CONVERSATION);
+      const message = await ended;
+      expect(new Date(message.callEndedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(message.callAnsweredAt).getTime()
+      );
+    });
+
+    it("logs a decline before the caller hears it, so the caller's leave doesn't log it missed", async () => {
+      ringing();
+      const { io, url } = await startServer();
+      const caller = (await connected(url, ME)).socket;
+      const callee = (await connected(url, OTHER)).socket;
+      await joinCall(caller, CONVERSATION);
+
+      const declined = next(caller, "call:declined");
+      callee.emit("call:decline", CONVERSATION);
+      await declined;
+      expect(CALLS[CONVERSATION].callStatus).toBe("declined");
+
+      caller.emit("call:leave", CONVERSATION); // what Room.tsx does on call:declined
+      await vi.waitFor(async () =>
+        expect(await io.in(callRoom(CONVERSATION)).fetchSockets()).toHaveLength(0)
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(CALLS[CONVERSATION].callStatus).toBe("declined");
+      expect(CALLS[CONVERSATION].callEndedAt).toBeInstanceOf(Date);
+    });
+
+    it("logs a call nobody answered as missed: the caller cancels or just leaves", async () => {
+      ringing();
+      const { url } = await startServer();
+      const caller = (await connected(url, ME)).socket;
+      await joinCall(caller, CONVERSATION);
+      caller.emit("call:cancel", CONVERSATION);
+      caller.emit("call:leave", CONVERSATION); // as Room.tsx does
+      await vi.waitFor(() => expect(CALLS[CONVERSATION].callStatus).toBe("missed"));
+
+      // a second call: the caller (two tabs on the call screen, which is not an answer) closes them
+      CALLS[CONVERSATION] = { id: "call-2", senderId: ME, callStatus: "ringing" };
+      const tab1 = (await connected(url, ME)).socket;
+      const tab2 = (await connected(url, ME)).socket;
+      await joinCall(tab1, CONVERSATION);
+      await joinCall(tab2, CONVERSATION);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(CALLS[CONVERSATION].callStatus).toBe("ringing");
+      tab1.close();
+      tab2.close();
+      await vi.waitFor(() => expect(CALLS[CONVERSATION].callStatus).toBe("missed"));
+      expect(CALLS[CONVERSATION].callAnsweredAt).toBeUndefined();
+    });
+
+    it("never moves a call back: a late no-answer after the callee joined keeps it answered", async () => {
+      ringing();
+      const { url } = await startServer();
+      const caller = (await connected(url, ME)).socket;
+      const callee = (await connected(url, OTHER)).socket;
+      await joinCall(caller, CONVERSATION);
+      await joinCall(callee, CONVERSATION);
+      await vi.waitFor(() => expect(CALLS[CONVERSATION].callStatus).toBe("answered"));
+
+      caller.emit("call:cancel", CONVERSATION);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(CALLS[CONVERSATION].callStatus).toBe("answered");
+    });
   });
 
   it("picks exactly one host when both peers join at the same time", async () => {

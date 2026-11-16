@@ -12,8 +12,7 @@ import useConversation from "@/app/hooks/useConversation";
 import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import ConversationBox from "./ConversationBox";
-import { FullConversationType, FullCallType } from "@/app/types";
-import IncomingCallModal from "@/app/components/modals/IncomingCallModal";
+import { FullConversationType } from "@/app/types";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
@@ -26,9 +25,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCallOpen, setIsCallOpen] = useState(false);
-  const [otherUser, setOtherUser] = useState<SafeUser>();
-  const [roomId, setRoomId] = useState<String>();
 
   const t = useTranslations("conversations");
   const router = useRouter();
@@ -84,33 +80,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
       }
     };
 
-    const incomingCallHandler = (call: FullCallType) => {
-      setOtherUser(call.user);
-      setRoomId(call.id);
-      setIsCallOpen(true);
-    };
-
     socket.on("conversation:new", newHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
-    socket.on("call:incoming", incomingCallHandler);
 
     return () => {
       socket.off("conversation:new", newHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
-      socket.off("call:incoming", incomingCallHandler);
     };
   }, [router, conversationId]);
 
   return (
     <>
-      <IncomingCallModal
-        user={otherUser!}
-        roomId={roomId!}
-        isOpen={isCallOpen}
-        onClose={() => setIsCallOpen(false)}
-      />
       <GroupChatModal
         users={users}
         isOpen={isModalOpen}

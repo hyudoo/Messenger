@@ -8,7 +8,13 @@ import { useSession } from "next-auth/react";
 import { FullMessageType } from "@/app/types";
 import { useTranslations } from "next-intl";
 import useDateLocale from "@/app/hooks/useDateLocale";
-import { HiPhoneArrowUpRight, HiPhoneArrowDownLeft } from "react-icons/hi2";
+import {
+  HiPhoneArrowUpRight,
+  HiPhoneArrowDownLeft,
+  HiPhoneXMark,
+} from "react-icons/hi2";
+
+import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 
 import Avatar from "@/app/components/Avatar";
 import ImageModal from "./ImageModal";
@@ -17,6 +23,44 @@ interface MessageBoxProps {
   data: FullMessageType;
   isLast?: boolean;
 }
+
+// A call message: direction, how it went (callStatus, kept by server/call-log.ts) and, once
+// answered and hung up, its duration. Calls from before callStatus existed show the direction only.
+const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call, isOwn }) => {
+  const t = useTranslations("chat");
+  const failed = call.callStatus === "declined" || call.callStatus === "missed";
+  const duration = call.callStatus === "ended" ? callDurationSeconds(call) : null;
+
+  const kind = call.callType ?? "video"; // older calls: video
+  let label = isOwn ? t("outgoing_call", { kind }) : t("incoming_call", { kind });
+  if (call.callStatus === "declined") {
+    label = isOwn ? t("call_declined_by_other") : t("call_declined_by_you");
+  } else if (call.callStatus === "missed") {
+    label = isOwn ? t("call_no_answer") : t("call_missed");
+  }
+
+  const Icon = failed ? HiPhoneXMark : isOwn ? HiPhoneArrowUpRight : HiPhoneArrowDownLeft;
+
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className={clsx(
+          "p-1 rounded-full",
+          failed ? "bg-rose-500" : isOwn ? "bg-sky-600" : "bg-muted-foreground"
+        )}>
+        <Icon size={10} className="text-white" aria-hidden />
+      </div>
+      <div className="flex flex-col">
+        <span>{label}</span>
+        {duration !== null && (
+          <span className={clsx("text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+            {t("call_duration", { duration: formatCallDuration(duration) })}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
   const t = useTranslations();
@@ -76,22 +120,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
             />
           )}
           {data.body && <div>{data.body}</div>}
-          {data.isCall && isOwn && (
-            <div className="flex gap-3">
-              <div className="bg-sky-600 p-1 rounded-full">
-                <HiPhoneArrowUpRight size={10} className="text-white" />
-              </div>
-              {t("chat.outgoing_call")}
-            </div>
-          )}
-          {data.isCall && !isOwn && (
-            <div className="flex gap-3">
-              <div className="bg-muted-foreground p-1 rounded-full">
-                <HiPhoneArrowDownLeft size={10} className="text-white" />
-              </div>
-              {t("chat.incoming_call")}
-            </div>
-          )}
+          {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
         </div>
         {isLast && isOwn && seenList.length > 0 && (
           <div

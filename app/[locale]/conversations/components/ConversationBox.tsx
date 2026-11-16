@@ -12,6 +12,7 @@ import useOtherUser from "@/app/hooks/useOtherUser";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { FullConversationType } from "@/app/types";
 import useDateLocale from "@/app/hooks/useDateLocale";
+import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 
 interface ConversationBoxProps {
   data: FullConversationType;
@@ -60,7 +61,19 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
     }
 
     if (lastMessage?.isCall) {
-      return t("last_call");
+      // older calls have no callType: video
+      const kind = lastMessage.callType ?? "video";
+      if (lastMessage.callStatus === "declined") {
+        return t("last_call_declined", { kind });
+      }
+      if (lastMessage.callStatus === "missed") {
+        return t("last_call_missed", { kind });
+      }
+      const duration =
+        lastMessage.callStatus === "ended" ? callDurationSeconds(lastMessage) : null;
+      return duration !== null
+        ? t("last_call_ended", { kind, duration: formatCallDuration(duration) })
+        : t("last_call", { kind });
     }
 
     if (lastMessage?.body) {

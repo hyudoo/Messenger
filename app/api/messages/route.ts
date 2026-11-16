@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       return tooManyRequests(limited.retryAfter);
     }
 
-    const { message, isCall, image, conversationId } = await request.json();
+    const { message, isCall, callType, image, conversationId } = await request.json();
 
     const conversation = await getConversationForUser(
       conversationId,
@@ -38,6 +38,9 @@ export async function POST(request: Request) {
     // only the sender's own uploads
     if (image !== undefined && !isUploadedFileUrl(image, currentUser.id)) {
       return new NextResponse("Invalid image", { status: 400 });
+    }
+    if (isCall === true && callType !== undefined && callType !== "audio" && callType !== "video") {
+      return new NextResponse("Invalid call type", { status: 400 });
     }
     if (!body && !image && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
@@ -61,6 +64,10 @@ export async function POST(request: Request) {
         body: body || undefined,
         image,
         isCall: isCall === true ? true : undefined,
+        // video unless asked for audio (older clients send no callType)
+        callType: isCall === true ? (callType === "audio" ? "audio" : "video") : undefined,
+        // the socket server moves it on from here (server/call-log.ts)
+        callStatus: isCall === true ? "ringing" : undefined,
         conversationId: conversation.id,
         senderId: currentUser.id,
         seenIds: [currentUser.id],
@@ -83,6 +90,7 @@ export async function POST(request: Request) {
         emitToUser(user.email, "call:incoming", {
           id: conversation.id,
           user: currentUser,
+          callType: newMessage.callType,
         });
       }
       // the new message is the conversation's last message
