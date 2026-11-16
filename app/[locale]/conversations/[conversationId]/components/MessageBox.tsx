@@ -15,6 +15,7 @@ import {
 } from "react-icons/hi2";
 
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
+import { JUMBO_EMOJI_MAX, countEmojiOnly } from "@/app/libs/emoji";
 
 import Avatar from "@/app/components/Avatar";
 import ImageModal from "./ImageModal";
@@ -78,11 +79,21 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
   const container = clsx("flex gap-3 p-4", isOwn && "justify-end");
   const avatar = clsx(isOwn && "order-2");
   const body = clsx("flex flex-col gap-2", isOwn && "items-end");
-  const message = clsx(
-    "text-sm w-fit overflow-hidden",
-    isOwn ? "bg-sky-500 text-white" : "bg-muted",
-    data.image ? "rounded-md p-0" : "rounded-full py-2 px-3"
-  );
+  // only a few emoji: shown large, without a bubble
+  const emojiCount =
+    !data.image && !data.isCall && data.body ? countEmojiOnly(data.body) : 0;
+  const jumbo = emojiCount > 0 && emojiCount <= JUMBO_EMOJI_MAX;
+
+  const message = jumbo
+    ? clsx(
+        "w-fit select-text leading-tight",
+        emojiCount === 1 ? "text-5xl" : "text-4xl"
+      )
+    : clsx(
+        "text-sm w-fit overflow-hidden",
+        isOwn ? "bg-sky-500 text-white" : "bg-muted",
+        data.image ? "rounded-md p-0" : "rounded-full py-2 px-3"
+      );
 
   return (
     <div className={container}>

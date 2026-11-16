@@ -93,6 +93,7 @@
     "call_no_answer": "No answer",
     "call_missed": "Missed call",
     "call_duration": "Duration {duration}",
+    "send_quick": "Send {emoji}",
     "audio_call": "Audio call"
   },
   "profile": {
@@ -154,5 +155,12 @@
     "no_answer": "{name} didn't answer",
     "audio_call": "Audio call",
     "camera_error": "Can't turn the camera on!"
+  },
+  "emoji": {
+    "open": "Choose an emoji",
+    "search": "Search emoji",
+    "clear": "Clear",
+    "no_results": "No emoji found",
+    "loading": "Loading…"
   }
 }

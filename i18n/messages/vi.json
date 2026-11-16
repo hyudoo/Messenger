@@ -93,6 +93,7 @@
     "call_no_answer": "Không có người trả lời",
     "call_missed": "Cuộc gọi nhỡ",
     "call_duration": "Thời lượng {duration}",
+    "send_quick": "Gửi {emoji}",
     "audio_call": "Gọi thoại"
   },
   "profile": {
@@ -154,5 +155,12 @@
     "no_answer": "{name} không trả lời",
     "audio_call": "Cuộc gọi thoại",
     "camera_error": "Không bật được camera!"
+  },
+  "emoji": {
+    "open": "Chọn biểu tượng cảm xúc",
+    "search": "Tìm biểu tượng",
+    "clear": "Xoá",
+    "no_results": "Không tìm thấy biểu tượng nào",
+    "loading": "Đang tải…"
   }
 }
