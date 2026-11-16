@@ -17,8 +17,12 @@ import {
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { JUMBO_EMOJI_MAX, countEmojiOnly } from "@/app/libs/emoji";
 
+import axios from "axios";
+import { toast } from "react-hot-toast";
+
 import Avatar from "@/app/components/Avatar";
 import ImageModal from "./ImageModal";
+import { ReactionChips, ReactionPicker } from "./MessageReactions";
 
 interface MessageBoxProps {
   data: FullMessageType;
@@ -69,7 +73,21 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
   const session = useSession();
   const [imageModalOpen, setImageModalOpen] = useState(false);
 
-  const isOwn = session.data?.user?.email === data?.sender?.email;
+  const myEmail = session.data?.user?.email;
+  const isOwn = myEmail === data?.sender?.email;
+
+  const reactions = data.reactions ?? [];
+  const myReaction = reactions.find((reaction) => myEmail && reaction.user.email === myEmail)?.emoji;
+  // the conversation room sends the updated message back (messages:update)
+  const react = (emoji: string) => {
+    axios
+      .post(`/api/messages/${data.id}/reactions`, { emoji })
+      .catch((error) =>
+        toast.error(
+          error?.response?.status === 429 ? t("chat.send_too_fast") : t("reactions.failed")
+        )
+      );
+  };
 
   const seenList = (data.seen || [])
     .filter((user) => user.email !== data?.sender?.email)
@@ -107,32 +125,38 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
             {format(new Date(data.createdAt), "p", { locale: dateLocale })}
           </div>
         </div>
-        <div className={message}>
-          {data.image && (
-            <ImageModal
-              src={data.image}
-              isOpen={imageModalOpen}
-              onClose={() => setImageModalOpen(false)}
-            />
-          )}
-          {data.image && (
-            <Image
-              alt={t("common.image")}
-              height="288"
-              width="288"
-              onClick={() => setImageModalOpen(true)}
-              src={data.image}
-              className="
-              object-cover
-              cursor-pointer
-              hover:scale-110
-              transition
-              translate"
-            />
-          )}
-          {data.body && <div>{data.body}</div>}
-          {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
+        <div className={clsx("group flex items-center gap-1", isOwn && "flex-row-reverse")}>
+          <div className={message}>
+            {data.image && (
+              <ImageModal
+                src={data.image}
+                isOpen={imageModalOpen}
+                onClose={() => setImageModalOpen(false)}
+              />
+            )}
+            {data.image && (
+              <Image
+                alt={t("common.image")}
+                height="288"
+                width="288"
+                onClick={() => setImageModalOpen(true)}
+                src={data.image}
+                className="
+                object-cover
+                cursor-pointer
+                hover:scale-110
+                transition
+                translate"
+              />
+            )}
+            {data.body && <div>{data.body}</div>}
+            {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
+          </div>
+          <ReactionPicker onReact={react} mine={myReaction} />
         </div>
+        {reactions.length > 0 && (
+          <ReactionChips reactions={reactions} myEmail={myEmail} onReact={react} />
+        )}
         {isLast && isOwn && seenList.length > 0 && (
           <div
             className="

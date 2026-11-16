@@ -41,6 +41,7 @@ vi.mock("@/app/libs/s3", async (importOriginal) => ({
 vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
 
 import { POST as sendMessage } from "@/app/api/messages/route";
+import { POST as toggleReaction } from "@/app/api/messages/[messageId]/reactions/route";
 import { DELETE as deleteConversation } from "@/app/api/conversations/[conversationId]/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
@@ -288,6 +289,66 @@ describe("POST /api/conversations/[id]/seen", () => {
     );
     expect(prisma.message.update).not.toHaveBeenCalled();
     expect(mocks.emitToConversation).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/messages/[id]/reactions", () => {
+  const react = (emoji: unknown, messageId = MESSAGE) =>
+    toggleReaction(
+      jsonRequest(`/api/messages/${messageId}/reactions`, { emoji }),
+      params({ messageId })
+    );
+
+  beforeEach(() => {
+    // the message lookup, then the reloaded message with its reactions
+    prisma.message.findUnique.mockImplementation(async ({ include }: any) =>
+      include ? { id: MESSAGE, conversationId: CONVERSATION, reactions: [] } : { conversationId: CONVERSATION }
+    );
+    prisma.reaction.findUnique.mockResolvedValue(null);
+  });
+
+  it("returns 404 to non-members and writes nothing", async () => {
+    asNonMember();
+    expect((await react("❤️")).status).toBe(404);
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+    expect(mocks.emitToConversation).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a malformed message id", async () => {
+    asMember();
+    expect((await react("❤️", "not-an-id")).status).toBe(404);
+    expect(prisma.message.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("accepts exactly one emoji", async () => {
+    asMember();
+    for (const emoji of ["", "hi", "❤️❤️", "❤️ ok", 42, "😂".repeat(20)]) {
+      expect((await react(emoji)).status).toBe(400);
+    }
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+  });
+
+  it("adds or replaces the caller's reaction and tells the conversation", async () => {
+    asMember();
+    expect((await react(" 👨‍👩‍👧 ")).status).toBe(200);
+    expect(prisma.reaction.upsert).toHaveBeenCalledWith({
+      where: { messageId_userId: { messageId: MESSAGE, userId: ME } },
+      create: { emoji: "👨‍👩‍👧", messageId: MESSAGE, userId: ME },
+      update: { emoji: "👨‍👩‍👧" },
+    });
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:update",
+      expect.objectContaining({ id: MESSAGE, reactions: [] })
+    );
+  });
+
+  it("removes the reaction when the same emoji is picked again", async () => {
+    asMember();
+    prisma.reaction.findUnique.mockResolvedValue({ id: "r1", emoji: "❤️" });
+    expect((await react("❤️")).status).toBe(200);
+    expect(prisma.reaction.deleteMany).toHaveBeenCalledWith({ where: { id: "r1" } });
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
   });
 });
 

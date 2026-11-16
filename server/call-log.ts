@@ -2,6 +2,7 @@ import type { Server } from "socket.io";
 import type { CallStatus, Prisma } from "@prisma/client";
 
 import prisma from "../app/libs/prismadb";
+import { MESSAGE_INCLUDE } from "../app/libs/message-include";
 import { conversationRoom, userRoom } from "../app/libs/socket-rooms";
 
 // The call message (the one /api/messages created with isCall, status "ringing") records how the
@@ -57,7 +58,7 @@ export const moveCall = async (
 
   const message = await prisma.message.findUnique({
     where: { id: call.id },
-    include: { seen: true, sender: true },
+    include: MESSAGE_INCLUDE,
   });
   if (!message) {
     return true;

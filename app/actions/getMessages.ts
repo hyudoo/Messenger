@@ -1,4 +1,5 @@
 import prisma from "@/app/libs/prismadb";
+import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 
 export const MESSAGE_PAGE_SIZE = 50;
 
@@ -10,10 +11,7 @@ const getMessages = async (conversationId: string, before?: string) => {
       where: {
         conversationId: conversationId,
       },
-      include: {
-        sender: true,
-        seen: true,
-      },
+      include: MESSAGE_INCLUDE,
       // newest first so `take` keeps the latest; id breaks createdAt ties
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: MESSAGE_PAGE_SIZE + 1,

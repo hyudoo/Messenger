@@ -32,6 +32,7 @@ export const LIMITS = {
   login: { limit: 10, windowMs: 15 * 60_000 }, // per IP + email
   loginIp: { limit: 50, windowMs: 15 * 60_000 }, // per IP, any email
   message: { limit: 20, windowMs: 10_000 }, // per user
+  reaction: { limit: 30, windowMs: 10_000 }, // per user
   upload: { limit: 20, windowMs: 60_000 }, // per user
 } as const;
 

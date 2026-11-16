@@ -162,5 +162,13 @@
     "clear": "Clear",
     "no_results": "No emoji found",
     "loading": "Loading…"
+  },
+  "reactions": {
+    "add": "React",
+    "more": "More emoji",
+    "react_with": "React with {emoji}",
+    "reacted_by": "{emoji} {names}",
+    "you": "You",
+    "failed": "Couldn't add the reaction!"
   }
 }

@@ -162,5 +162,13 @@
     "clear": "Xoá",
     "no_results": "Không tìm thấy biểu tượng nào",
     "loading": "Đang tải…"
+  },
+  "reactions": {
+    "add": "Thả cảm xúc",
+    "more": "Biểu tượng khác",
+    "react_with": "Thả {emoji}",
+    "reacted_by": "{emoji} {names}",
+    "you": "Bạn",
+    "failed": "Không thả được cảm xúc!"
   }
 }

@@ -4,6 +4,7 @@ import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 
 interface IParams {
   conversationId?: string;
@@ -44,10 +45,7 @@ export async function POST(
       where: {
         id: lastMessage.id,
       },
-      include: {
-        sender: true,
-        seen: true,
-      },
+      include: MESSAGE_INCLUDE,
       data: {
         seen: {
           connect: {

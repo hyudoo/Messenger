@@ -5,6 +5,7 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 
 const MAX_MESSAGE_LENGTH = 5000;
@@ -56,10 +57,7 @@ export async function POST(request: Request) {
     }
 
     const newMessage = await prisma.message.create({
-      include: {
-        seen: true,
-        sender: true,
-      },
+      include: MESSAGE_INCLUDE,
       data: {
         body: body || undefined,
         image,
