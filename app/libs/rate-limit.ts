@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "redis";
 
-// Fixed-window rate limiting. Counters live in Redis when REDIS_URL is set (shared
+import { getRedisUrl } from "./redis-url";
+
+// Fixed-window rate limiting. Counters live in Redis when it is configured (shared
 // by every instance), otherwise in this process's memory. If Redis fails, the
 // in-memory counter is used for that request so limits never block everyone.
 
@@ -45,7 +47,7 @@ interface LimitResult {
 // (Awaiting connect() here would hang every request while Redis is unreachable,
 // since node-redis keeps retrying without settling the promise.)
 const readyRedisClient = () => {
-  const url = process.env.REDIS_URL;
+  const url = getRedisUrl();
   if (!url) {
     return null;
   }

@@ -1,0 +1,54 @@
+# Docker's default json-file log driver never rotates; cap each container at 3 x 10 MB of logs
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  app:
+    logging: *default-logging
+    # Deploy sets APP_IMAGE to the image CI built for this commit; local runs build messenger:local
+    image: ${APP_IMAGE:-messenger:local}
+    restart: unless-stopped
+    build:
+      context: .
+      args:
+        - NODE_OPTIONS=${NODE_OPTIONS:-}
+        # Read by next.config.js at build time (allowed image host for uploads)
+        - AWS_REGION=${AWS_REGION:-}
+        - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
+        - NEXT_PUBLIC_S3_PUBLIC_URL=${NEXT_PUBLIC_S3_PUBLIC_URL:-}
+    container_name: messenger
+    # Runtime config and secrets (the deploy job writes .env from the ENV_FILE CI variable)
+    env_file: .env
+    ports:
+      # server.ts listens on PORT from env_file, so the container port is the same as the host port
+      - ${PORT:-3000}:${PORT:-3000}
+    environment:
+      - NODE_OPTIONS=${NODE_OPTIONS:-}
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      # Inside the compose network the app reaches the redis service by name on its container port; REDIS_HOST /
+      # REDIS_PORT in .env are for `npm run dev` on the host. REDIS_URL is cleared because it would win over them
+      - REDIS_URL=
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+
+  redis:
+    logging: *default-logging
+    restart: unless-stopped
+    image: redis:7-alpine
+    container_name: messenger_redis
+    ports:
+      # Host port from REDIS_PORT (pick one the portfolio's Redis doesn't use, e.g. 6381), on localhost only:
+      # `npm run dev` connects here, the app container goes through the compose network
+      - "127.0.0.1:${REDIS_PORT:-6381}:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+
+volumes:
+  redis-data: ~

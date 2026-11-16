@@ -1,0 +1,14 @@
+/node_modules
+/.next
+/coverage
+/tests
+/note
+.git
+.claude
+.vscode
+.playwright-mcp
+*.tsbuildinfo
+# secrets reach the container through env_file at run time, never an image layer
+.env
+.env.*
+!.env.example

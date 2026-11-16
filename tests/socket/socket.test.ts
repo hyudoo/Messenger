@@ -1,5 +1,6 @@
 import { createServer, type Server as HttpServer } from "http";
 import type { AddressInfo } from "net";
+import { createClient } from "redis";
 import { io as connect, type Socket as ClientSocket } from "socket.io-client";
 import type { Server } from "socket.io";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +39,7 @@ vi.mock("@/app/libs/prismadb", () => ({
 
 import { initSocketServer } from "@/server/socket";
 import { emitToConversation } from "@/app/libs/socket-server";
-import { conversationRoom } from "@/app/libs/socket-rooms";
+import { callRoom, conversationRoom } from "@/app/libs/socket-rooms";
 
 // ---- harness ----
 const servers: { http: HttpServer; io: Server }[] = [];
@@ -228,5 +229,37 @@ describe.skipIf(!process.env.TEST_REDIS_URL)("socket server on two instances (Re
     const offer = next(guest, "call:offer");
     host.emit("call:offer", GROUP, { type: "offer", sdp: "y" });
     expect(await offer).toEqual({ type: "offer", sdp: "y" });
+  });
+
+  it("picks exactly one host when peers on two instances join at the same time", async () => {
+    const [one, two] = await twoInstances();
+    for (let round = 0; round < 5; round++) {
+      const a = (await connected(one.url, ME)).socket;
+      const b = (await connected(two.url, OTHER)).socket;
+
+      const results = await Promise.all([joinCall(a, CONVERSATION), joinCall(b, CONVERSATION)]);
+
+      expect(results.every((result) => result.ok)).toBe(true);
+      expect(results.filter((result) => result.isHost)).toHaveLength(1);
+      a.close();
+      b.close();
+      await vi.waitFor(async () =>
+        expect(await one.io.in(callRoom(CONVERSATION)).fetchSockets()).toHaveLength(0)
+      );
+    }
+  });
+
+  it("takes over the host key from a socket that is no longer in the call", async () => {
+    const [one, two] = await twoInstances();
+    const redis = createClient({ url: process.env.TEST_REDIS_URL });
+    await redis.connect();
+    // e.g. left behind by an instance that crashed during a call
+    await redis.set(`call-host:${GROUP}`, "gone-socket");
+    await redis.quit();
+
+    const host = (await connected(one.url, ME)).socket;
+    const guest = (await connected(two.url, OTHER)).socket;
+    expect(await joinCall(host, GROUP)).toEqual({ ok: true, isHost: true });
+    expect(await joinCall(guest, GROUP)).toEqual({ ok: true, isHost: false });
   });
 });

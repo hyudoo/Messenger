@@ -32,7 +32,7 @@ app
       handle(req, res, parse(req.url!, true));
     });
 
-    // connects to Redis first when REDIS_URL is set
+    // connects to Redis first when REDIS_URL or REDIS_HOST is set
     await initSocketServer(httpServer);
 
     httpServer.listen(port, () => {

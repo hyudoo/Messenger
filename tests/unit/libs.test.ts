@@ -5,6 +5,7 @@ import { getIceServers } from "@/app/libs/ice-servers";
 import { validatePassword } from "@/app/libs/password";
 import { LIMITS, clientIp, rateLimit } from "@/app/libs/rate-limit";
 import { createPresignedUpload, isUploadedFileUrl } from "@/app/libs/s3";
+import { getRedisUrl } from "@/app/libs/redis-url";
 import { ME, OTHER, S3_BASE, resetRateLimits, uploadUrl } from "../helpers";
 
 describe("validatePassword", () => {
@@ -100,6 +101,32 @@ describe("rateLimit (in memory)", () => {
 });
 
 // needs a real Redis: TEST_REDIS_URL=redis://localhost:6390 npm test
+describe("getRedisUrl", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is null when nothing is configured", () => {
+    expect(getRedisUrl()).toBeNull();
+  });
+
+  it("builds the URL from host, port and an encoded password", () => {
+    vi.stubEnv("REDIS_HOST", "localhost");
+    vi.stubEnv("REDIS_PORT", "6380");
+    vi.stubEnv("REDIS_PASSWORD", "p@ss:w/rd#1");
+    expect(getRedisUrl()).toBe("redis://:p%40ss%3Aw%2Frd%231@localhost:6380");
+  });
+
+  it("defaults the port and omits auth without a password", () => {
+    vi.stubEnv("REDIS_HOST", "redis");
+    expect(getRedisUrl()).toBe("redis://redis:6379");
+  });
+
+  it("prefers REDIS_URL when both are set", () => {
+    vi.stubEnv("REDIS_HOST", "localhost");
+    vi.stubEnv("REDIS_URL", "rediss://cloud:6380");
+    expect(getRedisUrl()).toBe("rediss://cloud:6380");
+  });
+});
+
 describe.skipIf(!process.env.TEST_REDIS_URL)("rateLimit (Redis)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

@@ -1,0 +1,120 @@
+workflow:
+  auto_cancel:
+    on_new_commit: conservative
+
+stages:
+  - build
+  - deploy
+
+# Build and deploy share the same tag so deploy finds the image built for this commit
+variables:
+  APP_IMAGE: "${CI_PROJECT_PATH_SLUG}:${CI_COMMIT_SHA}"
+  # Images of the latest deploys kept on the server, so an earlier one can be rolled back to (see the deploy job)
+  KEEP_IMAGES: "5"
+
+# Typecheck and ESLint in a throwaway Node container. The checkout is mounted read-only at /src and copied to /app,
+# so nothing the container writes as root (node_modules, the generated Prisma client) lands in the runner's checkout;
+# the npm cache volume keeps installs fast between pipelines. node:22 (Debian, not alpine): Prisma needs OpenSSL
+lint:
+  tags:
+    - main
+  stage: build
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - docker run --rm -v "$PWD":/src:ro -v messenger-npm:/root/.npm node:22 sh -c "cp -a /src /app && cd /app && npm ci --no-audit --no-fund && npx tsc --noEmit && npm run lint"
+
+# Vitest, same throwaway-container setup as lint. The Redis tests run against a Redis container started on a private
+# network for this job only (a shell runner has no `services:`); after_script removes both even when the job fails
+test:
+  tags:
+    - main
+  stage: build
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  variables:
+    TEST_NETWORK: "messenger-test-${CI_JOB_ID}"
+    TEST_REDIS: "messenger-test-redis-${CI_JOB_ID}"
+  script:
+    - docker network create "$TEST_NETWORK"
+    - docker run -d --rm --name "$TEST_REDIS" --network "$TEST_NETWORK" redis:7-alpine
+    - docker run --rm --network "$TEST_NETWORK" -e TEST_REDIS_URL="redis://${TEST_REDIS}:6379" -v "$PWD":/src:ro -v messenger-npm:/root/.npm node:22 sh -c "cp -a /src /app && cd /app && npm ci --no-audit --no-fund && npm test"
+  after_script:
+    - docker rm -f "$TEST_REDIS" > /dev/null 2>&1 || true
+    - docker network rm "$TEST_NETWORK" > /dev/null 2>&1 || true
+
+# Known vulnerabilities in the locked dependencies (OSV database). Informational only: it never blocks a deploy,
+# since a fix often waits on an upstream release. Accepted advisories live in osv-scanner.toml.
+# When the job turns orange, read its log and bump or replace the package it names
+audit:
+  tags:
+    - main
+  stage: build
+  interruptible: true
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - docker run --rm -v "$PWD":/src:ro ghcr.io/google/osv-scanner:v1.9.2 --config=/src/osv-scanner.toml --lockfile=/src/package-lock.json
+
+# ENV_FILE is a File-type CI/CD variable holding the production .env. next.config.js reads AWS_REGION, AWS_S3_BUCKET
+# and NEXT_PUBLIC_S3_PUBLIC_URL at build time (allowed upload image host), so they are passed as build args
+build:
+  tags:
+    - main
+  stage: build
+  interruptible: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cp "${ENV_FILE}" .env
+    - set -a
+    - source .env
+    - set +a
+    - bash scripts/ci-docker-build.sh
+
+deploy:
+  tags:
+    - main
+  stage: deploy
+  interruptible: false
+  resource_group: production
+  environment:
+    name: production
+  needs:
+    - build
+    - lint
+    - test
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - cp "${ENV_FILE}" .env
+    - set -a
+    - source .env
+    - set +a
+    # Rollback: GitLab > Operate > Environments > production > "Rollback environment" re-runs the deploy job of an
+    # earlier pipeline, which starts that commit's image again. Only the newest KEEP_IMAGES images are kept
+    - |
+      if ! docker image inspect "$APP_IMAGE" > /dev/null 2>&1; then
+        echo "Image $APP_IMAGE is no longer on the server (only the newest $KEEP_IMAGES are kept). Roll back to a more recent deployment, or retry its build job first."
+        exit 1
+      fi
+    # Sync the schema's collections and indexes with the new image before swapping containers. MongoDB has no
+    # migrations: a change db push can't apply safely (e.g. a new unique index over duplicate data) fails the job here
+    # while the previous version keeps serving. A rollback does not undo it, so keep schema changes additive
+    - docker compose run --rm --no-deps app npx prisma db push --skip-generate
+    # The app's image was checked above; --pull missing only fetches redis:7-alpine on the first deploy.
+    # depends_on starts the redis service too (data survives in the redis-data volume)
+    - docker compose up -d --no-build --pull missing app
+    # Every deploy leaves a tagged image behind; keep the newest KEEP_IMAGES for rollbacks and remove the rest
+    # (one still used by a container is skipped), then the untagged leftovers of builds
+    - |
+      docker image ls "$CI_PROJECT_PATH_SLUG" --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' \
+        | sort -r | tail -n +$((KEEP_IMAGES + 1)) | cut -d'|' -f2 \
+        | xargs -r docker image rm || true
+    - docker image prune -f
