@@ -17,7 +17,8 @@
     "members": "{count} thành viên",
     "select_placeholder": "Chọn...",
     "no_options": "Không có lựa chọn",
-    "clear": "Xoá tìm kiếm"
+    "clear": "Xoá tìm kiếm",
+    "group_photo": "Ảnh nhóm"
   },
   "theme": {
     "toggle": "Đổi giao diện sáng / tối",
@@ -158,7 +159,15 @@
     "open_file": "Mở {name}",
     "forward": "Chuyển tiếp",
     "forwarded": "Đã chuyển tiếp",
-    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ)."
+    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ).",
+    "mention_suggestions": "Gợi ý thành viên để nhắc tên",
+    "more": "Thêm",
+    "pin": "Ghim tin nhắn",
+    "unpin": "Bỏ ghim",
+    "pin_failed": "Không ghim được tin nhắn!",
+    "pin_limit": "Chỉ ghim được tối đa 20 tin nhắn.",
+    "delete_for_me": "Xoá ở phía bạn",
+    "delete_for_me_failed": "Không xoá được tin nhắn!"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -197,7 +206,20 @@
     "remove_confirm": "Bấm lần nữa để xoá {name} khỏi nhóm",
     "remove_short": "Xoá?",
     "update_failed": "Không cập nhật được nhóm!",
-    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!",
+    "admin": "Quản trị viên",
+    "make_admin": "Cho {name} làm quản trị viên",
+    "unmake_admin": "Bỏ quyền quản trị viên của {name}",
+    "change_photo": "Đổi ảnh",
+    "remove_photo": "Xoá ảnh",
+    "invite_title": "Link mời vào nhóm",
+    "invite_hint": "Ai có link đều có thể tham gia nhóm.",
+    "invite_on": "Tạo link",
+    "invite_reset": "Đặt lại link",
+    "invite_off": "Tắt link",
+    "invite_copy": "Sao chép",
+    "invite_copied": "Đã sao chép link mời!",
+    "invite_copy_failed": "Không sao chép được link!"
   },
   "users": {
     "title": "Mọi người",
@@ -251,7 +273,12 @@
     "declined": "{name} đã từ chối cuộc gọi",
     "no_answer": "{name} không trả lời",
     "audio_call": "Cuộc gọi thoại",
-    "camera_error": "Không bật được camera!"
+    "camera_error": "Không bật được camera!",
+    "share_screen": "Chia sẻ màn hình",
+    "stop_share": "Dừng chia sẻ màn hình",
+    "sharing_you": "Bạn đang chia sẻ màn hình",
+    "sharing_other": "{name} đang chia sẻ màn hình",
+    "share_error": "Không chia sẻ được màn hình!"
   },
   "emoji": {
     "open": "Chọn biểu tượng cảm xúc",
@@ -268,7 +295,12 @@
     "left": "{actor} đã rời nhóm",
     "you_subject": "Bạn",
     "you_object": "bạn",
-    "someone": "Ai đó"
+    "someone": "Ai đó",
+    "pinned": "{actor} đã ghim một tin nhắn",
+    "photo": "{actor} đã đổi ảnh nhóm",
+    "promoted": "{actor} đã cho {users} làm quản trị viên",
+    "demoted": "{actor} đã bỏ quyền quản trị viên của {users}",
+    "joined": "{actor} đã tham gia nhóm qua link mời"
   },
   "presence": {
     "just_now": "Vừa mới hoạt động",
@@ -300,7 +332,8 @@
     "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
     "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
     "voice": "Đã gửi một tin nhắn thoại.",
-    "file": "Đã gửi tệp {name}."
+    "file": "Đã gửi tệp {name}.",
+    "mentioned_you": "Đã nhắc đến bạn: {text}"
   },
   "viewer": {
     "close": "Đóng",
@@ -329,5 +362,29 @@
     "sending": "Đang gửi…",
     "sent": "Đã gửi",
     "retry": "Thử lại"
+  },
+  "block": {
+    "block": "Chặn",
+    "unblock": "Bỏ chặn",
+    "confirm": "Chặn?",
+    "failed": "Không thực hiện được, thử lại sau.",
+    "blocked_by_me": "Bạn đã chặn {name}. Hai người không nhắn tin hay gọi cho nhau được.",
+    "blocked_by_them": "Bạn không thể trả lời cuộc trò chuyện này."
+  },
+  "pins": {
+    "show": "Xem tin nhắn đã ghim",
+    "all": "Tất cả ({count})",
+    "unpin": "Bỏ ghim",
+    "failed": "Không bỏ ghim được!"
+  },
+  "join": {
+    "invited": "Bạn được mời tham gia nhóm",
+    "members": "{count} thành viên",
+    "join": "Tham gia nhóm",
+    "back": "Về hộp thư",
+    "invalid_title": "Link mời không còn hiệu lực",
+    "invalid": "Link này đã bị tắt hoặc đặt lại. Hãy xin link mới từ thành viên của nhóm.",
+    "failed": "Không tham gia được nhóm!",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
   }
 }

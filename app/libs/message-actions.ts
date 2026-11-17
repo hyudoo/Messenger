@@ -33,6 +33,10 @@ export const canForwardMessage = (
   message: Actionable & { image?: string | null; attachment?: unknown }
 ) => isLive(message) && !!(message.body || message.image || message.attachment);
 
+// Anyone in the conversation may pin a person's message that is still there.
+export const canPinMessage = (message: Actionable) => isLive(message);
+export const MAX_PINNED_MESSAGES = 20;
+
 // Anyone in the conversation may reply to a message that is still there.
 export const canReplyToMessage = (message: Actionable) => isLive(message);
 

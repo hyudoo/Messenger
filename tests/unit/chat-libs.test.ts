@@ -1,14 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import { splitLinks } from "@/app/libs/linkify";
-import { matchesSearch, normalizeSearch } from "@/app/libs/search";
+import {
+  findFoldedMatch,
+  matchesSearch,
+  normalizeSearch,
+  searchTextOf,
+} from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
+import { findMentions, mentionQueryAt, splitMentions } from "@/app/libs/mentions";
 import {
   canEditGroup,
+  canManageAdmins,
+  canManageInvite,
   canRemoveMember,
+  isGroupAdmin,
   normalizeGroupName,
 } from "@/app/libs/conversation-permissions";
+import { isInviteCode, safeNextPath } from "@/app/libs/invite-code";
 import {
   canEditMessage,
   canRecallMessage,
@@ -211,10 +221,112 @@ describe("group permissions", () => {
     expect(canRemoveMember({ isGroup: false, ownerId: null }, "me", "other")).toBe(false);
   });
 
+  it("knows admins: the owner, the picked ones, anyone in an ownerless group", () => {
+    const withAdmins = { isGroup: true, ownerId: "owner", adminIds: ["admin"] };
+    expect(isGroupAdmin(withAdmins, "owner")).toBe(true);
+    expect(isGroupAdmin(withAdmins, "admin")).toBe(true);
+    expect(isGroupAdmin(withAdmins, "member")).toBe(false);
+    expect(isGroupAdmin(group(null), "member")).toBe(true);
+    expect(isGroupAdmin({ isGroup: false, ownerId: null }, "member")).toBe(false);
+    expect(canManageInvite(withAdmins, "admin")).toBe(true);
+  });
+
+  it("lets admins remove members, only the owner remove admins, nobody the owner", () => {
+    const withAdmins = { isGroup: true, ownerId: "owner", adminIds: ["admin", "admin2"] };
+    expect(canRemoveMember(withAdmins, "admin", "member")).toBe(true);
+    expect(canRemoveMember(withAdmins, "admin", "admin2")).toBe(false);
+    expect(canRemoveMember(withAdmins, "admin", "owner")).toBe(false);
+    expect(canRemoveMember(withAdmins, "owner", "admin")).toBe(true);
+    expect(canRemoveMember(withAdmins, "member", "other")).toBe(false);
+  });
+
+  it("lets only the owner change admins, never their own role", () => {
+    expect(canManageAdmins(group("owner"), "owner", "member")).toBe(true);
+    expect(canManageAdmins(group("owner"), "owner", "owner")).toBe(false);
+    expect(canManageAdmins({ ...group("owner"), adminIds: ["admin"] }, "admin", "member")).toBe(false);
+    expect(canManageAdmins(group(null), "member", "other")).toBe(false);
+  });
+
   it("normalizes a group name", () => {
     expect(normalizeGroupName("  Team ")).toBe("Team");
     expect(normalizeGroupName("   ")).toBeNull();
     expect(normalizeGroupName(42)).toBeNull();
     expect(normalizeGroupName("x".repeat(101))).toBeNull();
+  });
+});
+
+describe("message search folding", () => {
+  it("folds a body like the inbox search", () => {
+    expect(searchTextOf("Xin Chào ĐỨC")).toBe("xin chao duc");
+    expect(searchTextOf("   ")).toBeUndefined();
+    expect(searchTextOf(null)).toBeUndefined();
+  });
+
+  it("finds the match in the original text, ignoring case and diacritics", () => {
+    const text = "Hẹn gặp Đức lúc 5h nhé";
+    const match = findFoldedMatch(text, "duc luc")!;
+    expect(text.slice(...match)).toBe("Đức lúc");
+    expect(findFoldedMatch(text, "HEN")).toEqual([0, 3]);
+    expect(findFoldedMatch(text, "xyz")).toBeNull();
+    expect(findFoldedMatch(text, "  ")).toBeNull();
+  });
+
+  it("keeps whole characters around emoji", () => {
+    const text = "😀 chào";
+    expect(text.slice(...findFoldedMatch(text, "chao")!)).toBe("chào");
+  });
+});
+
+describe("mentions", () => {
+  const members = [
+    { id: "a", name: "Huy", email: "a@x" },
+    { id: "b", name: "Huy Do", email: "b@x" },
+    { id: "c", name: "An", email: "c@x" },
+  ];
+
+  it("finds members named as @Name, longest name first, not the sender", () => {
+    expect(findMentions("@Huy Do ơi, @An!", members, "a").map((m) => m.id)).toEqual(["b", "c"]);
+    expect(findMentions("hi @Huy.", members).map((m) => m.id)).toEqual(["a"]);
+    expect(findMentions("@An", members, "c")).toEqual([]);
+  });
+
+  it("ignores names inside other words or e-mails", () => {
+    expect(findMentions("@Annie", members)).toEqual([]);
+    expect(findMentions("mail@An", members)).toEqual([]);
+    expect(findMentions("no at sign", members)).toEqual([]);
+  });
+
+  it("cuts the text around its mentions", () => {
+    const mention = { id: "b", name: "Huy Do", email: "b@x" };
+    expect(splitMentions("hey @Huy Do, ok", [mention])).toEqual([
+      { type: "text", value: "hey " },
+      { type: "mention", value: "@Huy Do", mention },
+      { type: "text", value: ", ok" },
+    ]);
+    expect(splitMentions("plain", [])).toEqual([{ type: "text", value: "plain" }]);
+  });
+
+  it("finds the @word being typed before the caret", () => {
+    expect(mentionQueryAt("hi @hu", 6)).toEqual({ start: 3, query: "hu" });
+    expect(mentionQueryAt("@", 1)).toEqual({ start: 0, query: "" });
+    expect(mentionQueryAt("mail@x", 6)).toBeNull();
+    expect(mentionQueryAt("@huy do", 7)).toBeNull();
+  });
+});
+
+describe("invite codes", () => {
+  it("accepts only 16 base64url characters", () => {
+    expect(isInviteCode("AbCdEfGhIjKlMn_-")).toBe(true);
+    expect(isInviteCode("short")).toBe(false);
+    expect(isInviteCode("AbCdEfGhIjKlMn_/")).toBe(false);
+    expect(isInviteCode(42)).toBe(false);
+  });
+
+  it("only lets the login page go back to a join page", () => {
+    expect(safeNextPath("/join/AbCdEfGhIjKlMn_-")).toBe("/join/AbCdEfGhIjKlMn_-");
+    expect(safeNextPath("//evil.example/join/AbCdEfGhIjKlMn_-")).toBeNull();
+    expect(safeNextPath("https://evil.example")).toBeNull();
+    expect(safeNextPath("/conversations")).toBeNull();
+    expect(safeNextPath(["/join/AbCdEfGhIjKlMn_-"])).toBeNull();
   });
 });

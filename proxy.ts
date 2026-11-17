@@ -5,10 +5,11 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
 import { routing } from "./i18n/routing";
+import { safeNextPath } from "./app/libs/invite-code";
 
 const intlMiddleware = createMiddleware(routing);
 
-const PROTECTED_PATHS = ["/conversations", "/users", "/room"];
+const PROTECTED_PATHS = ["/conversations", "/users", "/room", "/join"];
 const LOCALE_PREFIX = new RegExp(`^/(${routing.locales.join("|")})(?=/|$)`);
 
 const localeOf = (req: NextRequest) => {
@@ -30,6 +31,11 @@ export default async function proxy(req: NextRequest) {
       const url = req.nextUrl.clone();
       url.pathname = `/${localeOf(req)}`;
       url.search = "";
+      // an invite link opens again after signing in (AuthForm); nothing else is passed on
+      const next = safeNextPath(path);
+      if (next) {
+        url.searchParams.set("next", next);
+      }
       return NextResponse.redirect(url);
     }
   }

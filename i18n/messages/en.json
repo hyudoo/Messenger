@@ -17,7 +17,8 @@
     "members": "{count, plural, one {# member} other {# members}}",
     "select_placeholder": "Select...",
     "no_options": "No options",
-    "clear": "Clear search"
+    "clear": "Clear search",
+    "group_photo": "Group photo"
   },
   "theme": {
     "toggle": "Toggle light / dark theme",
@@ -158,7 +159,15 @@
     "open_file": "Open {name}",
     "forward": "Forward",
     "forwarded": "Forwarded",
-    "jump_not_found": "Couldn't find this message (it may be too old)."
+    "jump_not_found": "Couldn't find this message (it may be too old).",
+    "mention_suggestions": "Members to mention",
+    "more": "More",
+    "pin": "Pin message",
+    "unpin": "Unpin",
+    "pin_failed": "Couldn't pin the message!",
+    "pin_limit": "You can pin at most 20 messages.",
+    "delete_for_me": "Delete for you",
+    "delete_for_me_failed": "Couldn't delete the message!"
   },
   "profile": {
     "close": "Close panel",
@@ -197,7 +206,20 @@
     "remove_confirm": "Click again to remove {name} from the group",
     "remove_short": "Remove?",
     "update_failed": "Couldn't update the group!",
-    "too_fast": "Too many changes, wait a moment and try again!"
+    "too_fast": "Too many changes, wait a moment and try again!",
+    "admin": "Admin",
+    "make_admin": "Make {name} an admin",
+    "unmake_admin": "Remove {name} as admin",
+    "change_photo": "Change photo",
+    "remove_photo": "Remove photo",
+    "invite_title": "Invite link",
+    "invite_hint": "Anyone with the link can join the group.",
+    "invite_on": "Create link",
+    "invite_reset": "Reset link",
+    "invite_off": "Turn off",
+    "invite_copy": "Copy",
+    "invite_copied": "Invite link copied!",
+    "invite_copy_failed": "Couldn't copy the link!"
   },
   "users": {
     "title": "People",
@@ -251,7 +273,12 @@
     "declined": "{name} declined the call",
     "no_answer": "{name} didn't answer",
     "audio_call": "Audio call",
-    "camera_error": "Can't turn the camera on!"
+    "camera_error": "Can't turn the camera on!",
+    "share_screen": "Share screen",
+    "stop_share": "Stop sharing",
+    "sharing_you": "You're sharing your screen",
+    "sharing_other": "{name} is sharing their screen",
+    "share_error": "Couldn't share the screen!"
   },
   "emoji": {
     "open": "Choose an emoji",
@@ -268,7 +295,12 @@
     "left": "{actor} left the group",
     "you_subject": "You",
     "you_object": "you",
-    "someone": "Someone"
+    "someone": "Someone",
+    "pinned": "{actor} pinned a message",
+    "photo": "{actor} changed the group photo",
+    "promoted": "{actor} made {users} an admin",
+    "demoted": "{actor} removed {users} as admin",
+    "joined": "{actor} joined the group via the invite link"
   },
   "presence": {
     "just_now": "Active just now",
@@ -300,7 +332,8 @@
     "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
     "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "voice": "Sent a voice message.",
-    "file": "Sent the file {name}."
+    "file": "Sent the file {name}.",
+    "mentioned_you": "Mentioned you: {text}"
   },
   "viewer": {
     "close": "Close",
@@ -329,5 +362,29 @@
     "sending": "Sending…",
     "sent": "Sent",
     "retry": "Retry"
+  },
+  "block": {
+    "block": "Block",
+    "unblock": "Unblock",
+    "confirm": "Block?",
+    "failed": "That didn't work, try again later.",
+    "blocked_by_me": "You blocked {name}. You can't message or call each other.",
+    "blocked_by_them": "You can't reply to this conversation."
+  },
+  "pins": {
+    "show": "Show the pinned message",
+    "all": "All ({count})",
+    "unpin": "Unpin",
+    "failed": "Couldn't unpin!"
+  },
+  "join": {
+    "invited": "You're invited to join",
+    "members": "{count, plural, one {# member} other {# members}}",
+    "join": "Join group",
+    "back": "Back to chats",
+    "invalid_title": "This invite link no longer works",
+    "invalid": "It was turned off or reset. Ask a member of the group for a new one.",
+    "failed": "Couldn't join the group!",
+    "too_fast": "You're going too fast, wait a moment and try again!"
   }
 }

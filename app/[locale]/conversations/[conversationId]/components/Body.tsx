@@ -290,9 +290,18 @@ const Body: React.FC<BodyProps> = ({
     socket.on("messages:new", messageHandler);
     socket.on("messages:update", updateMessagesHandler);
     socket.on("connect", resyncHandler);
+    // deleted for the user only (here or in another tab)
+    const hideHandler = (event: { conversationId: string; messageId: string }) => {
+      if (event.conversationId === conversationId) {
+        setMessages((current) => current.filter((message) => message.id !== event.messageId));
+      }
+    };
+
     socket.on("typing", typingHandler);
+    socket.on("messages:hide", hideHandler);
     return () => {
       socket.off("typing", typingHandler);
+      socket.off("messages:hide", hideHandler);
       unsubscribe();
       document.removeEventListener("visibilitychange", markSeen);
       socket.off("messages:new", messageHandler);

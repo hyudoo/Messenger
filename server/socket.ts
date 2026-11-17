@@ -10,7 +10,8 @@ import prisma from "../app/libs/prismadb";
 import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
 import { moveCallSafely } from "./call-log";
 import { getRedisUrl } from "../app/libs/redis-url";
-import { setIO } from "../app/libs/socket-server";
+import { blockCache, setIO } from "../app/libs/socket-server";
+import { blockPartnersOf } from "../app/libs/blocks";
 import {
   callRoom,
   conversationRoom,
@@ -145,22 +146,33 @@ const TYPING_MIN_INTERVAL_MS = 1000;
 // The members' emails per conversation, for relaying "typing" to their inboxes without a
 // database lookup per keystroke. Briefly stale after a member change: someone just added misses
 // a few seconds of it, and an inbox without that conversation ignores it.
+// Cached as promises, so events for one conversation keep their order while it loads.
 const MEMBER_CACHE_MS = 30_000;
-const memberCache = new Map<string, { emails: string[]; at: number }>();
+type Members = { emails: string[]; isGroup: boolean };
+const memberCache = new Map<string, { members: Promise<Members>; at: number }>();
 
-const memberEmails = async (conversationId: string) => {
-  const cached = memberCache.get(conversationId);
-  if (cached && Date.now() - cached.at < MEMBER_CACHE_MS) {
-    return cached.emails;
-  }
+const loadMembers = async (conversationId: string): Promise<Members> => {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { users: { select: { email: true } } },
+    select: { isGroup: true, users: { select: { email: true } } },
   });
-  const emails = (conversation?.users ?? [])
-    .map((user) => user.email)
-    .filter((email): email is string => !!email);
-  memberCache.set(conversationId, { emails, at: Date.now() });
+  return {
+    isGroup: !!conversation?.isGroup,
+    emails: (conversation?.users ?? [])
+      .map((user) => user.email)
+      .filter((email): email is string => !!email),
+  };
+};
+
+const memberEmails = (conversationId: string) => {
+  const cached = memberCache.get(conversationId);
+  if (cached && Date.now() - cached.at < MEMBER_CACHE_MS) {
+    return cached.members;
+  }
+  const members = loadMembers(conversationId);
+  // a failed load isn't kept
+  members.catch(() => memberCache.delete(conversationId));
+  memberCache.set(conversationId, { members, at: Date.now() });
   // drop old entries now and then, so the map doesn't grow with every conversation ever typed in
   if (memberCache.size > 1000) {
     const cutoff = Date.now() - MEMBER_CACHE_MS;
@@ -170,7 +182,35 @@ const memberEmails = async (conversationId: string) => {
       }
     });
   }
-  return emails;
+  return members;
+};
+
+// Who must not see a user's presence or typing, and whose they must not see: everyone they
+// blocked or were blocked by (emails). Cached per user on globalThis (blockCache), cleared by
+// POST /api/users/[userId]/block here and through "blocks:changed" on the other instances.
+const hiddenFor = (email: string) => {
+  const cache = blockCache();
+  let hidden = cache.get(email);
+  if (!hidden) {
+    hidden = prisma.user
+      .findUnique({ where: { email }, select: { id: true } })
+      .then(async (user) => {
+        if (!user) {
+          return new Set<string>();
+        }
+        const partners = await blockPartnersOf(user.id);
+        return new Set(
+          Array.from(partners.values()).filter((partner): partner is string => !!partner)
+        );
+      })
+      .catch((error) => {
+        logError("block_partners", error);
+        cache.delete(email);
+        return new Set<string>();
+      });
+    cache.set(email, hidden);
+  }
+  return hidden;
 };
 
 // "Active 5 minutes ago": stamped on every disconnect (only shown while the user is offline, so
@@ -288,7 +328,31 @@ const attachRedisAdapter = async (io: AppServer): Promise<RedisClient | null> =>
 export const initSocketServer = async (httpServer: HttpServer) => {
   const io: AppServer = new Server(httpServer);
   const redis = await attachRedisAdapter(io);
-  const presence = createPresence(io, { clustered: !!redis });
+  globalThis.ioClustered = !!redis;
+  // online / offline go to everyone here except the user's block partners
+  const presence = createPresence(io, {
+    clustered: !!redis,
+    announce: (event, email) => {
+      void hiddenFor(email).then((hidden) => {
+        const except = Array.from(hidden).map(userRoom);
+        (except.length > 0 ? io.local.except(except) : io.local).emit(event, email);
+      });
+    },
+  });
+  // a block / unblock on another instance
+  io.on("blocks:changed", (emails: unknown) => {
+    if (Array.isArray(emails)) {
+      emails.forEach((email) => typeof email === "string" && blockCache().delete(email));
+    }
+  });
+  // the online list as this user may see it
+  const sendPresenceList = (socket: AppSocket) =>
+    hiddenFor(socket.data.email).then((hidden) =>
+      socket.emit(
+        "presence:list",
+        presence.list().filter((online) => !hidden.has(online))
+      )
+    );
   presences.set(io, presence);
 
   io.use(async (socket, next) => {
@@ -344,12 +408,16 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         lastTypingAt = now;
       }
       const event = { conversationId, email, typing: isTyping };
-      socket.to(room).emit("typing", event);
-      memberEmails(conversationId)
-        .then((emails) => {
-          const inboxes = emails.filter((member) => member !== email).map(userRoom);
-          if (inboxes.length > 0) {
-            io.to(inboxes).emit("conversation:typing", event);
+      Promise.all([memberEmails(conversationId), hiddenFor(email)])
+        .then(([{ emails, isGroup }, hidden]) => {
+          const others = emails.filter((member) => member !== email);
+          // a blocked 1:1 chat: the other one doesn't see it
+          if (!isGroup && others.some((other) => hidden.has(other))) {
+            return;
+          }
+          socket.to(room).emit("typing", event);
+          if (others.length > 0) {
+            io.to(others.map(userRoom)).emit("conversation:typing", event);
           }
         })
         .catch((error) => logError("typing_members", error));
@@ -525,8 +593,10 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       presence.remove(email);
       touchLastSeen(userId);
     });
+    // asked again after a block / unblock (block:update)
+    socket.on("presence:sync", () => void sendPresenceList(socket));
     presence.add(email);
-    socket.emit("presence:list", presence.list());
+    void sendPresenceList(socket);
   });
 
   setIO(io);

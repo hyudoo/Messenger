@@ -11,6 +11,8 @@ import { deleteConversation } from "@/app/libs/conversation-delete";
 import { emitGroupUpdate } from "@/app/libs/conversation-members";
 import { postSystemMessage } from "@/app/libs/system-message";
 import { emitToUser } from "@/app/libs/socket-server";
+import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
+import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import prisma from "@/app/libs/prismadb";
 import { logError } from "@/app/libs/log";
@@ -23,7 +25,8 @@ const OBJECT_ID = /^[a-f\d]{24}$/i;
 // people added at once (the picker offers everyone, so this only stops abuse)
 const MAX_ADD = 50;
 
-// PATCH { name?, addUserIds? }: renames a group and / or adds people to it (any member).
+// PATCH { name?, image?, addUserIds? }: renames a group, changes its photo (the caller's own upload,
+// or null to remove it) and / or adds people to it (any member).
 // The members get the new name / list (conversation:update); the people added get the
 // conversation as their inbox shows it (conversation:new).
 export async function PATCH(
@@ -64,8 +67,26 @@ export async function PATCH(
         )
       )
     );
-    if (addIds.length > MAX_ADD || (name === undefined && addIds.length === 0)) {
+    // undefined: unchanged; null: removed; else the caller's own upload
+    const image: string | null | undefined =
+      body?.image === undefined || body.image === conversation.image ? undefined : body.image;
+    if (image !== undefined && image !== null && !isUploadedFileUrl(image, currentUser.id)) {
+      return new NextResponse("Invalid image", { status: 400 });
+    }
+    if (
+      addIds.length > MAX_ADD ||
+      (name === undefined && image === undefined && addIds.length === 0)
+    ) {
       return new NextResponse("Invalid data", { status: 400 });
+    }
+    if (image) {
+      // keeps the file from the pending-upload expiry; fails if it was never uploaded
+      try {
+        await markUploadsUsed([image]);
+      } catch (error) {
+        logError("mark_upload_used", error);
+        return new NextResponse("Image not found", { status: 400 });
+      }
     }
     if (addIds.length > 0) {
       const existing = await prisma.user.count({ where: { id: { in: addIds } } });
@@ -78,6 +99,7 @@ export async function PATCH(
       where: { id: conversation.id },
       data: {
         ...(name !== undefined && { name }),
+        ...(image !== undefined && { image }),
         ...(addIds.length > 0 && { users: { connect: addIds.map((id) => ({ id })) } }),
       },
       include: { users: true },
@@ -92,6 +114,14 @@ export async function PATCH(
     // theirs is ignored until conversation:new below)
     if (name !== undefined && name !== conversation.name) {
       await postSystemMessage({ conversation: updated, actorId: currentUser.id, type: "renamed", name });
+    }
+    if (image !== undefined) {
+      // the replaced photo, if nothing else uses it
+      cleanUpUploads([conversation.image]);
+      // removing it needs no event: the group's avatar just goes back to its members'
+      if (image) {
+        await postSystemMessage({ conversation: updated, actorId: currentUser.id, type: "photo" });
+      }
     }
     if (added.length > 0) {
       const event = await postSystemMessage({

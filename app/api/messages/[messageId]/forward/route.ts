@@ -6,6 +6,8 @@ import prisma from "@/app/libs/prismadb";
 import { canForwardMessage } from "@/app/libs/message-actions";
 import { deliverMessage } from "@/app/libs/message-delivery";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
+import { searchTextOf } from "@/app/libs/search";
+import { isBlockedBetween } from "@/app/libs/blocks";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 
@@ -46,13 +48,19 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
     if (!canForwardMessage(original)) {
       return new NextResponse("This message can't be forwarded", { status: 400 });
     }
+    const other = target.isGroup ? null : target.users.find((user) => user.id !== currentUser.id);
+    if (other && (await isBlockedBetween(currentUser.id, other.id))) {
+      return new NextResponse("Blocked", { status: 403 });
+    }
 
     const copy = await prisma.message.create({
       include: MESSAGE_INCLUDE,
       data: {
         body: original.body ?? undefined,
+        searchText: searchTextOf(original.body),
         image: original.image ?? undefined,
         attachment: original.attachment ?? undefined,
+        linkPreview: original.linkPreview ?? undefined,
         forwarded: true,
         conversationId: target.id,
         senderId: currentUser.id,

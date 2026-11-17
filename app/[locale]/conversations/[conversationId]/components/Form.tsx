@@ -14,6 +14,7 @@ import EmojiPicker from "@/app/components/EmojiPicker";
 import useComposer from "@/app/hooks/useComposer";
 import useConversation from "@/app/hooks/useConversation";
 import useOutbox, { OutboxPayload } from "@/app/hooks/useOutbox";
+import useDrafts from "@/app/hooks/useDrafts";
 import { QUICK_EMOJI } from "@/app/libs/emoji";
 import { getSocket } from "@/app/libs/socket-client";
 import {
@@ -24,7 +25,9 @@ import {
   baseContentType,
   uploadFile,
 } from "@/app/libs/upload";
-import { FullMessageType, ReplyPreview } from "@/app/types";
+import { FullMessageType, ReplyPreview, SafeUser } from "@/app/types";
+import MentionPicker, { mentionSuggestions } from "./MentionPicker";
+import { useSession } from "next-auth/react";
 
 const INPUT_ID = "message";
 // while typing, "typing" is re-sent this often (the others stop showing it after a few seconds)
@@ -49,7 +52,13 @@ const IMAGE_ACCEPT = Object.keys(IMAGE_TYPES).join(",");
 // Replying and editing are started from a message's actions (app/hooks/useComposer.ts).
 // Images and files (picked, pasted or dropped) wait in the tray, uploaded, until sent; each
 // becomes its own message, before the text. A voice message is recorded, uploaded and sent.
-const Form = () => {
+interface FormProps {
+  // the conversation's members (a group's "@" picker)
+  members: SafeUser[];
+  isGroup: boolean;
+}
+
+const Form: React.FC<FormProps> = ({ members, isGroup }) => {
   const t = useTranslations("chat");
   const tUpload = useTranslations("upload");
   const { conversationId } = useConversation();
@@ -58,7 +67,16 @@ const Form = () => {
   // only for this conversation (a reply started elsewhere doesn't follow the user here)
   const replyTo = composer.conversationId === conversationId ? composer.replyTo : null;
   const editing = composer.conversationId === conversationId ? composer.editing : null;
-  const [message, setMessage] = useState("");
+  // the text left here before switching chats (useDrafts), kept up to date in changeMessage
+  const [message, setMessage] = useState(
+    () => useDrafts.getState().drafts[conversationId] ?? ""
+  );
+  const saveDraft = (text: string) => useDrafts.getState().setDraft(conversationId, text);
+  const myEmail = useSession().data?.user?.email;
+  // the caret, for the mention picker; the picker closed with Esc at this "@" (its start)
+  const [caret, setCaret] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState<number | null>(null);
+  const [mentionActive, setMentionActive] = useState(0);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +96,8 @@ const Form = () => {
         if (state.editing && state.editing !== previous.editing) {
           setMessage(state.editing.body ?? "");
         } else if (!state.editing && previous.editing) {
-          setMessage("");
+          // back to what was being written before the edit
+          setMessage(useDrafts.getState().drafts[previous.editing.conversationId] ?? "");
         }
         if (state.editing !== previous.editing || state.replyTo !== previous.replyTo) {
           inputRef.current?.focus();
@@ -105,11 +124,14 @@ const Form = () => {
     };
   }, [conversationId]);
 
-  const changeMessage = (value: string) => {
+  const changeMessage = (value: string, at = value.length) => {
     setMessage(value);
+    setCaret(at);
+    setMentionActive(0);
     if (editing) {
-      return; // editing isn't "typing a new message"
+      return; // editing isn't "typing a new message" (nor a draft)
     }
+    saveDraft(value);
     if (!value.trim()) {
       stopTyping();
     } else if (Date.now() - typing.current.sentAt > TYPING_REFRESH_MS) {
@@ -175,6 +197,7 @@ const Form = () => {
     );
     sendAll([...attachments, ...(isEmpty ? [] : [{ message }])]);
     setMessage("");
+    saveDraft("");
     inputRef.current?.focus();
   };
 
@@ -269,6 +292,46 @@ const Form = () => {
         },
       };
 
+  // "@…" typed in a group: the members to pick from
+  const mention =
+    isGroup && !editing ? mentionSuggestions(message, caret, members, myEmail) : null;
+  const showMentions = !!mention && mention.start !== mentionDismissed;
+
+  const pickMention = (person: SafeUser) => {
+    if (!mention) {
+      return;
+    }
+    const inserted = `@${person.name} `;
+    const next = message.slice(0, mention.start) + inserted + message.slice(caret);
+    const at = mention.start + inserted.length;
+    changeMessage(next, at);
+    requestAnimationFrame(() => inputRef.current?.setSelectionRange(at, at));
+  };
+
+  const mentionKeys = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!showMentions || !mention) {
+      return false;
+    }
+    const count = mention.people.length;
+    if (event.key === "ArrowDown") {
+      setMentionActive((index) => (index + 1) % count);
+      return true;
+    }
+    if (event.key === "ArrowUp") {
+      setMentionActive((index) => (index - 1 + count) % count);
+      return true;
+    }
+    if (event.key === "Enter" || event.key === "Tab") {
+      pickMention(mention.people[Math.min(mentionActive, count - 1)]);
+      return true;
+    }
+    if (event.key === "Escape") {
+      setMentionDismissed(mention.start);
+      return true;
+    }
+    return false;
+  };
+
   if (recorder.recording) {
     return (
       <div className="w-full border-t bg-background">
@@ -360,12 +423,21 @@ const Form = () => {
             event.preventDefault();
             submit();
           }}
-          className="flex items-end gap-2 lg:gap-4 w-full">
+          className="relative flex items-end gap-2 lg:gap-4 w-full">
+          {showMentions && mention && (
+            <MentionPicker
+              people={mention.people}
+              active={Math.min(mentionActive, mention.people.length - 1)}
+              onPick={pickMention}
+            />
+          )}
           <MessageInput
             id={INPUT_ID}
             ref={inputRef}
             value={message}
             onChange={changeMessage}
+            onCaret={setCaret}
+            onKeyDownFirst={mentionKeys}
             onSubmit={submit}
             onEscape={replyTo || editing ? composer.cancel : undefined}
             onBlur={stopTyping}

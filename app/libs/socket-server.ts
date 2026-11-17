@@ -6,7 +6,16 @@ import { conversationRoom, userRoom } from "./socket-rooms";
 // with route handlers through globalThis, since both run in the same process.
 declare global {
   var io: Server | undefined;
+  // set by server/socket.ts: whether other instances share events (Redis adapter)
+  var ioClustered: boolean | undefined;
+  // email -> the emails hidden from them and them from (blocks; filled by server/socket.ts)
+  var blockCache: Map<string, Promise<Set<string>>> | undefined;
 }
+
+// The presence / typing filter's cache, shared by the socket server and route handlers (one
+// process, separate module copies).
+export const blockCache = (): Map<string, Promise<Set<string>>> =>
+  (globalThis.blockCache ??= new Map());
 
 export const setIO = (server: Server) => {
   globalThis.io = server;
@@ -35,4 +44,20 @@ export const emitToConversation = (
 // conversation room, so someone who left a group or lost a deleted conversation stops receiving it.
 export const removeUserFromConversationRoom = (email: string, conversationId: string) => {
   getIO()?.in(userRoom(email)).socketsLeave(conversationRoom(conversationId));
+};
+
+// After a block / unblock: forgets the cached block lists of these users here and on the other
+// instances, and tells their tabs (block:update), which refresh the open chat and ask for the
+// presence list again (presence:sync).
+export const notifyBlocksChanged = (emails: string[]) => {
+  emails.forEach((email) => blockCache().delete(email));
+  const io = getIO();
+  if (globalThis.ioClustered) {
+    try {
+      io?.serverSideEmit("blocks:changed", emails);
+    } catch {
+      // the others' caches catch up when those users reconnect
+    }
+  }
+  emails.forEach((email) => emitToUser(email, "block:update", {}));
 };

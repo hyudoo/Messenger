@@ -3,13 +3,17 @@ import type { AddressInfo } from "net";
 import { createClient } from "redis";
 import { io as connect, type Socket as ClientSocket } from "socket.io-client";
 import type { Server } from "socket.io";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CONVERSATION, ME, OTHER } from "../helpers";
 
 const THIRD = "ffffffffffffffffffffffff";
 const STRANGER = "999999999999999999999999";
 const GROUP = "abababababababababababab";
+
+// user id -> the ids they blocked
+const BLOCKS: Record<string, string[]> = {};
+const ALL_IDS = () => [ME, OTHER, THIRD, STRANGER];
 
 // conversation id -> member ids
 const MEMBERS: Record<string, string[]> = {
@@ -108,9 +112,23 @@ vi.mock("@/app/libs/prismadb", () => ({
     user: {
       // "active N minutes ago" (touchLastSeen)
       update: lastSeenUpdate,
-      findUnique: vi.fn(async ({ where }: any) => ({
-        conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
-      })),
+      findUnique: vi.fn(async ({ where }: any) => {
+        if (where.email) {
+          const id = ALL_IDS().find((candidate) => emailOf(candidate) === where.email);
+          return id ? { id } : null;
+        }
+        return {
+          conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
+          blockedUserIds: BLOCKS[where.id] ?? [],
+        };
+      }),
+      // app/libs/blocks.ts: who blocked a user / the users a user blocked
+      findMany: vi.fn(async ({ where }: any) => {
+        const ids = where.blockedUserIds
+          ? ALL_IDS().filter((id) => (BLOCKS[id] ?? []).includes(where.blockedUserIds.has))
+          : where.id.in;
+        return ids.map((id: string) => ({ id, email: emailOf(id) }));
+      }),
     },
   },
 }));
@@ -159,10 +177,14 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
     socket.emit("call:join", roomId, resolve)
   );
 
+// the servers' block caches are global: a test's closing disconnects refill them, so start clean
+beforeEach(() => globalThis.blockCache?.clear());
+
 afterEach(async () => {
   RECENT_CALLS.length = 0;
   pushMissedCall.mockClear();
   Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
+  Object.keys(BLOCKS).forEach((id) => delete BLOCKS[id]);
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
   await Promise.all(
@@ -677,6 +699,45 @@ describe("socket server lifecycle", () => {
     expect(await disconnected).toBe("transport close");
     const error = await next<Error>(client(url, ME), "connect_error");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("blocking", () => {
+  it("hides presence both ways between block partners, not from others", async () => {
+    BLOCKS[ME] = [OTHER];
+    const { url } = await startServer();
+    const a = (await connected(url, ME)).socket;
+    const c = (await connected(url, THIRD)).socket;
+    const aOnline = vi.fn();
+    a.on("presence:online", aOnline);
+    const cOnline = vi.fn();
+    c.on("presence:online", cOnline);
+
+    const b = await connected(url, OTHER);
+    // OTHER's list leaves out ME, and ME isn't told OTHER came online; THIRD sees both
+    expect(b.online).not.toContain(emailOf(ME));
+    expect(b.online).toContain(emailOf(THIRD));
+    await vi.waitFor(() => expect(cOnline).toHaveBeenCalledWith(emailOf(OTHER)));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(aOnline).not.toHaveBeenCalledWith(emailOf(OTHER));
+  });
+
+  it("drops typing in a blocked 1:1 chat", async () => {
+    BLOCKS[OTHER] = [ME];
+    const { io, url } = await startServer();
+    const a = (await connected(url, ME)).socket;
+    const b = (await connected(url, OTHER)).socket;
+    a.emit("conversation:join", CONVERSATION);
+    b.emit("conversation:join", CONVERSATION);
+    await vi.waitFor(async () =>
+      expect(await io.in(conversationRoom(CONVERSATION)).fetchSockets()).toHaveLength(2)
+    );
+    const got = vi.fn();
+    b.on("typing", got);
+    b.on("conversation:typing", got);
+    a.emit("typing", CONVERSATION, true);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(got).not.toHaveBeenCalled();
   });
 });
 

@@ -9,6 +9,10 @@ import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 import { deliverMessage } from "@/app/libs/message-delivery";
 import { parseAttachment } from "@/app/libs/attachment";
+import { searchTextOf } from "@/app/libs/search";
+import { findMentions } from "@/app/libs/mentions";
+import { isBlockedBetween } from "@/app/libs/blocks";
+import { attachLinkPreview } from "@/app/libs/message-preview";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -34,6 +38,14 @@ export async function POST(request: Request) {
     );
     if (!conversation) {
       return new NextResponse("Not found", { status: 404 });
+    }
+
+    // a 1:1 chat where either has blocked the other: no messages, no calls
+    const other = conversation.isGroup
+      ? null
+      : conversation.users.find((user) => user.id !== currentUser.id);
+    if (other && (await isBlockedBetween(currentUser.id, other.id))) {
+      return new NextResponse("Blocked", { status: 403 });
     }
 
     const body = typeof message === "string" ? message.trim() : "";
@@ -87,6 +99,9 @@ export async function POST(request: Request) {
       include: MESSAGE_INCLUDE,
       data: {
         body: body || undefined,
+        searchText: searchTextOf(body),
+        // only groups have mentions (in a 1:1 chat the other one gets everything anyway)
+        mentions: conversation.isGroup ? findMentions(body, conversation.users, currentUser.id) : [],
         image,
         attachment: file ?? undefined,
         isCall: isCall === true ? true : undefined,
@@ -102,6 +117,7 @@ export async function POST(request: Request) {
     });
 
     await deliverMessage({ conversation, sender: currentUser, message: newMessage, clientId });
+    attachLinkPreview(newMessage);
 
     return NextResponse.json(newMessage);
   } catch (error) {

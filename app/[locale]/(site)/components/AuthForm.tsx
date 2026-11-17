@@ -18,10 +18,16 @@ import { toast } from "react-hot-toast";
 
 type Variant = "LOGIN" | "REGISTER";
 
-const AuthForm = () => {
+interface AuthFormProps {
+  // a checked path to open after signing in (safeNextPath), else the inbox
+  next?: string | null;
+}
+
+const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
   const t = useTranslations("auth");
   const session = useSession();
   const router = useRouter();
+  const target = next ?? "/conversations";
 
   const loginErrorMessage = (error: string) =>
     error === TOO_MANY_ATTEMPTS ? t("login_too_many") : t("login_failed");
@@ -30,9 +36,9 @@ const AuthForm = () => {
 
   useEffect(() => {
     if (session?.status === "authenticated") {
-      router.push("/conversations");
+      router.push(target);
     }
-  }, [session?.status, router]);
+  }, [session?.status, router, target]);
 
   const toggleVarriant = useCallback(() => {
     if (variant === "LOGIN") {
@@ -84,7 +90,7 @@ const AuthForm = () => {
             toast.error(loginErrorMessage(callback.error));
           }
           if (callback?.ok) {
-            router.push("/conversations");
+            router.push(target);
           }
         })
         .catch((error) =>
@@ -111,7 +117,7 @@ const AuthForm = () => {
 
           if (callback?.ok && !callback?.error) {
             toast.success(t("login_success"));
-            router.push("/conversations");
+            router.push(target);
           }
         })
         .finally(() => setIsLoading(false));
@@ -128,7 +134,7 @@ const AuthForm = () => {
 
         if (callback?.ok) {
           toast.success(t("login_success"));
-          router.push("/conversations");
+          router.push(target);
         }
       })
       .finally(() => setIsLoading(false));

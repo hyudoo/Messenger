@@ -38,6 +38,18 @@ describe("proxy", () => {
     expect(location(await proxy(request(path)))).toBe(login);
   });
 
+  it("sends signed-out users from an invite link to the login page and back", async () => {
+    const response = await proxy(request("/en/join/AbCdEfGhIjKlMn_-"));
+    const target = new URL(response.headers.get("location")!);
+    expect(target.pathname).toBe("/en");
+    expect(target.searchParams.get("next")).toBe("/join/AbCdEfGhIjKlMn_-");
+  });
+
+  it("passes nothing else on to the login page", async () => {
+    const response = await proxy(request("/vi/conversations/abc?x=1"));
+    expect(new URL(response.headers.get("location")!).search).toBe("");
+  });
+
   it("uses the cookie language when a protected path has no locale", async () => {
     const response = await proxy(request("/conversations", { cookie: "NEXT_LOCALE=en" }));
     expect(location(response)).toBe("/en");

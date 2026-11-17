@@ -2,10 +2,10 @@
 
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { FaMicrophoneSlash } from "react-icons/fa";
-import { HiPhone } from "react-icons/hi2";
+import { HiPhone, HiComputerDesktop } from "react-icons/hi2";
 import Footer from "./Footer";
 import { toast } from "react-hot-toast";
 
@@ -41,13 +41,22 @@ type CallStatus =
 interface MediaState {
   mic: boolean;
   camera: boolean;
+  // sharing the screen (sent instead of the camera); missing from older clients
+  screen?: boolean;
 }
 
 const isMediaState = (value: unknown): value is MediaState =>
   typeof value === "object" &&
   value !== null &&
   typeof (value as MediaState).mic === "boolean" &&
-  typeof (value as MediaState).camera === "boolean";
+  typeof (value as MediaState).camera === "boolean" &&
+  ["boolean", "undefined"].includes(typeof (value as MediaState).screen);
+
+// screen sharing needs getDisplayMedia (desktop browsers; not phones)
+const noSubscription = () => () => {};
+const canShareScreen = () =>
+  typeof navigator !== "undefined" &&
+  typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
 const formatDuration = (seconds: number) => {
   const h = Math.floor(seconds / 3600);
@@ -112,6 +121,10 @@ const Body: React.FC<BodyProps> = ({
 }) => {
   const [micActive, setMicActive] = useState(true);
   const [cameraActive, setCameraActive] = useState(!audioOnly);
+  const [sharing, setSharing] = useState(false);
+  const shareSupported = useSyncExternalStore(noSubscription, canShareScreen, () => false);
+  // the shared screen's track while sharing (sent instead of the camera)
+  const screenTrack = useRef<MediaStreamTrack | null>(null);
   const [status, setStatus] = useState<CallStatus>("connecting");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   // both peers join the same kind of call, so an audio call starts camera off
@@ -186,7 +199,7 @@ const Body: React.FC<BodyProps> = ({
     // the other peer's mic / camera state (relayed as-is, so validate it)
     const onMedia = (media: unknown) => {
       if (isMediaState(media)) {
-        setRemoteMedia({ mic: media.mic, camera: media.camera });
+        setRemoteMedia({ mic: media.mic, camera: media.camera, screen: media.screen === true });
       }
     };
 
@@ -394,9 +407,12 @@ const Body: React.FC<BodyProps> = ({
       track.stop();
       stream.removeTrack(track);
     });
-    videoSender()
-      ?.replaceTrack(null)
-      .catch((error) => console.log(error));
+    // while sharing, the screen keeps the video sender
+    if (!screenTrack.current) {
+      videoSender()
+        ?.replaceTrack(null)
+        .catch((error) => console.log(error));
+    }
   };
 
   // Camera on (also an audio call switching to video): grab the camera and send
@@ -422,7 +438,10 @@ const Body: React.FC<BodyProps> = ({
       // re-attach so the self view picks up the new track
       userVideo.current!.srcObject = null;
       userVideo.current!.srcObject = stream;
-      await videoSender()?.replaceTrack(track);
+      // while sharing, the camera only shows in the self view until the sharing stops
+      if (!screenTrack.current) {
+        await videoSender()?.replaceTrack(track);
+      }
       return true;
     } catch (error) {
       console.log(error);
@@ -445,6 +464,8 @@ const Body: React.FC<BodyProps> = ({
   };
 
   const leaveRoom = () => {
+    screenTrack.current?.stop();
+    screenTrack.current = null;
     if (userVideo.current!.srcObject) {
       (userVideo.current!.srcObject as MediaStream)
         .getTracks()
@@ -503,7 +524,7 @@ const Body: React.FC<BodyProps> = ({
   const toggleMic = () => {
     toggleMediaStream("audio", micActive);
     setMicActive(!micActive);
-    updateLocalMedia({ mic: !micActive, camera: cameraActive });
+    updateLocalMedia({ mic: !micActive, camera: cameraActive, screen: sharing });
   };
 
   const toggleCamera = async () => {
@@ -513,8 +534,55 @@ const Body: React.FC<BodyProps> = ({
       return;
     }
     setCameraActive(!cameraActive);
-    updateLocalMedia({ mic: micActive, camera: !cameraActive });
+    updateLocalMedia({ mic: micActive, camera: !cameraActive, screen: sharing });
   };
+
+  // Screen sharing: the screen replaces the camera on the video sender (no new offer / answer);
+  // stopping (here or the browser's own "Stop sharing") puts the camera back when it is on.
+  const stopSharing = () => {
+    const track = screenTrack.current;
+    if (!track) {
+      return;
+    }
+    screenTrack.current = null;
+    track.onended = null;
+    track.stop();
+    const camera = userStream.current?.getVideoTracks()[0] ?? null;
+    videoSender()
+      ?.replaceTrack(camera)
+      .catch((error) => console.log(error));
+    setSharing(false);
+    updateLocalMedia({ ...localMedia.current, screen: false });
+  };
+
+  const startSharing = async () => {
+    let display: MediaStream;
+    try {
+      display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch (error) {
+      // NotAllowedError: the user closed the picker
+      if ((error as DOMException)?.name !== "NotAllowedError") {
+        toast.error(t("share_error"));
+      }
+      return;
+    }
+    const track = display.getVideoTracks()[0];
+    const sender = videoSender();
+    if (!track || !sender) {
+      display.getTracks().forEach((item) => item.stop());
+      toast.error(t("share_error"));
+      return;
+    }
+    // text and slides stay sharp rather than smooth
+    track.contentHint = "detail";
+    screenTrack.current = track;
+    track.onended = stopSharing;
+    await sender.replaceTrack(track).catch((error) => console.log(error));
+    setSharing(true);
+    updateLocalMedia({ ...localMedia.current, screen: true });
+  };
+
+  const toggleSharing = () => (sharing ? stopSharing() : startSharing());
 
   // Layout effects run before every passive effect, so the socket listeners
   // above always find handlers here.
@@ -561,7 +629,8 @@ const Body: React.FC<BodyProps> = ({
   const connected = status === "connected";
   // cover the remote video until media flows, or while the other camera is off;
   // an audio call shows only this
-  const showRemoteCover = !connected || !remoteMedia.camera;
+  const showRemoteCover = !connected || (!remoteMedia.camera && !remoteMedia.screen);
+  const remoteSharing = connected && remoteMedia.screen;
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-neutral-950 text-white">
@@ -578,6 +647,13 @@ const Body: React.FC<BodyProps> = ({
         playsInline
         ref={partnerVideo}
       />
+
+      {(sharing || remoteSharing) && (
+        <div className="absolute left-1/2 top-24 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium backdrop-blur">
+          <HiComputerDesktop size={14} aria-hidden />
+          {sharing ? t("sharing_you") : t("sharing_other", { name: otherName })}
+        </div>
+      )}
 
       {showRemoteCover && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 bg-neutral-900 px-6 text-center">
@@ -645,6 +721,9 @@ const Body: React.FC<BodyProps> = ({
         cameraActive={cameraActive}
         toggleMic={toggleMic}
         toggleCamera={toggleCamera}
+        sharing={sharing}
+        // only once the call is up: the video sender exists then
+        toggleSharing={shareSupported && connected ? toggleSharing : undefined}
         leaveRoom={hangUp}
       />
     </div>

@@ -21,10 +21,14 @@ import useDateLocale from "@/app/hooks/useDateLocale";
 import {
   canEditMessage,
   canForwardMessage,
+  canPinMessage,
   canRecallMessage,
   canReplyToMessage,
 } from "@/app/libs/message-actions";
 import { useForward } from "./ForwardDialog";
+import { deleteForMe, togglePin } from "./messageCommands";
+import usePins from "@/app/hooks/usePins";
+import { HiMapPin, HiEyeSlash } from "react-icons/hi2";
 import { FullMessageType } from "@/app/types";
 import { QUICK_REACTIONS } from "./MessageReactions";
 import { MessageSnippet } from "./MessageReply";
@@ -57,6 +61,8 @@ const MessageMenuSheet: React.FC<MessageMenuSheetProps> = ({
   const [confirmRecall, setConfirmRecall] = useState(false);
   // the sender's id is the message's own when it is the user's (no session id needed)
   const myId = isOwn ? message.senderId : "";
+  const pinned = usePins((state) => state.ids.includes(message.id));
+  const tChat = useTranslations("chat");
 
   const close = () => {
     onClose();
@@ -164,6 +170,18 @@ const MessageMenuSheet: React.FC<MessageMenuSheetProps> = ({
               {t("chat.forward")}
             </button>
           )}
+          {(canPinMessage(message) || pinned) && (
+            <button
+              type="button"
+              className={item}
+              onClick={() => {
+                close();
+                togglePin(message.id, !pinned, tChat);
+              }}>
+              <HiMapPin size={20} aria-hidden className="text-muted-foreground" />
+              {pinned ? t("chat.unpin") : t("chat.pin")}
+            </button>
+          )}
           {message.body && (
             <button type="button" className={item} onClick={copy}>
               <HiOutlineDocumentDuplicate size={20} aria-hidden className="text-muted-foreground" />
@@ -182,6 +200,16 @@ const MessageMenuSheet: React.FC<MessageMenuSheetProps> = ({
               {t("chat.edit")}
             </button>
           )}
+          <button
+            type="button"
+            className={item}
+            onClick={() => {
+              close();
+              deleteForMe(message.id, t("chat.delete_for_me_failed"));
+            }}>
+            <HiEyeSlash size={20} aria-hidden className="text-muted-foreground" />
+            {t("chat.delete_for_me")}
+          </button>
           {canRecallMessage(message, myId) && (
             <button
               type="button"

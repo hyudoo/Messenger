@@ -17,13 +17,17 @@ import {
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { JUMBO_EMOJI_MAX, countEmojiOnly } from "@/app/libs/emoji";
 import { splitLinks } from "@/app/libs/linkify";
+import { Mention, splitMentions } from "@/app/libs/mentions";
 
 import axios from "axios";
 import { toast } from "react-hot-toast";
 
 import Avatar from "@/app/components/Avatar";
 import { useOpenImage } from "./ImageViewer";
-import { FileCard, VoicePlayer } from "./MessageAttachment";
+import { FileCard, LinkPreviewCard, VoicePlayer } from "./MessageAttachment";
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import usePins from "@/app/hooks/usePins";
+import { deleteForMe, togglePin } from "./messageCommands";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
@@ -31,6 +35,7 @@ import useSystemText from "@/app/hooks/useSystemText";
 import {
   canEditMessage,
   canForwardMessage,
+  canPinMessage,
   canReactToMessage,
   canRecallMessage,
   canReplyToMessage,
@@ -39,6 +44,7 @@ import {
   HiArrowUturnLeft,
   HiArrowUturnRight,
   HiEllipsisHorizontal,
+  HiEllipsisVertical,
   HiPencil,
   HiTrash,
 } from "react-icons/hi2";
@@ -55,11 +61,40 @@ interface MessageBoxProps {
   pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
 }
 
-// The body with http(s) links clickable (opened in a new tab, without the referrer).
-const MessageText: React.FC<{ text: string; isOwn: boolean }> = ({ text, isOwn }) => (
+// The body with http(s) links clickable (opened in a new tab, without the referrer) and
+// @mentions highlighted (the reader's own more strongly).
+const MessageText: React.FC<{
+  text: string;
+  isOwn: boolean;
+  mentions?: Mention[];
+  myEmail?: string | null;
+}> = ({ text, isOwn, mentions = [], myEmail }) => (
   <>
     {splitLinks(text).map((segment, i) =>
-      segment.type === "link" ? (
+      segment.type === "text" ? (
+        <Fragment key={i}>
+          {splitMentions(segment.value, mentions).map((part, j) =>
+            part.type === "mention" ? (
+              <span
+                key={j}
+                className={clsx(
+                  "font-semibold",
+                  part.mention?.email && part.mention.email === myEmail
+                    ? isOwn
+                      ? "rounded bg-white/25 px-0.5"
+                      : "rounded bg-sky-500/20 px-0.5 text-sky-700 dark:text-sky-300"
+                    : isOwn
+                      ? "text-white"
+                      : "text-sky-600 dark:text-sky-400"
+                )}>
+                {part.value}
+              </span>
+            ) : (
+              <Fragment key={j}>{part.value}</Fragment>
+            )
+          )}
+        </Fragment>
+      ) : segment.type === "link" ? (
         <a
           key={i}
           href={segment.value}
@@ -175,6 +210,7 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
           <HiPencil size={16} aria-hidden />
         </button>
       )}
+      <MoreMenu message={message} />
       {canRecallMessage(message, myId) && (
         <button
           type="button"
@@ -190,6 +226,42 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
         </button>
       )}
     </div>
+  );
+};
+
+// Pin / unpin and "delete for me" (pointer devices; the touch menu has them too).
+const MoreMenu: React.FC<{ message: FullMessageType }> = ({ message }) => {
+  const t = useTranslations("chat");
+  const pinned = usePins((state) => state.ids.includes(message.id));
+  const item = "block w-full px-3 py-1.5 text-left text-sm text-foreground data-[focus]:bg-muted";
+  return (
+    <Menu>
+      <MenuButton
+        aria-label={t("more")}
+        title={t("more")}
+        className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none data-[open]:bg-muted">
+        <HiEllipsisVertical size={16} aria-hidden />
+      </MenuButton>
+      <MenuItems
+        anchor={{ to: "top", gap: 4 }}
+        className="z-40 min-w-40 rounded-lg border bg-background py-1 shadow-lg focus:outline-none">
+        {(canPinMessage(message) || pinned) && (
+          <MenuItem>
+            <button type="button" className={item} onClick={() => togglePin(message.id, !pinned, t)}>
+              {pinned ? t("unpin") : t("pin")}
+            </button>
+          </MenuItem>
+        )}
+        <MenuItem>
+          <button
+            type="button"
+            className={clsx(item, "text-rose-500")}
+            onClick={() => deleteForMe(message.id, t("delete_for_me_failed"))}>
+            {t("delete_for_me")}
+          </button>
+        </MenuItem>
+      </MenuItems>
+    </Menu>
   );
 };
 
@@ -369,14 +441,29 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
                 />
               </button>
             )}
-            {data.attachment?.kind === "file" && <FileCard attachment={data.attachment} isOwn={isOwn} />}
+            {data.attachment?.kind === "file" && (
+              <FileCard
+                attachment={data.attachment}
+                isOwn={isOwn}
+                // an outbox copy has no server id yet
+                messageId={pending ? undefined : data.id}
+              />
+            )}
+            {data.linkPreview && !recalled && (
+              <LinkPreviewCard preview={data.linkPreview} isOwn={isOwn} />
+            )}
             {data.attachment?.kind === "voice" && (
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />
             )}
             {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
             {data.body && (
               <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                <MessageText text={data.body} isOwn={isOwn && !jumbo} />
+                <MessageText
+                  text={data.body}
+                  isOwn={isOwn && !jumbo}
+                  mentions={data.mentions}
+                  myEmail={myEmail}
+                />
               </div>
             )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}

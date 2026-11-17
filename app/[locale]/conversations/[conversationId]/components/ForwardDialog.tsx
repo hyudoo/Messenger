@@ -103,7 +103,7 @@ const ForwardList: React.FC<{ message: FullMessageType }> = ({ message }) => {
           const other = conversation.users.find((user) => user.email !== myEmail);
           return (
             <li key={conversation.id} className="flex items-center gap-3 py-2">
-              {conversation.isGroup ? <AvatarGroup users={conversation.users} /> : <Avatar user={other} />}
+              {conversation.isGroup ? <AvatarGroup users={conversation.users} image={conversation.image} /> : <Avatar user={other} />}
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">{titleOf(conversation)}</span>
               <button
                 type="button"

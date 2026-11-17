@@ -41,9 +41,11 @@ export async function GET(
     }
 
     if (after) {
-      return NextResponse.json(await getMessagesAfter(conversation.id, after));
+      return NextResponse.json(await getMessagesAfter(conversation.id, after, currentUser.id));
     }
-    return NextResponse.json(await getMessages(conversation.id, before ?? undefined));
+    return NextResponse.json(
+      await getMessages(conversation.id, before ?? undefined, currentUser.id)
+    );
   } catch (error) {
     logError("messages_page", error);
     return new NextResponse("Error", { status: 500 });

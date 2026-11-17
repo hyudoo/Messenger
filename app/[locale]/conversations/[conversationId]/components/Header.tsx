@@ -25,9 +25,12 @@ interface HeaderProps {
   users: SafeUser[];
   // the user's own settings of this conversation
   settings: { muted: boolean; pinned: boolean };
+  // a 1:1 chat where the user blocked the other one / where either blocked the other (no calls)
+  blockedByMe: boolean;
+  blocked: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
+const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedByMe, blocked }) => {
   const t = useTranslations();
   const router = useRouter();
   const otherUser = useOtherUser(conversation);
@@ -72,6 +75,7 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
         data={conversation}
         users={users}
         settings={settings}
+        blockedByMe={blockedByMe}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
@@ -103,7 +107,7 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
             <HiChevronLeft size={32} />
           </Link>
           {conversation.isGroup ? (
-            <AvatarGroup users={conversation.users} />
+            <AvatarGroup users={conversation.users} image={conversation.image} />
           ) : (
             <Avatar user={otherUser} />
           )}
@@ -115,7 +119,7 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
           </div>
         </div>
         <div className="flex gap-4">
-          {!conversation.isGroup && (
+          {!conversation.isGroup && !blocked && (
             <>
               <button
                 type="button"

@@ -10,6 +10,7 @@ import { HiArrowLeft } from "react-icons/hi2";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import useMessageJump from "@/app/hooks/useMessageJump";
+import { findFoldedMatch } from "@/app/libs/search";
 
 // wait this long after the last keystroke before asking the server
 const SEARCH_DELAY_MS = 300;
@@ -28,20 +29,21 @@ interface ConversationSearchProps {
   onPick: () => void;
 }
 
-// The match in a result, highlighted (case-insensitive, like the server's search).
+// The match in a result, highlighted (ignoring case and diacritics, like the server's search).
 const Highlight: React.FC<{ text: string; query: string }> = ({ text, query }) => {
-  const at = text.toLowerCase().indexOf(query.toLowerCase());
-  if (!query || at < 0) {
+  const match = findFoldedMatch(text, query);
+  if (!match) {
     return <>{text}</>;
   }
+  const [at, end] = match;
   // a little context before the match, so it shows in a one-line preview
   const start = Math.max(0, at - 30);
   return (
     <>
       {start > 0 && "…"}
       {text.slice(start, at)}
-      <mark className="rounded bg-sky-500/25 text-foreground">{text.slice(at, at + query.length)}</mark>
-      {text.slice(at + query.length)}
+      <mark className="rounded bg-sky-500/25 text-foreground">{text.slice(at, end)}</mark>
+      {text.slice(end)}
     </>
   );
 };

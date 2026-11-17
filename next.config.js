@@ -29,6 +29,8 @@ const imageSources = [
   "https://lh3.googleusercontent.com",
   // emoji-picker-react draws its emoji from the emoji-datasource images on jsDelivr
   "https://cdn.jsdelivr.net",
+  // link previews show the linked site's own image (app/libs/link-preview.ts: https only)
+  "https:",
 ];
 
 // Enforced: only directives that cannot break the app (no framing = no clickjacking, no plugins,
@@ -63,10 +65,10 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // calls need the camera and microphone of this origin; nothing else
+  // calls need the camera, microphone and screen sharing of this origin; nothing else
   {
     key: "Permissions-Policy",
-    value: "camera=(self), microphone=(self), display-capture=(), geolocation=(), payment=(), usb=()",
+    value: "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()",
   },
   // only meaningful over HTTPS (browsers ignore it on plain http, e.g. localhost)
   ...(isProd
