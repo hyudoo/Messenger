@@ -1000,6 +1000,23 @@ describe("reactions on a recalled message", () => {
   });
 });
 
+describe("reactions on a call", () => {
+  it("are refused", async () => {
+    prisma.message.findUnique.mockResolvedValue({
+      conversationId: CONVERSATION,
+      deletedAt: null,
+      isCall: true,
+    });
+    asMember();
+    const response = await toggleReaction(
+      jsonRequest(`/api/messages/${MESSAGE}/reactions`, { emoji: "👍" }),
+      params({ messageId: MESSAGE })
+    );
+    expect(response.status).toBe(400);
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("rate limits on settings and new chats", () => {
   it("limits settings changes per user", async () => {
     prisma.user.update.mockResolvedValue(me);

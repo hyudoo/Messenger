@@ -7,6 +7,7 @@ import { countUnread, formatUnread } from "@/app/libs/unread";
 import {
   canEditMessage,
   canRecallMessage,
+  canReactToMessage,
   canReplyToMessage,
 } from "@/app/libs/message-actions";
 
@@ -151,5 +152,11 @@ describe("message actions", () => {
   it("replies to anything still there", () => {
     expect(canReplyToMessage(message({ senderId: "other" }))).toBe(true);
     expect(canReplyToMessage(message({ deletedAt: new Date() }))).toBe(false);
+  });
+
+  it("reacts to anything still there except a call", () => {
+    expect(canReactToMessage(message({ senderId: "other" }))).toBe(true);
+    expect(canReactToMessage(message({ deletedAt: new Date() }))).toBe(false);
+    expect(canReactToMessage(message({ isCall: true }))).toBe(false);
   });
 });

@@ -26,3 +26,7 @@ export const canRecallMessage = (message: Actionable, userId: string) =>
 
 // Anyone in the conversation may reply to a message that is still there.
 export const canReplyToMessage = (message: Actionable) => isLive(message);
+
+// Anyone in the conversation may react to a message that is still there, but not to a call.
+export const canReactToMessage = (message: Pick<Actionable, "isCall" | "deletedAt">) =>
+  !message.deletedAt && !message.isCall;

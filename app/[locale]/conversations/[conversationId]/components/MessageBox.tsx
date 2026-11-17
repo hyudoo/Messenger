@@ -26,8 +26,15 @@ import ImageModal from "./ImageModal";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
-import { canEditMessage, canRecallMessage, canReplyToMessage } from "@/app/libs/message-actions";
-import { HiArrowUturnLeft, HiPencil, HiTrash } from "react-icons/hi2";
+import {
+  canEditMessage,
+  canReactToMessage,
+  canRecallMessage,
+  canReplyToMessage,
+} from "@/app/libs/message-actions";
+import { HiArrowUturnLeft, HiEllipsisHorizontal, HiPencil, HiTrash } from "react-icons/hi2";
+import MessageMenuSheet from "./MessageMenuSheet";
+import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
 interface MessageBoxProps {
   data: FullMessageType;
@@ -96,7 +103,7 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call
   );
 };
 
-// Hover actions next to the bubble (always shown on touch screens, like the reaction smiley):
+// Hover actions next to the bubble (pointer devices only; touch screens use the "…" menu):
 // reply, and for the sender edit (text, for a while) and recall (two clicks: the second confirms).
 const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = ({
   message,
@@ -125,7 +132,7 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
   return (
     <div
       className={clsx(
-        "flex shrink-0 items-center transition group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100",
+        "flex shrink-0 items-center transition group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:hidden",
         confirmRecall ? "opacity-100" : "opacity-0"
       )}>
       {canReplyToMessage(message) && (
@@ -171,12 +178,14 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
   const dateLocale = useDateLocale();
   const session = useSession();
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const myEmail = session.data?.user?.email;
   const isOwn = myEmail === data?.sender?.email;
 
   const recalled = !!data.deletedAt;
-  const reactions = recalled ? [] : (data.reactions ?? []);
+  // none on a recalled message or a call (calls from before the rule may still have some)
+  const reactions = canReactToMessage(data) ? (data.reactions ?? []) : [];
   const myReaction = reactions.find((reaction) => myEmail && reaction.user.email === myEmail)?.emoji;
   // the conversation room sends the updated message back (messages:update)
   const react = (emoji: string) => {
@@ -188,6 +197,18 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
         )
       );
   };
+
+  // nothing to react to (or act on) before the server has the message, once recalled, or
+  // on a call (no reply / edit / recall / reaction there).
+  // Touch screens: hold for the menu, swipe towards the middle to reply.
+  const actionable = !pending && canReactToMessage(data);
+  const { startReply } = useComposer();
+  const swipeDirection = isOwn ? -1 : 1;
+  const { pull, handlers: gestures } = useMessageGestures({
+    direction: swipeDirection,
+    onLongPress: actionable ? () => setMenuOpen(true) : undefined,
+    onSwipe: actionable && canReplyToMessage(data) ? () => startReply(data) : undefined,
+  });
 
   const seenList = (data.seen || [])
     .filter((user) => user.email !== data?.sender?.email)
@@ -237,11 +258,34 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
           </div>
         )}
         {data.replyTo && !recalled && <ReplyQuote reply={data.replyTo} isOwn={isOwn} />}
+        <div className="relative max-w-full">
+          {/* revealed behind the bubble while it is swiped */}
+          {pull > 0 && (
+            <div
+              aria-hidden
+              className={clsx(
+                "absolute top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground",
+                isOwn ? "right-0" : "left-0"
+              )}
+              style={{
+                opacity: Math.min(pull / SWIPE_TRIGGER, 1),
+                transform: `translateY(-50%) scale(${pull >= SWIPE_TRIGGER ? 1.15 : 0.6 + 0.4 * (pull / SWIPE_TRIGGER)})`,
+              }}>
+              <HiArrowUturnLeft size={16} />
+            </div>
+          )}
         <div
-          className={clsx("group flex max-w-full items-center gap-1", isOwn && "flex-row-reverse")}
+          className={clsx(
+            "group relative flex max-w-full touch-pan-y items-center gap-1",
+            isOwn && "flex-row-reverse",
+            pull === 0 && "transition-transform duration-200"
+          )}
+          style={pull > 0 ? { transform: `translateX(${pull * swipeDirection}px)` } : undefined}
+          {...gestures}
           // the time of a grouped message, on hover
           title={showHeader ? undefined : format(new Date(data.createdAt), "p", { locale: dateLocale })}>
-          <div className={message}>
+          {/* touch screens: no text selection / iOS callout on a hold (the menu has "Copy") */}
+          <div className={clsx(message, "[@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none]")}>
             {recalled && t("chat.recalled")}
             {data.image && (
               <ImageModal
@@ -273,10 +317,30 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
           </div>
-          {/* nothing to react to (or act on) before the server has the message, or once recalled */}
-          {!pending && !recalled && <ReactionPicker onReact={react} mine={myReaction} />}
-          {!pending && !recalled && <MessageActions message={data} isOwn={isOwn} />}
+          {actionable && <ReactionPicker onReact={react} mine={myReaction} />}
+          {actionable && <MessageActions message={data} isOwn={isOwn} />}
+          {actionable && (
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label={t("chat.more_actions")}
+              aria-haspopup="dialog"
+              className="hidden shrink-0 rounded-full p-1 text-muted-foreground active:bg-muted [@media(hover:none)]:block">
+              <HiEllipsisHorizontal size={18} aria-hidden />
+            </button>
+          )}
         </div>
+        </div>
+        {actionable && (
+          <MessageMenuSheet
+            open={menuOpen}
+            onClose={() => setMenuOpen(false)}
+            message={data}
+            isOwn={isOwn}
+            onReact={react}
+            mine={myReaction}
+          />
+        )}
         {data.editedAt && !recalled && (
           <div className="text-xs font-light text-muted-foreground">{t("chat.edited")}</div>
         )}

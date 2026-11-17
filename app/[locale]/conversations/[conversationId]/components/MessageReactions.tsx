@@ -18,13 +18,13 @@ interface ReactionPickerProps {
   mine?: string;
 }
 
-// The smiley next to a message bubble: shown on hover (always on touch screens).
+// The smiley next to a message bubble: shown on hover; touch screens use the "…" menu instead.
 export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onReact, mine }) => {
   const t = useTranslations("reactions");
   const [full, setFull] = useState(false);
 
   return (
-    <Popover className="relative flex">
+    <Popover className="relative flex [@media(hover:none)]:hidden">
       {({ close }) => {
         const pick = (emoji: string) => {
           onReact(emoji);
@@ -50,7 +50,7 @@ export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onReact, mine })
                 focus-visible:ring-sky-500
                 group-hover:opacity-100
                 data-[open]:opacity-100
-                [@media(hover:none)]:opacity-100">
+">
               <HiOutlineFaceSmile size={18} />
             </PopoverButton>
             <PopoverPanel anchor={{ to: "top", gap: 8 }} className="z-50">
