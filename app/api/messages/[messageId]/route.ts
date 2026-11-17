@@ -92,7 +92,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<IPar
 }
 
 // DELETE: the sender recalls their message for everyone. The row stays (replies keep a target,
-// the chat shows "message recalled"); its text, image and reactions are removed.
+// the chat shows "message recalled"); its text, image, attachment and reactions are removed.
 export async function DELETE(request: Request, { params }: { params: Promise<IParams> }) {
   try {
     const currentUser = await getCurrentUser();
@@ -116,15 +116,19 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
       prisma.reaction.deleteMany({ where: { messageId: found.message.id } }),
       prisma.message.update({
         where: { id: found.message.id },
-        data: { body: null, image: null, editedAt: null, deletedAt: new Date() },
+        data: {
+          body: null,
+          image: null,
+          attachment: { unset: true },
+          editedAt: null,
+          deletedAt: new Date(),
+        },
         include: MESSAGE_INCLUDE,
       }),
     ]);
 
-    // the image goes from S3 once nothing references it (e.g. not also an avatar)
-    if (found.message.image) {
-      cleanUpUploads([found.message.image]);
-    }
+    // the files go from S3 once nothing references them (e.g. an image that is also an avatar)
+    cleanUpUploads([found.message.image, found.message.attachment?.url]);
     await broadcast(found.conversation, updated);
     return NextResponse.json(updated);
   } catch (error) {

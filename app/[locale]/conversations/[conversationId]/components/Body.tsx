@@ -14,6 +14,7 @@ import { FullMessageType, SafeUser } from "@/app/types";
 import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
+import { ImageViewerProvider } from "./ImageViewer";
 import { format, isToday, isYesterday } from "date-fns";
 
 interface BodyProps {
@@ -54,6 +55,7 @@ const outboxMessage = (item: OutboxItem, me: Partial<SafeUser>): FullMessageType
     id: item.clientId,
     body: item.payload.message ?? null,
     image: item.payload.image ?? null,
+    attachment: item.payload.attachment ? { duration: null, ...item.payload.attachment } : null,
     createdAt: item.createdAt,
     conversationId: item.conversationId,
     sender: me,
@@ -379,96 +381,103 @@ const Body: React.FC<BodyProps> = ({
     setUnseenCount(0);
   };
 
+  // the images the viewer can move between (the loaded pages, oldest first)
+  const images = messages
+    .filter((message) => message.image && !message.deletedAt)
+    .map((message) => message.image!);
+
   return (
-    <div className="relative flex-1 min-h-0">
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="h-full overflow-y-auto">
-        {hasMore && (
-          <div className="flex justify-center pt-4">
-            {/* fallback for when the first page doesn't fill the screen (no scroll) */}
-            <button
-              type="button"
-              onClick={loadOlder}
-              disabled={isLoadingOlder}
-              className="text-xs text-muted-foreground hover:underline disabled:opacity-50">
-              {isLoadingOlder ? tCommon("loading") : t("load_older")}
-            </button>
-          </div>
-        )}
-        {shown.map(({ message, item }, i) => {
-          const previous = shown[i - 1]?.message;
-          return (
-            <div key={item?.clientId ?? message.id}>
-              {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
-              {message.id === firstUnreadId && (
-                <div
-                  ref={unreadDividerRef}
-                  className="flex scroll-mt-4 items-center gap-3 px-4 pt-4 pb-1"
-                  role="separator"
-                  aria-label={t("unread_divider")}>
-                  <div className="h-px flex-1 bg-rose-500/60" />
-                  <span className="text-xs font-medium text-rose-500">{t("unread_divider")}</span>
-                  <div className="h-px flex-1 bg-rose-500/60" />
-                </div>
-              )}
-              <MessageBox
-                isLast={i === shown.length - 1}
-                showHeader={startsGroup(previous, message)}
-                data={message}
-                pending={
-                  item && item.status !== "sent"
-                    ? {
-                        status: item.status,
-                        tooFast: item.tooFast,
-                        onRetry: () => retry(item.clientId),
-                        onDiscard: () => discard(item.clientId),
-                      }
-                    : undefined
-                }
-              />
+    <ImageViewerProvider images={images}>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto">
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              {/* fallback for when the first page doesn't fill the screen (no scroll) */}
+              <button
+                type="button"
+                onClick={loadOlder}
+                disabled={isLoadingOlder}
+                className="text-xs text-muted-foreground hover:underline disabled:opacity-50">
+                {isLoadingOlder ? tCommon("loading") : t("load_older")}
+              </button>
             </div>
-          );
-        })}
-        {typingNames.length > 0 && (
-          <div className="flex items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" aria-live="polite">
-            <span className="flex gap-0.5" aria-hidden>
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
-            </span>
-            {t("typing", { names: typingNames.join(", "), count: typingNames.length })}
-          </div>
+          )}
+          {shown.map(({ message, item }, i) => {
+            const previous = shown[i - 1]?.message;
+            return (
+              <div key={item?.clientId ?? message.id}>
+                {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
+                {message.id === firstUnreadId && (
+                  <div
+                    ref={unreadDividerRef}
+                    className="flex scroll-mt-4 items-center gap-3 px-4 pt-4 pb-1"
+                    role="separator"
+                    aria-label={t("unread_divider")}>
+                    <div className="h-px flex-1 bg-rose-500/60" />
+                    <span className="text-xs font-medium text-rose-500">{t("unread_divider")}</span>
+                    <div className="h-px flex-1 bg-rose-500/60" />
+                  </div>
+                )}
+                <MessageBox
+                  isLast={i === shown.length - 1}
+                  showHeader={startsGroup(previous, message)}
+                  data={message}
+                  pending={
+                    item && item.status !== "sent"
+                      ? {
+                          status: item.status,
+                          tooFast: item.tooFast,
+                          onRetry: () => retry(item.clientId),
+                          onDiscard: () => discard(item.clientId),
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          })}
+          {typingNames.length > 0 && (
+            <div className="flex items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" aria-live="polite">
+              <span className="flex gap-0.5" aria-hidden>
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+              </span>
+              {t("typing", { names: typingNames.join(", "), count: typingNames.length })}
+            </div>
+          )}
+          <div className="pt-24" ref={bottomRef} />
+        </div>
+        {unseenCount > 0 && (
+          <button
+            type="button"
+            onClick={jumpToBottom}
+            className="
+              absolute
+              bottom-4
+              left-1/2
+              -translate-x-1/2
+              flex
+              items-center
+              gap-1
+              rounded-full
+              bg-sky-500
+              px-4
+              py-2
+              text-sm
+              text-white
+              shadow-lg
+              transition
+              hover:bg-sky-600">
+            <HiArrowDown size={16} aria-hidden />
+            {t("new_messages", { count: unseenCount })}
+          </button>
         )}
-        <div className="pt-24" ref={bottomRef} />
       </div>
-      {unseenCount > 0 && (
-        <button
-          type="button"
-          onClick={jumpToBottom}
-          className="
-            absolute
-            bottom-4
-            left-1/2
-            -translate-x-1/2
-            flex
-            items-center
-            gap-1
-            rounded-full
-            bg-sky-500
-            px-4
-            py-2
-            text-sm
-            text-white
-            shadow-lg
-            transition
-            hover:bg-sky-600">
-          <HiArrowDown size={16} aria-hidden />
-          {t("new_messages", { count: unseenCount })}
-        </button>
-      )}
-    </div>
+    </ImageViewerProvider>
   );
 };
 

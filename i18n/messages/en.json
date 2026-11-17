@@ -81,7 +81,9 @@
     "typing_group": "{count, plural, one {{names} is typing…} other {{names} are typing…}}",
     "you": "You",
     "unread": "{count, plural, one {# unread message} other {# unread messages}}",
-    "last_recalled": "Message unsent."
+    "last_recalled": "Message unsent.",
+    "last_voice": "Sent a voice message.",
+    "last_file": "Sent the file {name}."
   },
   "chat": {
     "placeholder": "Write a message",
@@ -110,7 +112,6 @@
     "sending": "Sending...",
     "retry": "Retry",
     "discard": "Discard",
-    "image_uploading": "Uploading image...",
     "reply": "Reply",
     "edit": "Edit",
     "recall": "Unsend",
@@ -133,7 +134,26 @@
     "reply_image": "Photo",
     "reply_call": "Call",
     "reply_jump": "Go to the original message",
-    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}"
+    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}",
+    "reply_voice": "Voice message",
+    "reply_file": "File {name}",
+    "attach_file": "Send a file",
+    "drop_files": "Drop images or files here to send them",
+    "remove_attachment": "Remove {name}",
+    "attachment_uploading": "Uploading…",
+    "attachment_failed": "Upload failed, click to retry",
+    "attachments_too_many": "At most {max} images or files at a time",
+    "record_voice": "Record a voice message",
+    "recording": "Recording",
+    "send_voice": "Send voice message",
+    "cancel_voice": "Cancel recording",
+    "mic_denied": "Can't use the microphone. Allow this site to use it.",
+    "voice_unsupported": "This browser can't record audio.",
+    "voice_uploading": "Sending voice message...",
+    "play": "Play",
+    "pause": "Pause",
+    "seek": "Seek voice message",
+    "open_file": "Open {name}"
   },
   "profile": {
     "close": "Close panel",
@@ -193,7 +213,11 @@
     "unsupported_type": "Only JPG, PNG, GIF or WEBP images are supported",
     "too_large": "Images can be at most 10MB",
     "too_many": "Too many uploads, try again in a few minutes",
-    "failed": "Upload failed"
+    "failed": "Upload failed",
+    "file_unsupported_type": "This file type isn't supported (PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP)",
+    "file_too_large": "Files can be up to 25MB",
+    "voice_unsupported_type": "This recording format isn't supported",
+    "voice_too_large": "The voice message is too long"
   },
   "call": {
     "incoming": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
@@ -263,6 +287,17 @@
     "prompt_later": "Not now",
     "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings.",
     "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
-    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}"
+    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
+    "voice": "Sent a voice message.",
+    "file": "Sent the file {name}."
+  },
+  "viewer": {
+    "close": "Close",
+    "previous": "Previous image",
+    "next": "Next image",
+    "download": "Download image",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "counter": "{current} / {total}"
   }
 }

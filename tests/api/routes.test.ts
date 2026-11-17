@@ -194,6 +194,45 @@ describe("POST /api/messages", () => {
     );
   });
 
+  describe("attachments", () => {
+    const pdf = { kind: "file", url: uploadUrl(ME, "pdf"), name: "report.pdf", size: 1000, type: "application/pdf" };
+    const voice = { kind: "voice", url: uploadUrl(ME, "webm"), name: "voice.webm", size: 1000, type: "audio/webm", duration: 4200 };
+
+    it("saves a file or voice message after marking the upload used", async () => {
+      asMember();
+      expect((await send({ attachment: pdf })).status).toBe(200);
+      expect(mocks.markUploadsUsed).toHaveBeenCalledWith([pdf.url]);
+      expect(prisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attachment: pdf }) })
+      );
+      expect((await send({ attachment: voice })).status).toBe(200);
+      expect(prisma.message.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attachment: voice }) })
+      );
+    });
+
+    it.each([
+      ["someone else's upload", { ...pdf, url: uploadUrl(OTHER, "pdf") }],
+      ["an image URL as a file", { ...pdf, url: uploadUrl(ME, "png") }],
+      ["a PDF as a voice message", { ...voice, url: uploadUrl(ME, "pdf") }],
+      ["a disallowed type", { ...pdf, type: "text/html" }],
+      ["a file too large", { ...pdf, size: 26 * 1024 * 1024 }],
+      ["a file without a name", { ...pdf, name: "  " }],
+      ["a voice message without a length", { ...voice, duration: undefined }],
+      ["a voice message too long", { ...voice, duration: 10 * 60 * 1000 }],
+      ["an unknown kind", { ...pdf, kind: "video" }],
+    ])("rejects %s", async (_, attachment) => {
+      asMember();
+      expect((await send({ attachment })).status).toBe(400);
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects an attachment together with an image", async () => {
+      asMember();
+      expect((await send({ attachment: pdf, image: uploadUrl(ME) })).status).toBe(400);
+    });
+  });
+
   it("marks an image as used before saving it", async () => {
     asMember();
     expect((await send({ image: uploadUrl(ME) })).status).toBe(200);
@@ -541,6 +580,18 @@ describe("POST /api/settings", () => {
 
 describe("POST /api/uploads", () => {
   const ask = (body: Record<string, unknown>) => requestUpload(jsonRequest("/api/uploads", body));
+
+  it("signs files and voice messages by kind, with their own types and limits", async () => {
+    const file = await (await ask({ contentType: "application/pdf", size: 20 * 1024 * 1024, kind: "file" })).json();
+    expect(file.fileUrl).toMatch(/\.pdf$/);
+    const voice = await (await ask({ contentType: "audio/webm", size: 100, kind: "voice" })).json();
+    expect(voice.fileUrl).toMatch(/\.webm$/);
+    // a PDF is not an image, an image is not a voice message, and no unknown kinds
+    expect((await ask({ contentType: "application/pdf", size: 10 })).status).toBe(400);
+    expect((await ask({ contentType: "image/png", size: 10, kind: "voice" })).status).toBe(400);
+    expect((await ask({ contentType: "image/png", size: 10, kind: "html" })).status).toBe(400);
+    expect((await ask({ contentType: "application/pdf", size: 26 * 1024 * 1024, kind: "file" })).status).toBe(400);
+  });
 
   it("rejects unsupported types and sizes", async () => {
     expect((await ask({ contentType: "text/html", size: 10 })).status).toBe(400);
@@ -1151,7 +1202,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.message.update).not.toHaveBeenCalled();
   });
 
-  it("recalls: clears text, image and reactions, and removes the image from S3", async () => {
+  it("recalls: clears text, image, attachment and reactions, and removes the image from S3", async () => {
     prisma.message.findUnique.mockResolvedValue(own({ body: null, image: uploadUrl(ME) }));
 
     expect((await recall()).status).toBe(200);
@@ -1159,7 +1210,13 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.reaction.deleteMany).toHaveBeenCalledWith({ where: { messageId: MESSAGE } });
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { body: null, image: null, editedAt: null, deletedAt: expect.any(Date) },
+        data: {
+          body: null,
+          image: null,
+          attachment: { unset: true },
+          editedAt: null,
+          deletedAt: expect.any(Date),
+        },
       })
     );
     expect(mocks.emitToConversation).toHaveBeenCalledWith(

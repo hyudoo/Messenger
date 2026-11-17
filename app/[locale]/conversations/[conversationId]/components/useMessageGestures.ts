@@ -20,7 +20,7 @@ interface Options {
   onLongPress?: () => void;
   // undefined: this message can't be replied to (no swipe)
   onSwipe?: () => void;
-  // a tap that didn't land on a link, button or image (those keep their own action)
+  // a tap that didn't land on a link, button, image or control (those keep their own action)
   onTap?: () => void;
 }
 
@@ -103,7 +103,7 @@ const useMessageGestures = ({ direction, onLongPress, onSwipe, onTap }: Options)
       onSwipe?.();
     } else if (
       mode.current === "pending" &&
-      !(event.target instanceof Element && event.target.closest("a, button, img"))
+      !(event.target instanceof Element && event.target.closest("a, button, img, input"))
     ) {
       onTap?.();
     }

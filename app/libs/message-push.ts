@@ -64,12 +64,26 @@ const callTopic = (conversationId: string) => `call${conversationId}`;
 export const pushNewMessage = ({
   body,
   image,
+  attachment,
   ...push
-}: ConversationPush & { body: string | null; image: string | null }) =>
-  pushToConversation(push, (t) => (image ? t("image") : (body ?? "")), {
-    tag: `conversation-${push.conversation.id}`,
-    topic: push.conversation.id,
-  });
+}: ConversationPush & {
+  body: string | null;
+  image: string | null;
+  attachment?: { kind: string; name: string } | null;
+}) =>
+  pushToConversation(
+    push,
+    (t) => {
+      if (image) {
+        return t("image");
+      }
+      if (attachment) {
+        return attachment.kind === "voice" ? t("voice") : t("file", { name: attachment.name });
+      }
+      return body ?? "";
+    },
+    { tag: `conversation-${push.conversation.id}`, topic: push.conversation.id }
+  );
 
 // A call starting: only worth delivering while it rings.
 export const pushIncomingCall = ({

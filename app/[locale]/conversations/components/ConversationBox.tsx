@@ -76,7 +76,11 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
       ? t("last_recalled")
       : lastMessage?.image
         ? t("last_image")
-        : lastMessage?.body;
+        : lastMessage?.attachment?.kind === "voice"
+          ? t("last_voice")
+          : lastMessage?.attachment
+            ? t("last_file", { name: lastMessage.attachment.name })
+            : lastMessage?.body;
     if (!text) {
       return t("no_messages");
     }

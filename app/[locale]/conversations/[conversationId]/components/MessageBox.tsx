@@ -22,7 +22,8 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 
 import Avatar from "@/app/components/Avatar";
-import ImageModal from "./ImageModal";
+import { useOpenImage } from "./ImageViewer";
+import { FileCard, VoicePlayer } from "./MessageAttachment";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
@@ -203,7 +204,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
   const t = useTranslations();
   const dateLocale = useDateLocale();
   const session = useSession();
-  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const openImage = useOpenImage();
   const [menuOpen, setMenuOpen] = useState(false);
   // touch screens: a grouped message's time, shown by a tap (there is no hover title)
   const [timeShown, setTimeShown] = useState(false);
@@ -330,26 +331,23 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
           <div className={clsx(message, "[@media(hover:none)]:select-none [@media(hover:none)]:[-webkit-touch-callout:none]")}>
             {recalled && t("chat.recalled")}
             {data.image && (
-              <ImageModal
-                src={data.image}
-                isOpen={imageModalOpen}
-                onClose={() => setImageModalOpen(false)}
-              />
+              <button
+                type="button"
+                onClick={() => openImage?.(data.image!)}
+                aria-label={t("common.image")}
+                className="block overflow-hidden">
+                <Image
+                  alt={t("common.image")}
+                  height="288"
+                  width="288"
+                  src={data.image}
+                  className="object-cover transition hover:scale-105"
+                />
+              </button>
             )}
-            {data.image && (
-              <Image
-                alt={t("common.image")}
-                height="288"
-                width="288"
-                onClick={() => setImageModalOpen(true)}
-                src={data.image}
-                className="
-                object-cover
-                cursor-pointer
-                hover:scale-110
-                transition
-                translate"
-              />
+            {data.attachment?.kind === "file" && <FileCard attachment={data.attachment} isOwn={isOwn} />}
+            {data.attachment?.kind === "voice" && (
+              <VoicePlayer attachment={data.attachment} isOwn={isOwn} />
             )}
             {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
             {data.body && (

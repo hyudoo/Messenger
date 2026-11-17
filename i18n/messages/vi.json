@@ -81,7 +81,9 @@
     "typing_group": "{count, plural, other {{names} đang soạn tin…}}",
     "you": "Bạn",
     "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
-    "last_recalled": "Tin nhắn đã được thu hồi."
+    "last_recalled": "Tin nhắn đã được thu hồi.",
+    "last_voice": "Đã gửi một tin nhắn thoại.",
+    "last_file": "Đã gửi tệp {name}."
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -110,7 +112,6 @@
     "sending": "Đang gửi...",
     "retry": "Thử lại",
     "discard": "Bỏ",
-    "image_uploading": "Đang tải ảnh lên...",
     "reply": "Trả lời",
     "edit": "Sửa",
     "recall": "Thu hồi",
@@ -133,7 +134,26 @@
     "reply_image": "Hình ảnh",
     "reply_call": "Cuộc gọi",
     "reply_jump": "Xem tin nhắn gốc",
-    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}"
+    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}",
+    "reply_voice": "Tin nhắn thoại",
+    "reply_file": "Tệp {name}",
+    "attach_file": "Gửi tệp",
+    "drop_files": "Thả ảnh hoặc tệp vào đây để gửi",
+    "remove_attachment": "Bỏ {name}",
+    "attachment_uploading": "Đang tải lên…",
+    "attachment_failed": "Tải lên thất bại, bấm để thử lại",
+    "attachments_too_many": "Mỗi lần gửi tối đa {max} ảnh hoặc tệp",
+    "record_voice": "Ghi âm tin nhắn thoại",
+    "recording": "Đang ghi âm",
+    "send_voice": "Gửi tin nhắn thoại",
+    "cancel_voice": "Huỷ ghi âm",
+    "mic_denied": "Không dùng được micro. Hãy cho phép trang truy cập micro.",
+    "voice_unsupported": "Trình duyệt này không ghi âm được.",
+    "voice_uploading": "Đang gửi tin nhắn thoại...",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "seek": "Tua tin nhắn thoại",
+    "open_file": "Mở {name}"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -193,7 +213,11 @@
     "unsupported_type": "Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP",
     "too_large": "Ảnh tối đa 10MB",
     "too_many": "Bạn tải ảnh lên quá nhiều, thử lại sau ít phút",
-    "failed": "Tải ảnh lên thất bại"
+    "failed": "Tải ảnh lên thất bại",
+    "file_unsupported_type": "Không hỗ trợ loại tệp này (PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP)",
+    "file_too_large": "Tệp tối đa 25MB",
+    "voice_unsupported_type": "Định dạng ghi âm không được hỗ trợ",
+    "voice_too_large": "Tin nhắn thoại quá dài"
   },
   "call": {
     "incoming": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
@@ -263,6 +287,17 @@
     "prompt_later": "Để sau",
     "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt.",
     "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
-    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}"
+    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
+    "voice": "Đã gửi một tin nhắn thoại.",
+    "file": "Đã gửi tệp {name}."
+  },
+  "viewer": {
+    "close": "Đóng",
+    "previous": "Ảnh trước",
+    "next": "Ảnh sau",
+    "download": "Tải ảnh xuống",
+    "zoom_in": "Phóng to",
+    "zoom_out": "Thu nhỏ",
+    "counter": "{current} / {total}"
   }
 }

@@ -100,6 +100,8 @@ model Message {
   callAnsweredAt DateTime?
   callEndedAt    DateTime?
   image     String?
+  // a file or a voice message (uploaded like images; app/libs/upload.ts has the allowed types)
+  attachment MessageAttachment?
   createdAt DateTime @default(now())
   // set when the sender edits the body (PATCH /api/messages/[messageId])
   editedAt  DateTime?
@@ -158,6 +160,23 @@ enum SystemType {
   added
   removed
   left
+}
+
+enum AttachmentKind {
+  file
+  voice
+}
+
+type MessageAttachment {
+  kind     AttachmentKind
+  url      String
+  // the file's name as the sender had it (voice: generated)
+  name     String
+  size     Int
+  // content type, without parameters
+  type     String
+  // voice only: length in ms
+  duration Int?
 }
 
 type SystemUser {

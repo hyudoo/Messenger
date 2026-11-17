@@ -11,7 +11,10 @@ export type MessageReaction = {
 };
 
 // The replied-to message as shown above a reply (REPLY_PREVIEW_SELECT, app/libs/message-include.ts).
-export type ReplyPreview = Pick<Message, "id" | "body" | "image" | "isCall" | "deletedAt"> & {
+export type ReplyPreview = Pick<
+  Message,
+  "id" | "body" | "image" | "attachment" | "isCall" | "deletedAt"
+> & {
   sender: { name: string | null; email: string | null };
 };
 

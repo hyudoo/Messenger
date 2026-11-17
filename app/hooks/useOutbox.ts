@@ -12,7 +12,18 @@ import { FullMessageType, ReplyPreview } from "@/app/types";
 export interface OutboxPayload {
   message?: string;
   image?: string;
+  // a file or voice message (already uploaded)
+  attachment?: OutboxAttachment;
   replyToId?: string;
+}
+
+export interface OutboxAttachment {
+  kind: "file" | "voice";
+  url: string;
+  name: string;
+  size: number;
+  type: string;
+  duration?: number;
 }
 
 export interface OutboxItem {

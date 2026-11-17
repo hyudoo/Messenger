@@ -37,7 +37,7 @@ export const deleteConversation = async (conversation: ConversationWithUsers) =>
   // cleaned up afterwards: their images on S3 and their ids in seenMessageIds
   const messages = await prisma.message.findMany({
     where: { conversationId: conversation.id },
-    select: { id: true, image: true },
+    select: { id: true, image: true, attachment: true },
   });
 
   // On MongoDB a delete leaves the id in every member's User.conversationIds;
@@ -54,7 +54,7 @@ export const deleteConversation = async (conversation: ConversationWithUsers) =>
     }),
   ]);
 
-  cleanUpUploads(messages.map((message) => message.image));
+  cleanUpUploads(messages.flatMap((message) => [message.image, message.attachment?.url]));
   pullSeenMessageIds(
     conversation.userIds,
     messages.map((message) => message.id)

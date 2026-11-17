@@ -6,6 +6,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import { UploadKind, extensionsOf } from "./upload";
+
 const region = process.env.AWS_REGION!;
 const bucket = process.env.AWS_S3_BUCKET!;
 
@@ -22,7 +24,12 @@ export const publicUrlFor = (key: string) => `${publicBaseUrl()}/${key}`;
 
 // Exactly the keys /api/uploads creates: uploads/<userId>/<uuid>.<ext>
 const UPLOAD_KEY =
-  /^uploads\/([a-f\d]{24})\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.(jpg|png|gif|webp)$/;
+  /^uploads\/([a-f\d]{24})\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.([a-z\d]{2,5})$/;
+const ALL_EXTENSIONS = new Set([
+  ...extensionsOf("image"),
+  ...extensionsOf("file"),
+  ...extensionsOf("voice"),
+]);
 
 const uploadKeyOf = (url: unknown) => {
   const prefix = `${publicBaseUrl()}/`;
@@ -31,13 +38,22 @@ const uploadKeyOf = (url: unknown) => {
   }
   const key = url.slice(prefix.length);
   const match = UPLOAD_KEY.exec(key);
-  return match ? { key, ownerId: match[1] } : null;
+  return match && ALL_EXTENSIONS.has(match[2])
+    ? { key, ownerId: match[1], extension: match[2] }
+    : null;
 };
 
-// True for URLs produced by /api/uploads for `ownerId`, so clients can store neither
-// arbitrary image URLs nor someone else's upload (which a later cleanup would delete).
-export const isUploadedFileUrl = (url: unknown, ownerId: string): url is string =>
-  uploadKeyOf(url)?.ownerId === ownerId;
+// True for URLs produced by /api/uploads for `ownerId` and `kind` (by the key's extension), so
+// clients can store neither arbitrary URLs, nor someone else's upload (which a later cleanup
+// would delete), nor e.g. a PDF as an image.
+export const isUploadedFileUrl = (
+  url: unknown,
+  ownerId: string,
+  kind: UploadKind = "image"
+): url is string => {
+  const upload = uploadKeyOf(url);
+  return upload?.ownerId === ownerId && extensionsOf(kind).includes(upload.extension);
+};
 
 // Deletes the S3 objects behind these URLs; anything not from /api/uploads is ignored.
 export const deleteUploadedObjects = async (urls: string[]) => {

@@ -9,6 +9,7 @@ import { MESSAGE_INCLUDE, NOT_RECALLED, NOT_SYSTEM } from "@/app/libs/message-in
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 import { pushIncomingCall, pushNewMessage } from "@/app/libs/message-push";
+import { parseAttachment } from "@/app/libs/attachment";
 
 const MAX_MESSAGE_LENGTH = 5000;
 // the sender's tab id for an optimistic message (app/hooks/useOutbox.ts); only echoed back
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       return tooManyRequests(limited.retryAfter);
     }
 
-    const { message, isCall, callType, image, conversationId, clientId, replyToId } =
+    const { message, isCall, callType, image, attachment, conversationId, clientId, replyToId } =
       await request.json();
 
     const conversation = await getConversationForUser(
@@ -46,10 +47,15 @@ export async function POST(request: Request) {
     if (image !== undefined && !isUploadedFileUrl(image, currentUser.id)) {
       return new NextResponse("Invalid image", { status: 400 });
     }
+    // a file or voice message: the caller's own upload of that kind, on its own
+    const file = attachment === undefined ? null : parseAttachment(attachment, currentUser.id);
+    if (attachment !== undefined && (!file || image !== undefined || isCall)) {
+      return new NextResponse("Invalid attachment", { status: 400 });
+    }
     if (isCall === true && callType !== undefined && callType !== "audio" && callType !== "video") {
       return new NextResponse("Invalid call type", { status: 400 });
     }
-    if (!body && !image && !isCall) {
+    if (!body && !image && !file && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
     }
     // a reply quotes a person's message of the same conversation that is still there
@@ -69,10 +75,11 @@ export async function POST(request: Request) {
         return new NextResponse("Invalid reply", { status: 400 });
       }
     }
-    if (image) {
-      // keeps the file from the pending-upload expiry; fails if it was never uploaded
+    const uploaded = [image, file?.url].filter((url): url is string => !!url);
+    if (uploaded.length > 0) {
+      // keeps the files from the pending-upload expiry; fails if one was never uploaded
       try {
-        await markUploadsUsed([image]);
+        await markUploadsUsed(uploaded);
       } catch (error) {
         logError("mark_upload_used", error);
         return new NextResponse("Image not found", { status: 400 });
@@ -84,6 +91,7 @@ export async function POST(request: Request) {
       data: {
         body: body || undefined,
         image,
+        attachment: file ?? undefined,
         isCall: isCall === true ? true : undefined,
         // video unless asked for audio (older clients send no callType)
         callType: isCall === true ? (callType === "audio" ? "audio" : "video") : undefined,
@@ -148,7 +156,12 @@ export async function POST(request: Request) {
         startedAt: newMessage.createdAt,
       });
     } else {
-      void pushNewMessage({ ...push, body: newMessage.body, image: newMessage.image });
+      void pushNewMessage({
+        ...push,
+        body: newMessage.body,
+        image: newMessage.image,
+        attachment: newMessage.attachment,
+      });
     }
 
     return NextResponse.json(newMessage);

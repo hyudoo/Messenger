@@ -6,7 +6,9 @@ import { HiArrowUturnLeft } from "react-icons/hi2";
 
 import { ReplyPreview } from "@/app/types";
 
-type Snippetable = Pick<ReplyPreview, "body" | "image" | "isCall" | "deletedAt">;
+type Snippetable = Pick<ReplyPreview, "body" | "image" | "isCall" | "deletedAt"> & {
+  attachment?: ReplyPreview["attachment"];
+};
 
 // One line standing for a message: its text, or what it was (image, call, recalled).
 export const MessageSnippet: React.FC<{ message: Snippetable }> = ({ message }) => {
@@ -19,6 +21,15 @@ export const MessageSnippet: React.FC<{ message: Snippetable }> = ({ message }) 
   }
   if (message.isCall) {
     return <>{t("reply_call")}</>;
+  }
+  if (message.attachment) {
+    return (
+      <>
+        {message.attachment.kind === "voice"
+          ? t("reply_voice")
+          : t("reply_file", { name: message.attachment.name })}
+      </>
+    );
   }
   return <>{message.body}</>;
 };

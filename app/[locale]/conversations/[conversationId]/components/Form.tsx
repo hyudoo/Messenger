@@ -2,20 +2,28 @@
 
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
-import { HiCheck, HiPaperAirplane, HiPhoto, HiXMark } from "react-icons/hi2";
+import { HiCheck, HiPaperAirplane, HiPaperClip, HiPhoto, HiXMark } from "react-icons/hi2";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 
 import MessageInput from "./MessageInput";
 import { MessageSnippet } from "./MessageReply";
-import ImageUploadButton from "@/app/components/ImageUploadButton";
+import AttachmentTray, { useAttachmentTray } from "./AttachmentTray";
+import { MicButton, RecordingBar, VoiceRecording, useVoiceRecorder } from "./VoiceRecorder";
 import EmojiPicker from "@/app/components/EmojiPicker";
 import useComposer from "@/app/hooks/useComposer";
 import useConversation from "@/app/hooks/useConversation";
-import useOutbox from "@/app/hooks/useOutbox";
+import useOutbox, { OutboxPayload } from "@/app/hooks/useOutbox";
 import { QUICK_EMOJI } from "@/app/libs/emoji";
 import { getSocket } from "@/app/libs/socket-client";
-import { UploadError, uploadImage } from "@/app/libs/upload";
+import {
+  AUDIO_TYPES,
+  FILE_TYPES,
+  IMAGE_TYPES,
+  UploadError,
+  baseContentType,
+  uploadFile,
+} from "@/app/libs/upload";
 import { FullMessageType, ReplyPreview } from "@/app/types";
 
 const INPUT_ID = "message";
@@ -26,14 +34,21 @@ const toPreview = (message: FullMessageType): ReplyPreview => ({
   id: message.id,
   body: message.body,
   image: message.image,
+  attachment: message.attachment,
   isCall: message.isCall,
   deletedAt: message.deletedAt,
   sender: { name: message.sender?.name ?? null, email: message.sender?.email ?? null },
 });
 
+// what the file picker offers (the same types /api/uploads accepts)
+const FILE_ACCEPT = Object.keys(FILE_TYPES).join(",");
+const IMAGE_ACCEPT = Object.keys(IMAGE_TYPES).join(",");
+
 // The composer. Sending goes through the outbox (app/hooks/useOutbox.ts): the message shows at
 // once in the chat and offers a retry there if it fails, so the input is cleared straight away.
 // Replying and editing are started from a message's actions (app/hooks/useComposer.ts).
+// Images and files (picked, pasted or dropped) wait in the tray, uploaded, until sent; each
+// becomes its own message, before the text. A voice message is recorded, uploaded and sent.
 const Form = () => {
   const t = useTranslations("chat");
   const tUpload = useTranslations("upload");
@@ -44,11 +59,17 @@ const Form = () => {
   const replyTo = composer.conversationId === conversationId ? composer.replyTo : null;
   const editing = composer.conversationId === conversationId ? composer.editing : null;
   const [message, setMessage] = useState("");
-  const [isPasting, setIsPasting] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const tray = useAttachmentTray();
   // when "typing" was last sent (0: not typing); an object so the unmount cleanup can hold it
   const typing = useRef({ sentAt: 0 });
   const isEmpty = message.trim().length === 0;
+  // something to send: text, or uploaded images / files (none still uploading)
+  const canSend = (!isEmpty || tray.readyCount > 0) && !tray.uploading;
+  const trayEmpty = tray.items.length === 0;
 
   // starting an edit puts the message's text in the input; a reply just focuses it
   useEffect(
@@ -111,23 +132,48 @@ const Form = () => {
     });
   };
 
+  // one message per payload; a reply goes on the text, or on the first one without text
+  const sendAll = (payloads: OutboxPayload[]) => {
+    const textIndex = payloads.findIndex((payload) => payload.message);
+    const replyIndex = textIndex >= 0 ? textIndex : 0;
+    payloads.forEach((payload, index) =>
+      send(
+        conversationId,
+        { ...payload, ...(replyTo && index === replyIndex && { replyToId: replyTo.id }) },
+        replyTo && index === replyIndex ? toPreview(replyTo) : undefined
+      )
+    );
+    if (replyTo && payloads.length > 0) {
+      composer.cancel();
+    }
+  };
+
   const submit = () => {
-    if (isEmpty) {
+    if (editing) {
+      if (!isEmpty) {
+        stopTyping();
+        submitEdit(editing);
+      }
+      return;
+    }
+    if (!canSend) {
       return;
     }
     stopTyping();
-    if (editing) {
-      submitEdit(editing);
-      return;
-    }
-    send(
-      conversationId,
-      { message, ...(replyTo && { replyToId: replyTo.id }) },
-      replyTo ? toPreview(replyTo) : undefined
+    const attachments: OutboxPayload[] = tray.takeReady().map((item) =>
+      item.kind === "image"
+        ? { image: item.url }
+        : {
+            attachment: {
+              kind: "file",
+              url: item.url!,
+              name: item.file.name,
+              size: item.file.size,
+              type: baseContentType(item.file.type),
+            },
+          }
     );
-    if (replyTo) {
-      composer.cancel();
-    }
+    sendAll([...attachments, ...(isEmpty ? [] : [{ message }])]);
     setMessage("");
     inputRef.current?.focus();
   };
@@ -144,7 +190,33 @@ const Form = () => {
     }
   };
 
-  const sendImage = (url: string) => send(conversationId, { image: url });
+  const recorder = useVoiceRecorder(async ({ blob, type, duration }: VoiceRecording) => {
+    const uploading = toast.loading(t("voice_uploading"));
+    try {
+      const url = await uploadFile(blob, "voice");
+      toast.dismiss(uploading);
+      sendAll([
+        {
+          attachment: {
+            kind: "voice",
+            url,
+            name: `voice-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-")}.${AUDIO_TYPES[type]}`,
+            size: blob.size,
+            type,
+            duration: Math.round(duration),
+          },
+        },
+      ]);
+    } catch (error) {
+      const code = error instanceof UploadError ? error.code : "failed";
+      toast.error(
+        code === "unsupported_type" || code === "too_large"
+          ? tUpload(`voice_${code}`)
+          : tUpload(code),
+        { id: uploading }
+      );
+    }
+  });
 
   // inserts at the caret (or replaces the selection), keeping the picker open
   const insertEmoji = (emoji: string) => {
@@ -159,35 +231,59 @@ const Form = () => {
     });
   };
 
-  // a pasted image (screenshot, copied picture) is uploaded and sent like a picked one;
+  // pasted images / files (a screenshot, a copied picture) go to the tray like picked ones;
   // pasted text goes into the input as usual
-  const handlePaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const file = Array.from(event.clipboardData.files).find((item) =>
-      item.type.startsWith("image/")
-    );
-    if (!file) {
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.files);
+    if (files.length === 0) {
       return;
     }
     event.preventDefault();
-    if (isPasting) {
-      return;
-    }
-    setIsPasting(true);
-    const uploading = toast.loading(t("image_uploading"));
-    try {
-      sendImage(await uploadImage(file));
-      toast.dismiss(uploading);
-    } catch (error) {
-      toast.error(tUpload(error instanceof UploadError ? error.code : "failed"), {
-        id: uploading,
-      });
-    } finally {
-      setIsPasting(false);
-    }
+    tray.add(files);
   };
 
+  const pickFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    tray.add(Array.from(event.target.files ?? []));
+    event.target.value = "";
+  };
+
+  // files dragged onto the composer
+  const dropProps = editing
+    ? {}
+    : {
+        onDragOver: (event: React.DragEvent) => {
+          if (event.dataTransfer.types.includes("Files")) {
+            event.preventDefault();
+            setDragging(true);
+          }
+        },
+        onDragLeave: (event: React.DragEvent) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setDragging(false);
+          }
+        },
+        onDrop: (event: React.DragEvent) => {
+          event.preventDefault();
+          setDragging(false);
+          tray.add(Array.from(event.dataTransfer.files));
+        },
+      };
+
+  if (recorder.recording) {
+    return (
+      <div className="w-full border-t bg-background">
+        <RecordingBar elapsed={recorder.elapsed} onCancel={recorder.cancel} onSend={recorder.send} />
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-background border-t w-full">
+    <div className="relative w-full border-t bg-background" {...dropProps}>
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-sky-500 bg-background/90 text-sm font-medium text-sky-500">
+          {t("drop_files")}
+        </div>
+      )}
       {(replyTo || editing) && (
         <div className="flex items-center gap-3 border-b px-4 py-2 text-sm">
           <div className="min-w-0 flex-1">
@@ -210,6 +306,23 @@ const Form = () => {
           </button>
         </div>
       )}
+      {!editing && <AttachmentTray items={tray.items} onRemove={tray.remove} onRetry={tray.retry} />}
+      <input
+        ref={imageInputRef}
+        type="file"
+        multiple
+        accept={IMAGE_ACCEPT}
+        className="hidden"
+        onChange={pickFiles}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={FILE_ACCEPT}
+        className="hidden"
+        onChange={pickFiles}
+      />
       <div
         className="
       py-4
@@ -221,9 +334,23 @@ const Form = () => {
       w-full">
         {!editing && (
           <div className="flex h-10 shrink-0 items-center gap-2 lg:gap-4">
-            <ImageUploadButton onUpload={sendImage} disabled={isPasting}>
-              <HiPhoto size={30} className="text-sky-500" aria-label={t("attach_image")} />
-            </ImageUploadButton>
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              aria-label={t("attach_image")}
+              title={t("attach_image")}
+              className="text-sky-500 transition hover:text-sky-600">
+              <HiPhoto size={30} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label={t("attach_file")}
+              title={t("attach_file")}
+              className="text-sky-500 transition hover:text-sky-600">
+              <HiPaperClip size={24} aria-hidden />
+            </button>
+            <MicButton onClick={recorder.start} />
             <EmojiPicker onSelect={insertEmoji} />
           </div>
         )}
@@ -246,7 +373,7 @@ const Form = () => {
             placeholder={t("placeholder")}
           />
           <div className="flex h-10 shrink-0 items-center">
-            {isEmpty && !editing ? (
+            {isEmpty && trayEmpty && !editing ? (
               <button
                 type="button"
                 onClick={sendQuickEmoji}
@@ -270,7 +397,7 @@ const Form = () => {
             ) : (
               <button
                 type="submit"
-                disabled={isEmpty}
+                disabled={editing ? isEmpty : !canSend}
                 aria-label={editing ? t("save_edit") : t("send")}
                 title={editing ? t("save_edit") : undefined}
                 className="
