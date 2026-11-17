@@ -8,6 +8,7 @@ import prisma from "@/app/libs/prismadb";
 import { ConversationWithUsers } from "@/app/types";
 import { logError } from "@/app/libs/log";
 import { normalizeGroupName } from "@/app/libs/conversation-permissions";
+import { postSystemMessage } from "@/app/libs/system-message";
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
@@ -88,6 +89,13 @@ export async function POST(request: Request) {
       });
 
       notifyMembers(newConversation);
+      // the first message: "X created the group" (also moves it to the top of the inboxes)
+      await postSystemMessage({
+        conversation: newConversation,
+        actorId: currentUser.id,
+        type: "created",
+        name: groupName,
+      });
       return NextResponse.json(newConversation);
     }
 

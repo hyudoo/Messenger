@@ -65,6 +65,7 @@ const MessageNotifications = () => {
         !update.lastMessageAt || // not a new message (seen, members)
         !message ||
         message.isCall ||
+        message.systemType || // group events aren't worth a notification
         message.sender?.email === me ||
         getNotificationState() !== "on" ||
         isPushActive() // the service worker shows it

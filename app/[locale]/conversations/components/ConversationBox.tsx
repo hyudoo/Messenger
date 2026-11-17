@@ -12,6 +12,7 @@ import useOtherUser from "@/app/hooks/useOtherUser";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { FullConversationType } from "@/app/types";
 import useDateLocale from "@/app/hooks/useDateLocale";
+import useSystemText from "@/app/hooks/useSystemText";
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { formatUnread } from "@/app/libs/unread";
 
@@ -28,6 +29,7 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
   const dateLocale = useDateLocale();
   const otherUser = useOtherUser(data);
   const session = useSession();
+  const systemText = useSystemText();
 
   const lastMessage = useMemo(() => {
     const messages = data.messages || [];
@@ -47,6 +49,10 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
   const unread = data.unreadCount ?? (hasSeen || !lastMessage ? 0 : 1);
 
   const lastMessageText = useMemo(() => {
+    // a group event is a whole sentence already ("You added …")
+    if (lastMessage?.systemType) {
+      return systemText(lastMessage);
+    }
     if (lastMessage?.isCall) {
       // older calls have no callType: video
       const kind = lastMessage.callType ?? "video";
@@ -80,7 +86,7 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
       return t("last_from", { name: lastMessage.sender.name, text });
     }
     return text;
-  }, [lastMessage, t, userEmail, data.isGroup]);
+  }, [lastMessage, t, userEmail, data.isGroup, systemText]);
 
   const title = data.name || otherUser.name;
 

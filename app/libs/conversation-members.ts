@@ -1,5 +1,6 @@
 import prisma from "./prismadb";
 import { deleteConversation } from "./conversation-delete";
+import { postSystemMessage } from "./system-message";
 import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
 
@@ -19,10 +20,15 @@ export const emitGroupUpdate = (conversation: ConversationWithUsers, to: SafeUse
   });
 };
 
-// Takes a member out of a group (leaving, or removed by the owner; callers check who may).
-// Their tabs drop it (conversation:remove) and leave its room, the others get the new member
-// list. The owner going hands the group on to another member; the last member going deletes it.
-export const removeGroupMember = async (conversation: ConversationWithUsers, memberId: string) => {
+// Takes a member out of a group: leaving (actorId = memberId) or removed by the owner (callers
+// check who may). Their tabs drop it (conversation:remove) and leave its room, the others get the
+// new member list and a group event. The owner going hands the group on to another member; the
+// last member going deletes it.
+export const removeGroupMember = async (
+  conversation: ConversationWithUsers,
+  memberId: string,
+  actorId: string = memberId
+) => {
   const member = conversation.users.find((user) => user.id === memberId);
   const remaining = conversation.users.filter((user) => user.id !== memberId);
   if (remaining.length === 0) {
@@ -45,5 +51,10 @@ export const removeGroupMember = async (conversation: ConversationWithUsers, mem
     removeUserFromConversationRoom(member.email, conversation.id);
   }
   emitGroupUpdate(updated, updated.users);
+  await postSystemMessage(
+    actorId === memberId
+      ? { conversation: updated, actorId, type: "left" }
+      : { conversation: updated, actorId, type: "removed", users: member ? [member] : [] }
+  );
   return updated;
 };

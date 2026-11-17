@@ -787,6 +787,108 @@ describe("DELETE /api/conversations/[id]/members/[userId]", () => {
   });
 });
 
+describe("group events (system messages)", () => {
+  const FOURTH = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const fourth = user(FOURTH);
+  const event = (data: Record<string, unknown>) => ({ id: MESSAGE, createdAt: new Date(), ...data });
+  const systemCreate = () =>
+    prisma.message.create.mock.calls.map(([args]) => (args as { data: Record<string, unknown> }).data);
+  const patch = (body: Record<string, unknown>) =>
+    updateGroup(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  beforeEach(() => {
+    prisma.message.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => event(data));
+  });
+
+  it("posts one when a group is created", async () => {
+    prisma.user.count.mockResolvedValue(2);
+    prisma.conversation.create.mockResolvedValue({ ...group(ME), name: "Team" });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    const response = await createConversation(
+      jsonRequest("/api/conversations", {
+        isGroup: true,
+        name: "Team",
+        members: [{ value: OTHER }, { value: THIRD }],
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({ systemType: "created", systemName: "Team", senderId: ME, seenIds: [ME] }),
+    ]);
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:new",
+      expect.objectContaining({ systemType: "created" })
+    );
+  });
+
+  it("posts renamed and added; the people added have it as read and as their preview", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Old" });
+    prisma.user.count.mockResolvedValue(1);
+    prisma.conversation.update.mockResolvedValue({
+      ...group(OTHER, [me, other, third, fourth]),
+      name: "New",
+      lastMessageAt: new Date(),
+    });
+
+    expect((await patch({ name: "New", addUserIds: [FOURTH] })).status).toBe(200);
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({ systemType: "renamed", systemName: "New", seenIds: [ME] }),
+      expect.objectContaining({
+        systemType: "added",
+        systemUsers: [{ id: FOURTH, name: fourth.name, email: fourth.email }],
+        seenIds: [ME, FOURTH],
+      }),
+    ]);
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:new",
+      expect.objectContaining({ messages: [expect.objectContaining({ systemType: "added" })] })
+    );
+  });
+
+  it("posts nothing for a rename to the same name", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Same" });
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "Same" });
+    expect((await patch({ name: "Same" })).status).toBe(200);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("posts removed (by the owner) and left", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.conversation.update.mockResolvedValue(group(ME, [me, other]));
+    await removeMember(
+      jsonRequest(`/api/conversations/${CONVERSATION}/members/${THIRD}`, null, { method: "DELETE" }),
+      params({ conversationId: CONVERSATION, userId: THIRD })
+    );
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [other, third]));
+    await leaveConversation(
+      jsonRequest(`/api/conversations/${CONVERSATION}/leave`, null),
+      params({ conversationId: CONVERSATION })
+    );
+
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({
+        systemType: "removed",
+        senderId: ME,
+        systemUsers: [{ id: THIRD, name: third.name, email: third.email }],
+      }),
+      expect.objectContaining({ systemType: "left", senderId: ME }),
+    ]);
+  });
+
+  it("keeps the change when the event can't be posted", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Old" });
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "New" });
+    prisma.message.create.mockRejectedValue(new Error("db down"));
+    expect((await patch({ name: "New" })).status).toBe(200);
+  });
+});
+
 describe("GET /api/conversations/[id]/messages (after / latest)", () => {
   const get = (query: string) =>
     olderMessages(

@@ -50,14 +50,14 @@ export async function POST(
     // "missing" and "not a member" look the same
     const message = await prisma.message.findUnique({
       where: { id: messageId },
-      select: { conversationId: true, deletedAt: true, isCall: true },
+      select: { conversationId: true, deletedAt: true, isCall: true, systemType: true },
     });
     const conversation =
       message && (await getConversationForUser(message.conversationId, currentUser.id));
     if (!conversation) {
       return new NextResponse("Not found", { status: 404 });
     }
-    // a recalled message has nothing left to react to, and a call isn't something to react to
+    // a recalled message has nothing left to react to; calls and group events aren't for reacting
     if (!canReactToMessage(message)) {
       return new NextResponse("Cannot react to this message", { status: 400 });
     }

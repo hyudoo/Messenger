@@ -26,6 +26,7 @@ import ImageModal from "./ImageModal";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
+import useSystemText from "@/app/hooks/useSystemText";
 import {
   canEditMessage,
   canReactToMessage,
@@ -213,6 +214,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
     onTap: showHeader ? undefined : () => setTimeShown((shown) => !shown),
   });
 
+  const systemText = useSystemText();
+
   const seenList = (data.seen || [])
     .filter((user) => user.email !== data?.sender?.email)
     .map((user) => user.name)
@@ -245,6 +248,17 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
         // rounded-2xl, not rounded-full: a pill shape breaks once a message wraps
         data.image ? "rounded-md p-0" : "rounded-2xl py-2 px-3"
       );
+
+  // a group event: one centered line, no avatar, bubble or actions
+  if (data.systemType) {
+    return (
+      <div id={messageElementId(data.id)} className="flex justify-center px-4 py-3">
+        <p className="max-w-[85%] text-center text-xs text-muted-foreground">
+          {systemText(data)}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div id={messageElementId(data.id)} className={clsx(container, "rounded-lg")}>

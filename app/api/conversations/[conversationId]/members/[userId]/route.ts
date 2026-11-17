@@ -41,7 +41,7 @@ export async function DELETE(
       return new NextResponse("Only the group owner can remove members", { status: 403 });
     }
 
-    await removeGroupMember(conversation, userId);
+    await removeGroupMember(conversation, userId, currentUser.id);
     return new NextResponse("Success");
   } catch (error) {
     logError("conversation_remove_member", error);

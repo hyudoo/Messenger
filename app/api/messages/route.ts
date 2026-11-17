@@ -5,7 +5,7 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
-import { MESSAGE_INCLUDE, NOT_RECALLED } from "@/app/libs/message-include";
+import { MESSAGE_INCLUDE, NOT_RECALLED, NOT_SYSTEM } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 import { pushIncomingCall, pushNewMessage } from "@/app/libs/message-push";
@@ -52,12 +52,16 @@ export async function POST(request: Request) {
     if (!body && !image && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
     }
-    // a reply quotes a message of the same conversation that is still there (not recalled)
+    // a reply quotes a person's message of the same conversation that is still there
     if (replyToId !== undefined && replyToId !== null) {
       const original =
         typeof replyToId === "string" && OBJECT_ID.test(replyToId) && !isCall
           ? await prisma.message.findFirst({
-              where: { id: replyToId, conversationId: conversation.id, ...NOT_RECALLED },
+              where: {
+                id: replyToId,
+                conversationId: conversation.id,
+                AND: [NOT_RECALLED, NOT_SYSTEM],
+              },
               select: { id: true },
             })
           : null;

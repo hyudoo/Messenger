@@ -222,6 +222,16 @@
     "no_results": "Không tìm thấy biểu tượng nào",
     "loading": "Đang tải…"
   },
+  "system": {
+    "created": "{actor} đã tạo nhóm “{name}”",
+    "renamed": "{actor} đã đổi tên nhóm thành “{name}”",
+    "added": "{actor} đã thêm {users} vào nhóm",
+    "removed": "{actor} đã xoá {users} khỏi nhóm",
+    "left": "{actor} đã rời nhóm",
+    "you_subject": "Bạn",
+    "you_object": "bạn",
+    "someone": "Ai đó"
+  },
   "reactions": {
     "add": "Thả cảm xúc",
     "more": "Biểu tượng khác",

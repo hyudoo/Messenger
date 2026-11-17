@@ -9,6 +9,7 @@ import {
 } from "@/app/libs/conversation-permissions";
 import { deleteConversation } from "@/app/libs/conversation-delete";
 import { emitGroupUpdate } from "@/app/libs/conversation-members";
+import { postSystemMessage } from "@/app/libs/system-message";
 import { emitToUser } from "@/app/libs/socket-server";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import prisma from "@/app/libs/prismadb";
@@ -87,14 +88,21 @@ export async function PATCH(
       updated,
       updated.users.filter((user) => !addIds.includes(user.id))
     );
+    // the events go to everyone now in the group (the people added have no inbox item yet, so
+    // theirs is ignored until conversation:new below)
+    if (name !== undefined && name !== conversation.name) {
+      await postSystemMessage({ conversation: updated, actorId: currentUser.id, type: "renamed", name });
+    }
     if (added.length > 0) {
-      // the inbox item: the last message, nothing unread yet
-      const messages = await prisma.message.findMany({
-        where: { conversationId: updated.id },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        include: { sender: true, seen: true },
+      const event = await postSystemMessage({
+        conversation: updated,
+        actorId: currentUser.id,
+        type: "added",
+        users: added,
+        seenBy: added.map((user) => user.id),
       });
+      // their inbox item: the last message ("X added you"), nothing unread yet
+      const messages = event ? [event] : [];
       added.forEach((user) => {
         if (user.email) {
           emitToUser(user.email, "conversation:new", { ...updated, messages, unreadCount: 0 });

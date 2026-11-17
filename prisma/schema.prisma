@@ -105,6 +105,13 @@ model Message {
   // reactions are removed, the row stays so the chat shows "message recalled" in its place
   deletedAt DateTime?
 
+  // A group event (app/libs/system-message.ts), shown as a centered line instead of a bubble; the
+  // sender is who did it. systemName: the group's name (created / renamed). systemUsers: who was
+  // added / removed, as they were then (a later rename or deleted account doesn't change it).
+  systemType  SystemType?
+  systemName  String?
+  systemUsers SystemUser[]
+
   // the message this one replies to (same conversation). NoAction: required by MongoDB for a
   // self-relation; the original is never hard-deleted on its own (recall keeps the row, and a
   // conversation delete removes both)
@@ -141,6 +148,20 @@ model Reaction {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
+}
+
+enum SystemType {
+  created
+  renamed
+  added
+  removed
+  left
+}
+
+type SystemUser {
+  id    String  @db.ObjectId
+  name  String?
+  email String?
 }
 
 enum CallType {

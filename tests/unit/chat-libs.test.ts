@@ -95,6 +95,13 @@ describe("message groups", () => {
     );
   });
 
+  it("never groups group events", () => {
+    const first = at("2026-11-17T10:00:00");
+    const event = { ...at("2026-11-17T10:00:30"), systemType: "renamed" };
+    expect(startsGroup(first, event)).toBe(true);
+    expect(startsGroup(event, at("2026-11-17T10:00:40"))).toBe(true);
+  });
+
   it("puts a divider where the local day changes", () => {
     expect(startsNewDay(undefined, at("2026-11-17T10:00:00"))).toBe(true);
     expect(startsNewDay(at("2026-11-17T10:00:00"), at("2026-11-17T23:00:00"))).toBe(false);
@@ -163,6 +170,8 @@ describe("message actions", () => {
     expect(canReactToMessage(message({ senderId: "other" }))).toBe(true);
     expect(canReactToMessage(message({ deletedAt: new Date() }))).toBe(false);
     expect(canReactToMessage(message({ isCall: true }))).toBe(false);
+    expect(canReactToMessage(message({ systemType: "added" }))).toBe(false);
+    expect(canReplyToMessage(message({ systemType: "added" }))).toBe(false);
   });
 });
 

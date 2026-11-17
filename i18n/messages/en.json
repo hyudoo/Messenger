@@ -222,6 +222,16 @@
     "no_results": "No emoji found",
     "loading": "Loading…"
   },
+  "system": {
+    "created": "{actor} created the group “{name}”",
+    "renamed": "{actor} named the group “{name}”",
+    "added": "{actor} added {users} to the group",
+    "removed": "{actor} removed {users} from the group",
+    "left": "{actor} left the group",
+    "you_subject": "You",
+    "you_object": "you",
+    "someone": "Someone"
+  },
   "reactions": {
     "add": "React",
     "more": "More emoji",
