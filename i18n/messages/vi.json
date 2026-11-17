@@ -158,7 +158,8 @@
     "open_file": "Mở {name}",
     "forward": "Chuyển tiếp",
     "forwarded": "Đã chuyển tiếp",
-    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ)."
+    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ).",
+    "mention_suggestions": "Gợi ý thành viên để nhắc tên"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -300,7 +301,8 @@
     "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
     "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
     "voice": "Đã gửi một tin nhắn thoại.",
-    "file": "Đã gửi tệp {name}."
+    "file": "Đã gửi tệp {name}.",
+    "mentioned_you": "Đã nhắc đến bạn: {text}"
   },
   "viewer": {
     "close": "Đóng",
@@ -329,5 +331,13 @@
     "sending": "Đang gửi…",
     "sent": "Đã gửi",
     "retry": "Thử lại"
+  },
+  "block": {
+    "block": "Chặn",
+    "unblock": "Bỏ chặn",
+    "confirm": "Chặn?",
+    "failed": "Không thực hiện được, thử lại sau.",
+    "blocked_by_me": "Bạn đã chặn {name}. Hai người không nhắn tin hay gọi cho nhau được.",
+    "blocked_by_them": "Bạn không thể trả lời cuộc trò chuyện này."
   }
 }

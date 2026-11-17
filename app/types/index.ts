@@ -2,7 +2,10 @@ import { CallType, Conversation, Message, User } from "@prisma/client";
 
 // What Prisma returns for a user: hashedPassword is omitted globally (app/libs/prismadb.ts).
 // a user row as queries return it (app/libs/prismadb.ts omits these fields)
-export type SafeUser = Omit<User, "hashedPassword" | "mutedConversationIds" | "pinnedConversationIds">;
+export type SafeUser = Omit<
+  User,
+  "hashedPassword" | "mutedConversationIds" | "pinnedConversationIds" | "blockedUserIds"
+>;
 
 // A reaction as MESSAGE_INCLUDE loads it (app/libs/message-include.ts).
 export type MessageReaction = {
@@ -53,6 +56,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
     lastMessageAt?: string;
     // the recipient muted this conversation: no notification
     muted?: boolean;
+    // the message mentions the recipient (a group's "@Name")
+    mentioned?: boolean;
   };
 
 export type ConversationWithUsers = Conversation & {

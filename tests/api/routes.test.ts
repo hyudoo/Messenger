@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   emitToUser: vi.fn(),
   emitToConversation: vi.fn(),
   removeUserFromConversationRoom: vi.fn(),
+  notifyBlocksChanged: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
   pushNewMessage: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("@/app/libs/socket-server", () => ({
   emitToUser: mocks.emitToUser,
   emitToConversation: mocks.emitToConversation,
   removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
+  notifyBlocksChanged: mocks.notifyBlocksChanged,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/app/libs/s3")>()),
@@ -63,6 +65,7 @@ import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversation
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
+import { POST as blockUser } from "@/app/api/users/[userId]/block/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
 import {
@@ -1088,6 +1091,135 @@ describe("GET /api/conversations/[id]/search", () => {
   });
 });
 
+describe("mentions", () => {
+  const send = (body: Record<string, unknown>) =>
+    sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, ...body }));
+
+  it("stores a group message's mentions; they get through a mute, with their own push", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    // both others muted the group
+    prisma.user.findMany.mockResolvedValue([{ id: OTHER }, { id: THIRD }]);
+    prisma.message.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: MESSAGE,
+      createdAt: new Date(),
+      ...data,
+    }));
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    expect((await send({ message: `hi @${other.name}!` })).status).toBe(200);
+    const mention = { id: OTHER, name: other.name, email: other.email };
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ mentions: [mention] }) })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      other.email,
+      "conversation:update",
+      expect.objectContaining({ mentioned: true })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      other.email,
+      "conversation:update",
+      expect.not.objectContaining({ muted: true })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      third.email,
+      "conversation:update",
+      expect.objectContaining({ muted: true })
+    );
+    expect(mocks.pushNewMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientIds: [OTHER], mentionedIds: [OTHER] })
+    );
+  });
+
+  it("has none in a 1:1 chat", async () => {
+    asMember();
+    await send({ message: `@${other.name} hi` });
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ mentions: [] }) })
+    );
+  });
+});
+
+describe("blocking", () => {
+  const block = (userId: string, blocked: unknown) =>
+    blockUser(jsonRequest(`/api/users/${userId}/block`, { blocked }), params({ userId }));
+
+  it("validates the request", async () => {
+    expect((await block(ME, true)).status).toBe(400);
+    expect((await block(OTHER, "yes")).status).toBe(400);
+    prisma.user.findUnique.mockResolvedValue(null);
+    expect((await block(OTHER, true)).status).toBe(404);
+  });
+
+  it("blocks and unblocks, telling both sides", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: OTHER, email: other.email });
+    prisma.user.findUniqueOrThrow.mockResolvedValue({ blockedUserIds: [] });
+    expect((await block(OTHER, true)).status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: ME },
+      data: { blockedUserIds: [OTHER] },
+      select: { id: true },
+    });
+    expect(mocks.notifyBlocksChanged).toHaveBeenCalledWith([me.email, other.email]);
+
+    prisma.user.findUniqueOrThrow.mockResolvedValue({ blockedUserIds: [OTHER] });
+    await block(OTHER, false);
+    expect(prisma.user.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ data: { blockedUserIds: [] } })
+    );
+  });
+
+  it("refuses messages and calls in a blocked 1:1 chat, either way", async () => {
+    asMember();
+    prisma.user.count.mockResolvedValue(1);
+    const send = (body: Record<string, unknown>) =>
+      sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, ...body }));
+    expect((await send({ message: "hi" })).status).toBe(403);
+    expect((await send({ isCall: true })).status).toBe(403);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { id: ME, blockedUserIds: { has: OTHER } },
+          { id: OTHER, blockedUserIds: { has: ME } },
+        ],
+      },
+    });
+  });
+
+  it("doesn't touch groups", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.user.count.mockResolvedValue(1);
+    prisma.message.create.mockResolvedValue({ id: MESSAGE, createdAt: new Date() });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+    const response = await sendMessage(
+      jsonRequest("/api/messages", { conversationId: CONVERSATION, message: "hi" })
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("hides a block partner's last active time in the inbox", async () => {
+    const seen = new Date();
+    prisma.conversation.findMany.mockResolvedValue([
+      { id: CONVERSATION, messages: [], users: [{ ...me, lastSeenAt: seen }, { ...other, lastSeenAt: seen }] },
+    ]);
+    // the user blocked OTHER
+    prisma.user.findUnique.mockResolvedValue({
+      blockedUserIds: [OTHER],
+      mutedConversationIds: [],
+      pinnedConversationIds: [],
+    });
+    prisma.user.findMany.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+      where.id ? [{ id: OTHER, email: other.email }] : []
+    );
+    const [item] = await (await listConversations()).json();
+    expect(item.users.map((user: { lastSeenAt: string | null }) => user.lastSeenAt)).toEqual([
+      seen.toISOString(),
+      null,
+    ]);
+  });
+});
+
 describe("GET /api/messages/[id]/download", () => {
   const download = () =>
     downloadFile(
@@ -1392,7 +1524,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: MESSAGE },
-        data: { body: "hello", searchText: "hello", editedAt: expect.any(Date) },
+        data: { body: "hello", searchText: "hello", mentions: [], editedAt: expect.any(Date) },
       })
     );
     expect(mocks.emitToConversation).toHaveBeenCalledWith(

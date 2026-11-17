@@ -1,6 +1,7 @@
 import prisma from "@/app/libs/prismadb";
 import { UNREAD_SCAN_LIMIT, countUnread } from "@/app/libs/unread";
 import getCurrentUser from "./getCurrentUser";
+import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
 
 // Unread count of one conversation: scans its newest messages (index conversationId + createdAt)
 // back to the user's read marker, at most UNREAD_SCAN_LIMIT of them.
@@ -49,6 +50,9 @@ export const findConversationsForUser = async (userId: string) => {
     },
   });
 
+  // block partners come without their last active time
+  const partners = await blockPartnersOf(userId).catch(() => new Map<string, string | null>());
+
   // only conversations whose last message is unread need a scan (usually few)
   return Promise.all(
     conversations.map(async (conversation) => {
@@ -59,6 +63,7 @@ export const findConversationsForUser = async (userId: string) => {
           : 0;
       return {
         ...conversation,
+        users: hideLastSeen(conversation.users, partners),
         unreadCount: unread,
         muted: !!settings?.mutedConversationIds.includes(conversation.id),
         pinned: !!settings?.pinnedConversationIds.includes(conversation.id),

@@ -5,6 +5,7 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { logError } from "@/app/libs/log";
 import { canEditMessage, canRecallMessage } from "@/app/libs/message-actions";
 import { searchTextOf } from "@/app/libs/search";
+import { findMentions } from "@/app/libs/mentions";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -81,7 +82,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<IPar
 
     const updated = await prisma.message.update({
       where: { id: found.message.id },
-      data: { body, searchText: searchTextOf(body), editedAt: new Date() },
+      data: {
+        body,
+        searchText: searchTextOf(body),
+        // names added by the edit are highlighted, but nobody is notified again
+        mentions: found.conversation.isGroup
+          ? findMentions(body, found.conversation.users, currentUser.id)
+          : [],
+        editedAt: new Date(),
+      },
       include: MESSAGE_INCLUDE,
     });
     await broadcast(found.conversation, updated);

@@ -25,7 +25,8 @@ const mutedMembers = async (conversation: ConversationWithUsers) => {
 // After a new message is saved (sent, or forwarded): it becomes the conversation's last message,
 // goes to the chat (messages:new) and to every member's inbox (conversation:update), rings the
 // others for a call, and is pushed to the others' browsers. A muted conversation gets no push and
-// no in-tab notification (`muted` in the update); calls still ring.
+// no in-tab notification (`muted` in the update) except for the people it mentions; calls still
+// ring.
 export const deliverMessage = async ({ conversation, sender, message, clientId }: DeliverOptions) => {
   const { lastMessageAt } = await prisma.conversation.update({
     where: { id: conversation.id },
@@ -40,7 +41,9 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
     ...(typeof clientId === "string" && CLIENT_ID.test(clientId) && { clientId }),
   });
 
+  const mentioned = new Set((message.mentions ?? []).map((mention) => mention.id));
   const muted = await mutedMembers(conversation).catch(() => new Set<string>());
+  mentioned.forEach((id) => muted.delete(id));
   conversation.users.forEach((user) => {
     if (!user.email) {
       return;
@@ -60,6 +63,7 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
       name: conversation.name,
       isGroup: conversation.isGroup,
       ...(muted.has(user.id) && { muted: true }),
+      ...(mentioned.has(user.id) && { mentioned: true }),
     });
   });
 
@@ -79,6 +83,7 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
     void pushNewMessage({
       ...push,
       recipientIds: others.filter((id) => !muted.has(id)),
+      mentionedIds: Array.from(mentioned),
       body: message.body,
       image: message.image,
       attachment: message.attachment,

@@ -61,29 +61,41 @@ const callTag = (conversationId: string) => `call-${conversationId}`;
 const callTopic = (conversationId: string) => `call${conversationId}`;
 
 // A new message (not calls).
+// The people a group message mentions get "mentioned you: …" (the rest the plain text).
 export const pushNewMessage = ({
   body,
   image,
   attachment,
+  mentionedIds = [],
   ...push
 }: ConversationPush & {
   body: string | null;
   image: string | null;
   attachment?: { kind: string; name: string } | null;
-}) =>
-  pushToConversation(
-    push,
-    (t) => {
-      if (image) {
-        return t("image");
-      }
-      if (attachment) {
-        return attachment.kind === "voice" ? t("voice") : t("file", { name: attachment.name });
-      }
-      return body ?? "";
-    },
-    { tag: `conversation-${push.conversation.id}`, topic: push.conversation.id }
-  );
+  mentionedIds?: string[];
+}) => {
+  const content = (t: Translate) => {
+    if (image) {
+      return t("image");
+    }
+    if (attachment) {
+      return attachment.kind === "voice" ? t("voice") : t("file", { name: attachment.name });
+    }
+    return body ?? "";
+  };
+  const options = { tag: `conversation-${push.conversation.id}`, topic: push.conversation.id };
+  const mentioned = push.recipientIds.filter((id) => mentionedIds.includes(id));
+  const rest = push.recipientIds.filter((id) => !mentionedIds.includes(id));
+  return Promise.all([
+    rest.length > 0 && pushToConversation({ ...push, recipientIds: rest }, content, options),
+    mentioned.length > 0 &&
+      pushToConversation(
+        { ...push, recipientIds: mentioned },
+        (t) => t("mentioned_you", { text: content(t) }),
+        options
+      ),
+  ]);
+};
 
 // A call starting: only worth delivering while it rings.
 export const pushIncomingCall = ({

@@ -79,13 +79,14 @@ const MessageNotifications = () => {
       }
 
       const sender = message.sender?.name ?? "";
-      const text = message.image
+      const content = message.image
         ? translate("image")
         : message.attachment?.kind === "voice"
           ? translate("voice")
           : message.attachment
             ? translate("file", { name: message.attachment.name })
             : (message.body ?? "");
+      const text = update.mentioned ? translate("mentioned_you", { text: content }) : content;
       const notification = new Notification(
         update.isGroup && update.name ? update.name : sender,
         {

@@ -193,7 +193,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
       );
     };
 
+    // someone blocked / unblocked (the user or the other one): the open chat's composer, call
+    // buttons and status change, and so does whose presence may be seen
+    const blockHandler = () => {
+      if (conversationId) {
+        router.refresh();
+      }
+      socket.emit("presence:sync");
+    };
+
     socket.on("conversation:typing", typingHandler);
+    socket.on("block:update", blockHandler);
     socket.on("conversation:settings", settingsHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
@@ -203,6 +213,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
       socket.off("conversation:typing", typingHandler);
+      socket.off("block:update", blockHandler);
       socket.off("conversation:settings", settingsHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);

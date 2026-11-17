@@ -1,5 +1,7 @@
 import prisma from "@/app/libs/prismadb";
 import getSession from "./getSession";
+import getCurrentUser from "./getCurrentUser";
+import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
 
 const getUsers = async () => {
   const session = await getSession();
@@ -19,7 +21,12 @@ const getUsers = async () => {
       },
     });
 
-    return users;
+    // block partners come without their last active time
+    const currentUser = await getCurrentUser();
+    const partners = currentUser
+      ? await blockPartnersOf(currentUser.id).catch(() => new Map())
+      : new Map();
+    return hideLastSeen(users, partners);
   } catch (error: any) {
     return [];
   }

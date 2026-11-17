@@ -9,6 +9,7 @@ import {
 } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
+import { findMentions, mentionQueryAt, splitMentions } from "@/app/libs/mentions";
 import {
   canEditGroup,
   canRemoveMember,
@@ -243,5 +244,42 @@ describe("message search folding", () => {
   it("keeps whole characters around emoji", () => {
     const text = "😀 chào";
     expect(text.slice(...findFoldedMatch(text, "chao")!)).toBe("chào");
+  });
+});
+
+describe("mentions", () => {
+  const members = [
+    { id: "a", name: "Huy", email: "a@x" },
+    { id: "b", name: "Huy Do", email: "b@x" },
+    { id: "c", name: "An", email: "c@x" },
+  ];
+
+  it("finds members named as @Name, longest name first, not the sender", () => {
+    expect(findMentions("@Huy Do ơi, @An!", members, "a").map((m) => m.id)).toEqual(["b", "c"]);
+    expect(findMentions("hi @Huy.", members).map((m) => m.id)).toEqual(["a"]);
+    expect(findMentions("@An", members, "c")).toEqual([]);
+  });
+
+  it("ignores names inside other words or e-mails", () => {
+    expect(findMentions("@Annie", members)).toEqual([]);
+    expect(findMentions("mail@An", members)).toEqual([]);
+    expect(findMentions("no at sign", members)).toEqual([]);
+  });
+
+  it("cuts the text around its mentions", () => {
+    const mention = { id: "b", name: "Huy Do", email: "b@x" };
+    expect(splitMentions("hey @Huy Do, ok", [mention])).toEqual([
+      { type: "text", value: "hey " },
+      { type: "mention", value: "@Huy Do", mention },
+      { type: "text", value: ", ok" },
+    ]);
+    expect(splitMentions("plain", [])).toEqual([{ type: "text", value: "plain" }]);
+  });
+
+  it("finds the @word being typed before the caret", () => {
+    expect(mentionQueryAt("hi @hu", 6)).toEqual({ start: 3, query: "hu" });
+    expect(mentionQueryAt("@", 1)).toEqual({ start: 0, query: "" });
+    expect(mentionQueryAt("mail@x", 6)).toBeNull();
+    expect(mentionQueryAt("@huy do", 7)).toBeNull();
   });
 });

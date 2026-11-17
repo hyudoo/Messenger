@@ -26,7 +26,18 @@ export const INSTANCE_TIMEOUT_MS = 35_000;
 const isEmail = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 320;
 
-export const createPresence = (io: AnyServer, { clustered }: { clustered: boolean }) => {
+// announce: tells this instance's clients that a user went online / offline (default: all of
+// them; the socket server leaves out the people the user blocked or was blocked by).
+export const createPresence = (
+  io: AnyServer,
+  {
+    clustered,
+    announce = (event, email) => io.local.emit(event, email),
+  }: {
+    clustered: boolean;
+    announce?: (event: "presence:online" | "presence:offline", email: string) => void;
+  }
+) => {
   const self = randomUUID();
   // this instance's sockets per user
   const local = new Map<string, number>();
@@ -50,7 +61,7 @@ export const createPresence = (io: AnyServer, { clustered }: { clustered: boolea
     const count = (refs.get(email) ?? 0) + 1;
     refs.set(email, count);
     if (count === 1) {
-      io.local.emit("presence:online", email);
+      announce("presence:online", email);
     }
   };
 
@@ -61,7 +72,7 @@ export const createPresence = (io: AnyServer, { clustered }: { clustered: boolea
       return;
     }
     refs.delete(email);
-    io.local.emit("presence:offline", email);
+    announce("presence:offline", email);
   };
 
   const instance = (id: string) => {

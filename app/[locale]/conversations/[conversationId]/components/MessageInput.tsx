@@ -5,7 +5,12 @@ import { useLayoutEffect } from "react";
 interface MessageInputProps {
   id: string;
   value: string;
-  onChange: (value: string) => void;
+  // the new value and where the caret is
+  onChange: (value: string, caret: number) => void;
+  // the caret moved without a change (arrows, clicks)
+  onCaret?: (caret: number) => void;
+  // gets every key first; true = handled (e.g. the mention picker's arrows / Enter)
+  onKeyDownFirst?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
   onSubmit: () => void;
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   // Esc: cancels a reply / edit (only passed while there is one)
@@ -24,6 +29,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   id,
   value,
   onChange,
+  onCaret,
+  onKeyDownFirst,
   onSubmit,
   onPaste,
   onEscape,
@@ -41,6 +48,10 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, [value, ref]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (onKeyDownFirst?.(event)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "Escape" && onEscape) {
       event.preventDefault();
       onEscape();
@@ -64,7 +75,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
         ref={ref}
         rows={1}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(event.target.value, event.target.selectionStart)}
+        onSelect={(event) => onCaret?.(event.currentTarget.selectionStart)}
         onKeyDown={handleKeyDown}
         onPaste={onPaste}
         onBlur={onBlur}

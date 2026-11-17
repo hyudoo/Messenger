@@ -17,6 +17,7 @@ import {
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { JUMBO_EMOJI_MAX, countEmojiOnly } from "@/app/libs/emoji";
 import { splitLinks } from "@/app/libs/linkify";
+import { Mention, splitMentions } from "@/app/libs/mentions";
 
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -55,11 +56,40 @@ interface MessageBoxProps {
   pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
 }
 
-// The body with http(s) links clickable (opened in a new tab, without the referrer).
-const MessageText: React.FC<{ text: string; isOwn: boolean }> = ({ text, isOwn }) => (
+// The body with http(s) links clickable (opened in a new tab, without the referrer) and
+// @mentions highlighted (the reader's own more strongly).
+const MessageText: React.FC<{
+  text: string;
+  isOwn: boolean;
+  mentions?: Mention[];
+  myEmail?: string | null;
+}> = ({ text, isOwn, mentions = [], myEmail }) => (
   <>
     {splitLinks(text).map((segment, i) =>
-      segment.type === "link" ? (
+      segment.type === "text" ? (
+        <Fragment key={i}>
+          {splitMentions(segment.value, mentions).map((part, j) =>
+            part.type === "mention" ? (
+              <span
+                key={j}
+                className={clsx(
+                  "font-semibold",
+                  part.mention?.email && part.mention.email === myEmail
+                    ? isOwn
+                      ? "rounded bg-white/25 px-0.5"
+                      : "rounded bg-sky-500/20 px-0.5 text-sky-700 dark:text-sky-300"
+                    : isOwn
+                      ? "text-white"
+                      : "text-sky-600 dark:text-sky-400"
+                )}>
+                {part.value}
+              </span>
+            ) : (
+              <Fragment key={j}>{part.value}</Fragment>
+            )
+          )}
+        </Fragment>
+      ) : segment.type === "link" ? (
         <a
           key={i}
           href={segment.value}
@@ -383,7 +413,12 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
             {data.body && (
               <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">
-                <MessageText text={data.body} isOwn={isOwn && !jumbo} />
+                <MessageText
+                  text={data.body}
+                  isOwn={isOwn && !jumbo}
+                  mentions={data.mentions}
+                  myEmail={myEmail}
+                />
               </div>
             )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}

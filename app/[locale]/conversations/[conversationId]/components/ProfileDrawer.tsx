@@ -32,6 +32,8 @@ import AvatarGroup from "@/app/components/AvatarGroup";
 import ConfirmModal from "./ConfirmModal";
 import ConversationSearch from "./ConversationSearch";
 import { getSocket } from "@/app/libs/socket-client";
+import { useRouter } from "@/i18n/navigation";
+import { HiNoSymbol } from "react-icons/hi2";
 import { ConversationSettings } from "@/app/types";
 import { GroupMembers, GroupName } from "./GroupSettings";
 
@@ -45,6 +47,8 @@ interface ProfileDrawerProps {
   users: SafeUser[];
   // the user's own settings of this conversation (from the page; kept live below)
   settings: { muted: boolean; pinned: boolean };
+  // 1:1: whether the user blocked the other one
+  blockedByMe: boolean;
 }
 
 const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
@@ -53,6 +57,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
   data,
   users,
   settings: initialSettings,
+  blockedByMe,
 }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -90,6 +95,24 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
           error?.response?.status === 409 ? t("profile.pin_limit") : t("common.error")
         )
       )
+      .finally(() => setSavingSetting(false));
+  };
+
+  // blocking (1:1): two clicks, the second confirms; the page reloads with the new state
+  const router = useRouter();
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const toggleBlock = () => {
+    if (!blockedByMe && !confirmBlock) {
+      setConfirmBlock(true);
+      setTimeout(() => setConfirmBlock(false), 3000);
+      return;
+    }
+    setConfirmBlock(false);
+    setSavingSetting(true);
+    axios
+      .post(`/api/users/${otherUser.id}/block`, { blocked: !blockedByMe })
+      .then(() => router.refresh())
+      .catch(() => toast.error(t("block.failed")))
       .finally(() => setSavingSetting(false));
   };
 
@@ -234,6 +257,29 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                 </span>
                                 <span className="text-sm font-light text-muted-foreground">
                                   {t("profile.leave")}
+                                </span>
+                              </button>
+                            )}
+                            {!data.isGroup && (
+                              <button
+                                type="button"
+                                disabled={savingSetting}
+                                onClick={toggleBlock}
+                                className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75 disabled:opacity-50">
+                                <span
+                                  className={
+                                    confirmBlock
+                                      ? "w-10 h-10 rounded-full flex items-center justify-center bg-rose-500 text-white"
+                                      : "w-10 h-10 bg-muted rounded-full flex items-center justify-center"
+                                  }>
+                                  <HiNoSymbol size={20} aria-hidden />
+                                </span>
+                                <span className="text-sm font-light text-muted-foreground">
+                                  {blockedByMe
+                                    ? t("block.unblock")
+                                    : confirmBlock
+                                      ? t("block.confirm")
+                                      : t("block.block")}
                                 </span>
                               </button>
                             )}

@@ -24,6 +24,8 @@ model User {
   // omitted from every query (app/libs/prismadb.ts) unless asked for
   mutedConversationIds  String[] @db.ObjectId
   pinnedConversationIds String[] @db.ObjectId
+  // people this user blocked (POST /api/users/[userId]/block; app/libs/blocks.ts). Private too
+  blockedUserIds        String[] @db.ObjectId
   updatedAt      DateTime  @updatedAt
 
   conversationIds String[]       @db.ObjectId
@@ -108,6 +110,8 @@ model Message {
   attachment MessageAttachment?
   // a copy of another message (POST /api/messages/[messageId]/forward), shown "Forwarded"
   forwarded Boolean?
+  // group members named as "@Name" in the body (app/libs/mentions.ts), as they were then
+  mentions MessageMention[]
   // the body without case or Vietnamese diacritics (searchTextOf), what search matches against;
   // older messages get it from scripts/backfill-search-text.ts
   searchText String?
@@ -186,6 +190,12 @@ type MessageAttachment {
   type     String
   // voice only: length in ms
   duration Int?
+}
+
+type MessageMention {
+  id    String  @db.ObjectId
+  name  String
+  email String?
 }
 
 type SystemUser {

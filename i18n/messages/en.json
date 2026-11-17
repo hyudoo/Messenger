@@ -158,7 +158,8 @@
     "open_file": "Open {name}",
     "forward": "Forward",
     "forwarded": "Forwarded",
-    "jump_not_found": "Couldn't find this message (it may be too old)."
+    "jump_not_found": "Couldn't find this message (it may be too old).",
+    "mention_suggestions": "Members to mention"
   },
   "profile": {
     "close": "Close panel",
@@ -300,7 +301,8 @@
     "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
     "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "voice": "Sent a voice message.",
-    "file": "Sent the file {name}."
+    "file": "Sent the file {name}.",
+    "mentioned_you": "Mentioned you: {text}"
   },
   "viewer": {
     "close": "Close",
@@ -329,5 +331,13 @@
     "sending": "Sending…",
     "sent": "Sent",
     "retry": "Retry"
+  },
+  "block": {
+    "block": "Block",
+    "unblock": "Unblock",
+    "confirm": "Block?",
+    "failed": "That didn't work, try again later.",
+    "blocked_by_me": "You blocked {name}. You can't message or call each other.",
+    "blocked_by_them": "You can't reply to this conversation."
   }
 }
