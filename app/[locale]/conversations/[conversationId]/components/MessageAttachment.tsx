@@ -47,6 +47,47 @@ export const FileCard: React.FC<Props & { messageId?: string }> = ({ attachment,
   );
 };
 
+// The first link's preview, under the text: image, site, title, description; opens the link.
+// The image is loaded straight from the site (any https host), without a referrer.
+export const LinkPreviewCard: React.FC<{
+  preview: NonNullable<FullMessageType["linkPreview"]>;
+  isOwn: boolean;
+}> = ({ preview, isOwn }) => (
+  <a
+    href={preview.url}
+    target="_blank"
+    rel="noopener noreferrer nofollow"
+    className={clsx(
+      "mt-2 block overflow-hidden rounded-xl border sm:w-72",
+      isOwn ? "border-white/30 bg-white/10" : "border-border bg-background"
+    )}>
+    {preview.image && (
+      // any host: next/image only allows the configured ones
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={preview.image}
+        alt=""
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        className="h-36 w-full object-cover"
+      />
+    )}
+    <span className="block px-3 py-2">
+      {preview.siteName && (
+        <span className={clsx("block truncate text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+          {preview.siteName}
+        </span>
+      )}
+      <span className="line-clamp-2 block font-medium">{preview.title}</span>
+      {preview.description && (
+        <span className={clsx("line-clamp-2 block text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+          {preview.description}
+        </span>
+      )}
+    </span>
+  </a>
+);
+
 // A voice message: play / pause, a seekable progress bar and the time left.
 export const VoicePlayer: React.FC<Props> = ({ attachment, isOwn }) => {
   const t = useTranslations("chat");

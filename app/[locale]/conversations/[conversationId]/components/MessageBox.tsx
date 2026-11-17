@@ -24,7 +24,10 @@ import { toast } from "react-hot-toast";
 
 import Avatar from "@/app/components/Avatar";
 import { useOpenImage } from "./ImageViewer";
-import { FileCard, VoicePlayer } from "./MessageAttachment";
+import { FileCard, LinkPreviewCard, VoicePlayer } from "./MessageAttachment";
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import usePins from "@/app/hooks/usePins";
+import { deleteForMe, togglePin } from "./messageCommands";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
@@ -32,6 +35,7 @@ import useSystemText from "@/app/hooks/useSystemText";
 import {
   canEditMessage,
   canForwardMessage,
+  canPinMessage,
   canReactToMessage,
   canRecallMessage,
   canReplyToMessage,
@@ -40,6 +44,7 @@ import {
   HiArrowUturnLeft,
   HiArrowUturnRight,
   HiEllipsisHorizontal,
+  HiEllipsisVertical,
   HiPencil,
   HiTrash,
 } from "react-icons/hi2";
@@ -205,6 +210,7 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
           <HiPencil size={16} aria-hidden />
         </button>
       )}
+      <MoreMenu message={message} />
       {canRecallMessage(message, myId) && (
         <button
           type="button"
@@ -220,6 +226,42 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
         </button>
       )}
     </div>
+  );
+};
+
+// Pin / unpin and "delete for me" (pointer devices; the touch menu has them too).
+const MoreMenu: React.FC<{ message: FullMessageType }> = ({ message }) => {
+  const t = useTranslations("chat");
+  const pinned = usePins((state) => state.ids.includes(message.id));
+  const item = "block w-full px-3 py-1.5 text-left text-sm text-foreground data-[focus]:bg-muted";
+  return (
+    <Menu>
+      <MenuButton
+        aria-label={t("more")}
+        title={t("more")}
+        className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground focus:outline-none data-[open]:bg-muted">
+        <HiEllipsisVertical size={16} aria-hidden />
+      </MenuButton>
+      <MenuItems
+        anchor={{ to: "top", gap: 4 }}
+        className="z-40 min-w-40 rounded-lg border bg-background py-1 shadow-lg focus:outline-none">
+        {(canPinMessage(message) || pinned) && (
+          <MenuItem>
+            <button type="button" className={item} onClick={() => togglePin(message.id, !pinned, t)}>
+              {pinned ? t("unpin") : t("pin")}
+            </button>
+          </MenuItem>
+        )}
+        <MenuItem>
+          <button
+            type="button"
+            className={clsx(item, "text-rose-500")}
+            onClick={() => deleteForMe(message.id, t("delete_for_me_failed"))}>
+            {t("delete_for_me")}
+          </button>
+        </MenuItem>
+      </MenuItems>
+    </Menu>
   );
 };
 
@@ -406,6 +448,9 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
                 // an outbox copy has no server id yet
                 messageId={pending ? undefined : data.id}
               />
+            )}
+            {data.linkPreview && !recalled && (
+              <LinkPreviewCard preview={data.linkPreview} isOwn={isOwn} />
             )}
             {data.attachment?.kind === "voice" && (
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />

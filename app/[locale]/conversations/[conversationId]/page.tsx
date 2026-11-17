@@ -4,12 +4,14 @@ import getUsers from "@/app/actions/getUsers";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import getConversationSettings from "@/app/actions/getConversationSettings";
 import getBlockState from "@/app/actions/getBlockState";
+import { findPinnedMessages } from "@/app/actions/getPinnedMessages";
 import { findFirstUnread } from "@/app/libs/unread";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
 import Form from "./components/Form";
 import BlockedNotice from "./components/BlockedNotice";
+import PinnedBar from "./components/PinnedBar";
 import EmptyState from "@/app/components/EmptyState";
 
 interface IParams {
@@ -34,7 +36,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   // only loaded once membership is confirmed; older pages load on scroll
   // the users: people a group member may add (the drawer's picker)
   const [{ messages, hasMore }, users, settings] = await Promise.all([
-    getMessages(conversation.id),
+    getMessages(conversation.id, undefined, (await getCurrentUser())?.id),
     conversation.isGroup ? getUsers() : Promise.resolve([]),
     getConversationSettings(conversation.id),
   ]);
@@ -45,6 +47,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
     ? undefined
     : conversation.users.find((user) => user.id !== currentUser?.id);
   const block = await getBlockState(other?.id);
+  const pins = await findPinnedMessages(conversation.pinnedMessageIds ?? []).catch(() => []);
   const blocked = block.byMe || block.byThem;
   const firstUnreadId = currentUser ? findFirstUnread(messages, currentUser.id) : null;
 
@@ -58,6 +61,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
           blockedByMe={block.byMe}
           blocked={blocked}
         />
+        <PinnedBar conversationId={conversation.id} initialPins={pins} />
         <Body
           initialMessages={messages}
           initialHasMore={hasMore}

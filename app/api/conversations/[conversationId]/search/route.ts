@@ -43,6 +43,7 @@ export async function GET(request: Request, { params }: { params: Promise<IParam
     const messages = await prisma.message.findMany({
       where: {
         conversationId: conversation.id,
+        NOT: { hiddenForIds: { has: currentUser.id } },
         AND: [
           NOT_RECALLED,
           NOT_SYSTEM,

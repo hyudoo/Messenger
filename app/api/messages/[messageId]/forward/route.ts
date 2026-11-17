@@ -60,6 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
         searchText: searchTextOf(original.body),
         image: original.image ?? undefined,
         attachment: original.attachment ?? undefined,
+        linkPreview: original.linkPreview ?? undefined,
         forwarded: true,
         conversationId: target.id,
         senderId: currentUser.id,

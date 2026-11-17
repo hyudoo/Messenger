@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import {
+  HiComputerDesktop,
   HiVideoCamera,
   HiVideoCameraSlash,
   HiPhoneXMark,
@@ -14,6 +15,9 @@ interface FooterProps {
   cameraActive: boolean;
   toggleMic: () => void;
   toggleCamera: () => void;
+  sharing: boolean;
+  // missing where sharing isn't possible (phones, or before the call is up)
+  toggleSharing?: () => void;
   leaveRoom: () => void;
 }
 
@@ -30,6 +34,8 @@ const Footer: React.FC<FooterProps> = ({
   cameraActive,
   toggleMic,
   toggleCamera,
+  sharing,
+  toggleSharing,
   leaveRoom,
 }) => {
   const t = useTranslations("call");
@@ -66,6 +72,18 @@ const Footer: React.FC<FooterProps> = ({
             <HiVideoCameraSlash size={24} />
           )}
         </button>
+        {toggleSharing && (
+          <button
+            type="button"
+            // inverted while sharing, like a muted mic
+            className={toggleClass(!sharing)}
+            aria-label={sharing ? t("stop_share") : t("share_screen")}
+            aria-pressed={sharing}
+            title={sharing ? t("stop_share") : t("share_screen")}
+            onClick={toggleSharing}>
+            <HiComputerDesktop size={24} />
+          </button>
+        )}
         <button
           type="button"
           className="flex h-14 w-20 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"

@@ -12,6 +12,7 @@ import { parseAttachment } from "@/app/libs/attachment";
 import { searchTextOf } from "@/app/libs/search";
 import { findMentions } from "@/app/libs/mentions";
 import { isBlockedBetween } from "@/app/libs/blocks";
+import { attachLinkPreview } from "@/app/libs/message-preview";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
     });
 
     await deliverMessage({ conversation, sender: currentUser, message: newMessage, clientId });
+    attachLinkPreview(newMessage);
 
     return NextResponse.json(newMessage);
   } catch (error) {

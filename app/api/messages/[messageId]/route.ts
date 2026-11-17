@@ -6,6 +6,8 @@ import { logError } from "@/app/libs/log";
 import { canEditMessage, canRecallMessage } from "@/app/libs/message-actions";
 import { searchTextOf } from "@/app/libs/search";
 import { findMentions } from "@/app/libs/mentions";
+import { attachLinkPreview } from "@/app/libs/message-preview";
+import { firstLink } from "@/app/libs/link-preview";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -94,6 +96,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<IPar
       include: MESSAGE_INCLUDE,
     });
     await broadcast(found.conversation, updated);
+    // the first link changed: a new preview (or none)
+    attachLinkPreview(updated, firstLink(found.message.body));
     return NextResponse.json(updated);
   } catch (error) {
     logError("message_edit", error);
@@ -118,6 +122,26 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
     if (!found) {
       return new NextResponse("Not found", { status: 404 });
     }
+
+    // ?scope=me: deleted for the caller only (any message but a group event); their tabs drop it
+    if (new URL(request.url).searchParams.get("scope") === "me") {
+      if (found.message.systemType) {
+        return new NextResponse("Group events can't be deleted", { status: 400 });
+      }
+      await prisma.message.update({
+        where: { id: found.message.id },
+        data: { hiddenForIds: { push: currentUser.id } },
+        select: { id: true },
+      });
+      if (currentUser.email) {
+        emitToUser(currentUser.email, "messages:hide", {
+          conversationId: found.conversation.id,
+          messageId: found.message.id,
+        });
+      }
+      return new NextResponse("Success");
+    }
+
     if (!canRecallMessage(found.message, currentUser.id)) {
       return new NextResponse("This message can't be recalled", { status: 403 });
     }
@@ -131,6 +155,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
           searchText: null,
           image: null,
           attachment: { unset: true },
+          linkPreview: { unset: true },
           editedAt: null,
           deletedAt: new Date(),
         },
@@ -140,6 +165,20 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
 
     // the files go from S3 once nothing references them (e.g. an image that is also an avatar)
     cleanUpUploads([found.message.image, found.message.attachment?.url]);
+    // a recalled message isn't pinned any more
+    const pins = found.conversation.pinnedMessageIds ?? [];
+    if (pins.includes(found.message.id)) {
+      const pinnedMessageIds = pins.filter((id) => id !== found.message.id);
+      await prisma.conversation.update({
+        where: { id: found.conversation.id },
+        data: { pinnedMessageIds },
+        select: { id: true },
+      });
+      emitToConversation(found.conversation.id, "pins:update", {
+        conversationId: found.conversation.id,
+        pinnedMessageIds,
+      });
+    }
     await broadcast(found.conversation, updated);
     return NextResponse.json(updated);
   } catch (error) {

@@ -40,6 +40,8 @@ const useSystemText = () => {
         return t("removed", { actor, users });
       case "left":
         return t("left", { actor });
+      case "pinned":
+        return t("pinned", { actor });
     }
   };
 };

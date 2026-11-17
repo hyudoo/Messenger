@@ -85,6 +85,8 @@ model Conversation {
   // Groups only: the member who may delete the group for everyone (the creator; passed on to another
   // member when they leave). Missing on groups from before it existed: any member may delete those.
   ownerId       String?  @db.ObjectId
+  // messages pinned to the top of the chat, latest first (POST /api/messages/[id]/pin)
+  pinnedMessageIds String[] @db.ObjectId
 
   messages Message[]
 
@@ -112,6 +114,11 @@ model Message {
   forwarded Boolean?
   // group members named as "@Name" in the body (app/libs/mentions.ts), as they were then
   mentions MessageMention[]
+  // the first link's preview (app/libs/link-preview.ts), filled in after the message is sent
+  linkPreview LinkPreviewData?
+  // users who deleted the message for themselves only (DELETE ...?scope=me). Never sent to
+  // clients (app/libs/prismadb.ts omits it)
+  hiddenForIds String[] @db.ObjectId
   // the body without case or Vietnamese diacritics (searchTextOf), what search matches against;
   // older messages get it from scripts/backfill-search-text.ts
   searchText String?
@@ -173,6 +180,7 @@ enum SystemType {
   added
   removed
   left
+  pinned
 }
 
 enum AttachmentKind {
@@ -190,6 +198,14 @@ type MessageAttachment {
   type     String
   // voice only: length in ms
   duration Int?
+}
+
+type LinkPreviewData {
+  url         String
+  title       String
+  description String?
+  image       String?
+  siteName    String?
 }
 
 type MessageMention {

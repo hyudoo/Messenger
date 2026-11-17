@@ -3,14 +3,18 @@ import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 
 export const MESSAGE_PAGE_SIZE = 50;
 
+// what `viewerId` sees of a conversation: not the messages they deleted for themselves
+const visibleTo = (conversationId: string, viewerId?: string) => ({
+  conversationId,
+  ...(viewerId && { NOT: { hiddenForIds: { has: viewerId } } }),
+});
+
 // One page of a conversation's messages, oldest first: the latest page, or the
 // page just before message `before`. Callers must check membership first.
-const getMessages = async (conversationId: string, before?: string) => {
+const getMessages = async (conversationId: string, before?: string, viewerId?: string) => {
   try {
     const page = await prisma.message.findMany({
-      where: {
-        conversationId: conversationId,
-      },
+      where: visibleTo(conversationId, viewerId),
       include: MESSAGE_INCLUDE,
       // newest first so `take` keeps the latest; id breaks createdAt ties
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -32,9 +36,9 @@ export default getMessages;
 // The messages newer than message `after`, oldest first, at most one page; `hasMore` means more
 // than a page arrived since (the client then reloads the latest page instead). Used to catch up
 // after a socket reconnect. Throws on a database error. Callers must check membership first.
-export const getMessagesAfter = async (conversationId: string, after: string) => {
+export const getMessagesAfter = async (conversationId: string, after: string, viewerId?: string) => {
   const page = await prisma.message.findMany({
-    where: { conversationId },
+    where: visibleTo(conversationId, viewerId),
     include: MESSAGE_INCLUDE,
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: MESSAGE_PAGE_SIZE + 1,

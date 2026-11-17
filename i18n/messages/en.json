@@ -159,7 +159,14 @@
     "forward": "Forward",
     "forwarded": "Forwarded",
     "jump_not_found": "Couldn't find this message (it may be too old).",
-    "mention_suggestions": "Members to mention"
+    "mention_suggestions": "Members to mention",
+    "more": "More",
+    "pin": "Pin message",
+    "unpin": "Unpin",
+    "pin_failed": "Couldn't pin the message!",
+    "pin_limit": "You can pin at most 20 messages.",
+    "delete_for_me": "Delete for you",
+    "delete_for_me_failed": "Couldn't delete the message!"
   },
   "profile": {
     "close": "Close panel",
@@ -252,7 +259,12 @@
     "declined": "{name} declined the call",
     "no_answer": "{name} didn't answer",
     "audio_call": "Audio call",
-    "camera_error": "Can't turn the camera on!"
+    "camera_error": "Can't turn the camera on!",
+    "share_screen": "Share screen",
+    "stop_share": "Stop sharing",
+    "sharing_you": "You're sharing your screen",
+    "sharing_other": "{name} is sharing their screen",
+    "share_error": "Couldn't share the screen!"
   },
   "emoji": {
     "open": "Choose an emoji",
@@ -269,7 +281,8 @@
     "left": "{actor} left the group",
     "you_subject": "You",
     "you_object": "you",
-    "someone": "Someone"
+    "someone": "Someone",
+    "pinned": "{actor} pinned a message"
   },
   "presence": {
     "just_now": "Active just now",
@@ -339,5 +352,11 @@
     "failed": "That didn't work, try again later.",
     "blocked_by_me": "You blocked {name}. You can't message or call each other.",
     "blocked_by_them": "You can't reply to this conversation."
+  },
+  "pins": {
+    "show": "Show the pinned message",
+    "all": "All ({count})",
+    "unpin": "Unpin",
+    "failed": "Couldn't unpin!"
   }
 }

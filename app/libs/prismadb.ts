@@ -13,6 +13,8 @@ const createClient = () =>
         pinnedConversationIds: true,
         blockedUserIds: true,
       },
+      // who hid a message for themselves, and the folded search text: server-side only
+      message: { hiddenForIds: true, searchText: true },
     },
   });
 

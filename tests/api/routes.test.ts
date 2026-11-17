@@ -66,6 +66,8 @@ import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
 import { POST as blockUser } from "@/app/api/users/[userId]/block/route";
+import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
+import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
 import {
@@ -1220,6 +1222,126 @@ describe("blocking", () => {
   });
 });
 
+describe("pinning messages", () => {
+  const pin = (pinned: unknown) =>
+    pinMessage(jsonRequest(`/api/messages/${MESSAGE}/pin`, { pinned }), params({ messageId: MESSAGE }));
+  const stored = (extra: Record<string, unknown> = {}) =>
+    prisma.message.findUnique.mockResolvedValue({
+      id: MESSAGE,
+      conversationId: CONVERSATION,
+      senderId: OTHER,
+      body: "hi",
+      ...extra,
+    });
+
+  it("validates, and refuses non-members, calls and a 21st pin", async () => {
+    expect((await pin("yes")).status).toBe(400);
+    stored();
+    asNonMember();
+    expect((await pin(true)).status).toBe(404);
+    stored({ isCall: true });
+    asMember();
+    expect((await pin(true)).status).toBe(400);
+    stored();
+    prisma.conversation.findFirst.mockResolvedValue({
+      ...conversation,
+      pinnedMessageIds: Array.from({ length: 20 }, (_, i) => String(i).padStart(24, "e")),
+    });
+    expect((await pin(true)).status).toBe(409);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("pins first in the list, tells the chat and posts the event; unpins", async () => {
+    stored();
+    prisma.conversation.findFirst.mockResolvedValue({ ...conversation, pinnedMessageIds: ["x".repeat(24)] });
+    prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    expect(await (await pin(true)).json()).toEqual({
+      conversationId: CONVERSATION,
+      pinnedMessageIds: [MESSAGE, "x".repeat(24)],
+    });
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(CONVERSATION, "pins:update", {
+      conversationId: CONVERSATION,
+      pinnedMessageIds: [MESSAGE, "x".repeat(24)],
+    });
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ systemType: "pinned" }) })
+    );
+
+    prisma.message.create.mockClear();
+    prisma.conversation.findFirst.mockResolvedValue({ ...conversation, pinnedMessageIds: [MESSAGE] });
+    expect(await (await pin(false)).json()).toEqual(
+      expect.objectContaining({ pinnedMessageIds: [] })
+    );
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("lists the pinned messages in pin order", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...conversation, pinnedMessageIds: ["b", "a"] });
+    prisma.message.findMany.mockResolvedValue([{ id: "a" }, { id: "b" }]);
+    const response = await pinnedMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/pins`, null, { method: "GET" }),
+      params({ conversationId: CONVERSATION })
+    );
+    expect(await response.json()).toEqual([{ id: "b" }, { id: "a" }]);
+  });
+});
+
+describe("deleting a message for oneself", () => {
+  const hide = () =>
+    recallMessage(
+      jsonRequest(`/api/messages/${MESSAGE}?scope=me`, null, { method: "DELETE" }),
+      params({ messageId: MESSAGE })
+    );
+
+  it("hides any message for the caller only and tells their tabs", async () => {
+    prisma.message.findUnique.mockResolvedValue({
+      id: MESSAGE,
+      conversationId: CONVERSATION,
+      senderId: OTHER,
+      body: "hi",
+    });
+    asMember();
+    expect((await hide()).status).toBe(200);
+    expect(prisma.message.update).toHaveBeenCalledWith({
+      where: { id: MESSAGE },
+      data: { hiddenForIds: { push: ME } },
+      select: { id: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(me.email, "messages:hide", {
+      conversationId: CONVERSATION,
+      messageId: MESSAGE,
+    });
+    // not recalled for the others
+    expect(mocks.emitToConversation).not.toHaveBeenCalled();
+  });
+
+  it("refuses group events", async () => {
+    prisma.message.findUnique.mockResolvedValue({
+      id: MESSAGE,
+      conversationId: CONVERSATION,
+      senderId: OTHER,
+      systemType: "added",
+    });
+    asMember();
+    expect((await hide()).status).toBe(400);
+  });
+
+  it("leaves hidden messages out of the pages", async () => {
+    asMember();
+    await olderMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/messages?before=${MESSAGE}`, null, { method: "GET" }),
+      params({ conversationId: CONVERSATION })
+    );
+    expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { conversationId: CONVERSATION, NOT: { hiddenForIds: { has: ME } } },
+      })
+    );
+  });
+});
+
 describe("GET /api/messages/[id]/download", () => {
   const download = () =>
     downloadFile(
@@ -1567,6 +1689,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
           searchText: null,
           image: null,
           attachment: { unset: true },
+          linkPreview: { unset: true },
           editedAt: null,
           deletedAt: expect.any(Date),
         },
