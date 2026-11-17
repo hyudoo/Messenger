@@ -1,6 +1,8 @@
 import getConversationById from "@/app/actions/getConversationById";
 import getMessages from "@/app/actions/getMessages";
 import getUsers from "@/app/actions/getUsers";
+import getCurrentUser from "@/app/actions/getCurrentUser";
+import { findFirstUnread } from "@/app/libs/unread";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
@@ -32,12 +34,20 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
     getMessages(conversation.id),
     conversation.isGroup ? getUsers() : Promise.resolve([]),
   ]);
+  // where the "new messages" divider goes (before this page's "seen" marks them read)
+  const currentUser = await getCurrentUser();
+  const firstUnreadId = currentUser ? findFirstUnread(messages, currentUser.id) : null;
 
   return (
     <div className="lg:pl-80 h-full">
       <div className="h-full flex flex-col">
         <Header conversation={conversation} users={users} />
-        <Body initialMessages={messages} initialHasMore={hasMore} members={conversation.users} />
+        <Body
+          initialMessages={messages}
+          initialHasMore={hasMore}
+          members={conversation.users}
+          firstUnreadId={firstUnreadId}
+        />
         <Form />
       </div>
     </div>

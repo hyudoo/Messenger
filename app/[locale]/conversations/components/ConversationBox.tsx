@@ -19,11 +19,14 @@ import { formatUnread } from "@/app/libs/unread";
 interface ConversationBoxProps {
   data: FullConversationType;
   selected?: boolean;
+  // who is typing in it right now (replaces the last message's preview)
+  typingNames?: string[];
 }
 
 const ConversationBox: React.FC<ConversationBoxProps> = ({
   data,
   selected,
+  typingNames = [],
 }) => {
   const t = useTranslations("conversations");
   const dateLocale = useDateLocale();
@@ -145,7 +148,15 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
               "min-w-0 flex-1 truncate text-sm",
               unread > 0 ? "text-foreground font-medium" : "text-muted-foreground"
             )}>
-            {lastMessageText}
+            {typingNames.length > 0 ? (
+              <span className="font-medium text-sky-500">
+                {data.isGroup
+                  ? t("typing_group", { names: typingNames.join(", "), count: typingNames.length })
+                  : t("typing")}
+              </span>
+            ) : (
+              lastMessageText
+            )}
           </p>
           {unread > 0 && (
             <span

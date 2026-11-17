@@ -77,6 +77,8 @@
     "search": "Search conversations",
     "no_results": "No conversations found.",
     "last_from": "{name}: {text}",
+    "typing": "Typing…",
+    "typing_group": "{count, plural, one {{names} is typing…} other {{names} are typing…}}",
     "you": "You",
     "unread": "{count, plural, one {# unread message} other {# unread messages}}",
     "last_recalled": "Message unsent."
@@ -119,6 +121,7 @@
     "copy_failed": "Couldn't copy!",
     "more_actions": "Message options",
     "recall_tap_again": "Tap again to unsend",
+    "unread_divider": "New messages",
     "recalled": "Message unsent",
     "edited": "Edited",
     "editing": "Editing message",
@@ -231,6 +234,10 @@
     "you_subject": "You",
     "you_object": "you",
     "someone": "Someone"
+  },
+  "presence": {
+    "just_now": "Active just now",
+    "active_ago": "Active {time} ago"
   },
   "reactions": {
     "add": "React",

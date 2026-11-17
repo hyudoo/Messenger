@@ -10,7 +10,7 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import { useIsActive } from "@/app/hooks/useActiveList";
+import usePresenceText from "@/app/hooks/usePresenceText";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -31,14 +31,11 @@ const Header: React.FC<HeaderProps> = ({ conversation, users }) => {
   const otherUser = useOtherUser(conversation);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const isActive = useIsActive(otherUser?.email);
-  const statusText = useMemo(() => {
-    if (conversation.isGroup) {
-      return t("common.members", { count: conversation.userIds.length });
-    }
-
-    return isActive ? t("common.online") : t("common.offline");
-  }, [conversation, isActive, t]);
+  // 1:1: "Active now", "Active 5 minutes ago" or "Offline"
+  const presenceText = usePresenceText(otherUser);
+  const statusText = conversation.isGroup
+    ? t("common.members", { count: conversation.userIds.length })
+    : presenceText;
 
   // const handleCall = useCallback(() => {
   //   axios.post("/api/messages", {

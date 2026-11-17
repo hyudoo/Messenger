@@ -20,6 +20,10 @@ import { ConversationUpdate, FullConversationType } from "@/app/types";
 import { matchesSearch } from "@/app/libs/search";
 import { formatUnread } from "@/app/libs/unread";
 
+// "typing" events refresh every few seconds while someone types; without one for this long the
+// inbox stops showing it (same as the chat's indicator)
+const TYPING_TIMEOUT_MS = 5000;
+
 interface ConversationListProps {
   initialItems: FullConversationType[];
   users: SafeUser[];
@@ -32,6 +36,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // conversation id -> email -> when their last "typing" arrived (conversation:typing)
+  const [typing, setTyping] = useState<Record<string, Record<string, number>>>({});
 
   const t = useTranslations("conversations");
   const router = useRouter();
@@ -152,7 +158,25 @@ const ConversationList: React.FC<ConversationListProps> = ({
       }
     };
 
+    const typingHandler = (event: { conversationId: string; email: string; typing: boolean }) => {
+      if (event.email === myEmailRef.current) {
+        return;
+      }
+      setTyping((current) => {
+        const people = { ...current[event.conversationId] };
+        if (event.typing) {
+          people[event.email] = Date.now();
+        } else if (people[event.email]) {
+          delete people[event.email];
+        } else {
+          return current;
+        }
+        return { ...current, [event.conversationId]: people };
+      });
+    };
+
     socket.on("conversation:new", newHandler);
+    socket.on("conversation:typing", typingHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
     socket.on("connect", resyncHandler);
@@ -160,10 +184,41 @@ const ConversationList: React.FC<ConversationListProps> = ({
     return () => {
       socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
+      socket.off("conversation:typing", typingHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
     };
   }, [router, conversationId]);
+
+  // drops typing entries that weren't refreshed in time
+  const typingActive = Object.values(typing).some((people) => Object.keys(people).length > 0);
+  useEffect(() => {
+    if (!typingActive) {
+      return;
+    }
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setTyping((current) => {
+        let changed = false;
+        const next: typeof current = {};
+        Object.entries(current).forEach(([id, people]) => {
+          const fresh = Object.entries(people).filter(([, at]) => now - at < TYPING_TIMEOUT_MS);
+          changed ||= fresh.length !== Object.keys(people).length;
+          if (fresh.length > 0) {
+            next[id] = Object.fromEntries(fresh);
+          }
+        });
+        return changed ? next : current;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [typingActive]);
+
+  // the names of who is typing in a conversation (the open chat shows its own indicator too)
+  const typingNames = (item: FullConversationType) =>
+    Object.keys(typing[item.id] ?? {})
+      .map((email) => item.users.find((user) => user.email === email)?.name)
+      .filter((name): name is string => !!name);
 
   return (
     <>
@@ -217,6 +272,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
               key={item.id}
               data={item}
               selected={conversationId === item.id}
+              typingNames={typingNames(item)}
             />
           ))}
           {query && visibleItems.length === 0 && (

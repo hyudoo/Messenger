@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { splitLinks } from "@/app/libs/linkify";
 import { matchesSearch, normalizeSearch } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
-import { countUnread, formatUnread } from "@/app/libs/unread";
+import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
 import {
   canEditGroup,
   canRemoveMember,
@@ -127,6 +127,17 @@ describe("countUnread", () => {
   it("is 0 when the newest message was seen", () => {
     expect(countUnread([from("a", ["a", ME]), from("a")], ME)).toBe(0);
     expect(countUnread([], ME)).toBe(0);
+  });
+
+  it("finds where the new messages start (oldest first)", () => {
+    const page = [
+      { id: "1", ...from("a", ["a", ME]) },
+      { id: "2", ...from("b") },
+      { id: "3", ...from("a") },
+    ];
+    expect(findFirstUnread(page, ME)).toBe("2");
+    expect(findFirstUnread([...page, { id: "4", ...from(ME) }], ME)).toBeNull();
+    expect(findFirstUnread([], ME)).toBeNull();
   });
 
   it("caps the label at 99+", () => {

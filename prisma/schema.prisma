@@ -18,6 +18,8 @@ model User {
   image          String?
   hashedPassword String?
   createdAt      DateTime  @default(now())
+  // when one of the user's sockets last disconnected ("active 5 minutes ago"; server/socket.ts)
+  lastSeenAt     DateTime?
   updatedAt      DateTime  @updatedAt
 
   conversationIds String[]       @db.ObjectId

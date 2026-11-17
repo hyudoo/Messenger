@@ -18,4 +18,21 @@ export const countUnread = (newestFirst: Scanned[], userId: string) => {
   return count;
 };
 
+// The first unread message of a page (oldest first), where the chat puts its "new messages"
+// divider; null when everything is read. The same read marker as countUnread.
+export const findFirstUnread = <T extends Scanned & { id: string }>(
+  oldestFirst: T[],
+  userId: string
+) => {
+  let first: string | null = null;
+  for (let i = oldestFirst.length - 1; i >= 0; i--) {
+    const message = oldestFirst[i];
+    if (message.seenIds.includes(userId) || message.senderId === userId) {
+      break;
+    }
+    first = message.id;
+  }
+  return first;
+};
+
 export const formatUnread = (count: number) => (count > 99 ? "99+" : String(count));

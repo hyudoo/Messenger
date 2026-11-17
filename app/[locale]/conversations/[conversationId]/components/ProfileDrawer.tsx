@@ -16,7 +16,7 @@ import {
   canDeleteConversation,
   canLeaveConversation,
 } from "@/app/libs/conversation-permissions";
-import { useIsActive } from "@/app/hooks/useActiveList";
+import usePresenceText from "@/app/hooks/usePresenceText";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -63,14 +63,11 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     return data.name || otherUser.name;
   }, [data.name, otherUser.name]);
 
-  const isActive = useIsActive(otherUser?.email);
-
-  const statusText = useMemo(() => {
-    if (data.isGroup) {
-      return t("common.members", { count: data.users.length });
-    }
-    return isActive ? t("common.online") : t("common.offline");
-  }, [data, isActive, t]);
+  // 1:1: "Active now", "Active 5 minutes ago" or "Offline"
+  const presenceText = usePresenceText(otherUser);
+  const statusText = data.isGroup
+    ? t("common.members", { count: data.users.length })
+    : presenceText;
   return (
     <>
       <ConfirmModal

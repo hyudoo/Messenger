@@ -21,6 +21,9 @@ interface BodyProps {
   initialHasMore: boolean;
   // the conversation's members, for the names in "X is typing"
   members: SafeUser[];
+  // the first message the user hadn't read when opening the chat: a "new messages" divider goes
+  // before it, and the chat opens there instead of at the bottom
+  firstUnreadId?: string | null;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -81,12 +84,14 @@ const DayDivider: React.FC<{ date: Date | string }> = ({ date }) => {
 const Body: React.FC<BodyProps> = ({
   initialMessages = [],
   initialHasMore,
+  firstUnreadId,
   members,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState(initialMessages);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -100,6 +105,7 @@ const Body: React.FC<BodyProps> = ({
   // set before a render that should end scrolled to the bottom (read in the layout effect)
   const scrollToBottomRef = useRef(true);
   const nearBottomRef = useRef(true);
+  const isFirstLayoutRef = useRef(true);
   // the latest messages for the socket handlers, which are registered once per conversation
   const messagesRef = useRef(messages);
 
@@ -272,9 +278,17 @@ const Body: React.FC<BodyProps> = ({
       container.scrollTop += container.scrollHeight - previousHeight;
       heightBeforePrependRef.current = null;
     } else if (scrollToBottomRef.current) {
-      bottomRef.current?.scrollIntoView();
+      // opening the chat with unread messages: start at the first of them (the browser stops at
+      // the bottom when they fit on the screen)
+      const divider = isFirstLayoutRef.current ? unreadDividerRef.current : null;
+      if (divider) {
+        divider.scrollIntoView({ block: "start" });
+      } else {
+        bottomRef.current?.scrollIntoView();
+      }
     }
     scrollToBottomRef.current = false;
+    isFirstLayoutRef.current = false;
   }, [messages]);
 
   // This conversation's outbox entries not in the list yet. A sent one is dropped as soon as its
@@ -388,6 +402,17 @@ const Body: React.FC<BodyProps> = ({
           return (
             <div key={item?.clientId ?? message.id}>
               {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
+              {message.id === firstUnreadId && (
+                <div
+                  ref={unreadDividerRef}
+                  className="flex scroll-mt-4 items-center gap-3 px-4 pt-4 pb-1"
+                  role="separator"
+                  aria-label={t("unread_divider")}>
+                  <div className="h-px flex-1 bg-rose-500/60" />
+                  <span className="text-xs font-medium text-rose-500">{t("unread_divider")}</span>
+                  <div className="h-px flex-1 bg-rose-500/60" />
+                </div>
+              )}
               <MessageBox
                 isLast={i === shown.length - 1}
                 showHeader={startsGroup(previous, message)}

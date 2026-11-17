@@ -142,6 +142,45 @@ const scheduleExpiry = (socket: AppSocket) => {
 // every few seconds while typing; this only stops a flood)
 const TYPING_MIN_INTERVAL_MS = 1000;
 
+// The members' emails per conversation, for relaying "typing" to their inboxes without a
+// database lookup per keystroke. Briefly stale after a member change: someone just added misses
+// a few seconds of it, and an inbox without that conversation ignores it.
+const MEMBER_CACHE_MS = 30_000;
+const memberCache = new Map<string, { emails: string[]; at: number }>();
+
+const memberEmails = async (conversationId: string) => {
+  const cached = memberCache.get(conversationId);
+  if (cached && Date.now() - cached.at < MEMBER_CACHE_MS) {
+    return cached.emails;
+  }
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { users: { select: { email: true } } },
+  });
+  const emails = (conversation?.users ?? [])
+    .map((user) => user.email)
+    .filter((email): email is string => !!email);
+  memberCache.set(conversationId, { emails, at: Date.now() });
+  // drop old entries now and then, so the map doesn't grow with every conversation ever typed in
+  if (memberCache.size > 1000) {
+    const cutoff = Date.now() - MEMBER_CACHE_MS;
+    memberCache.forEach((entry, id) => {
+      if (entry.at < cutoff) {
+        memberCache.delete(id);
+      }
+    });
+  }
+  return emails;
+};
+
+// "Active 5 minutes ago": stamped on every disconnect (only shown while the user is offline, so
+// a stamp while another tab stays open is harmless). Fire-and-forget.
+const touchLastSeen = (userId: string) => {
+  Promise.resolve()
+    .then(() => prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }))
+    .catch((error) => logError("last_seen", error));
+};
+
 const isMember = async (conversationId: unknown, userId: string) => {
   if (typeof conversationId !== "string") {
     return false;
@@ -284,8 +323,9 @@ export const initSocketServer = async (httpServer: HttpServer) => {
     });
 
     // "X is typing…": relayed to the others in the conversation room, which only members can
-    // join (conversation:join checks), so no database lookup per keystroke. The client stops
-    // showing it after a few seconds without a refresh, so a lost "stopped" is harmless.
+    // join (conversation:join checks), and to the other members' inboxes (conversation:typing,
+    // members from memberEmails' cache). The client stops showing it after a few seconds without
+    // a refresh, so a lost "stopped" is harmless.
     let lastTypingAt = 0;
     socket.on("typing", (conversationId: unknown, typing: unknown) => {
       if (typeof conversationId !== "string") {
@@ -303,7 +343,16 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         }
         lastTypingAt = now;
       }
-      socket.to(room).emit("typing", { conversationId, email, typing: isTyping });
+      const event = { conversationId, email, typing: isTyping };
+      socket.to(room).emit("typing", event);
+      memberEmails(conversationId)
+        .then((emails) => {
+          const inboxes = emails.filter((member) => member !== email).map(userRoom);
+          if (inboxes.length > 0) {
+            io.to(inboxes).emit("conversation:typing", event);
+          }
+        })
+        .catch((error) => logError("typing_members", error));
     });
 
     // Video call: at most two peers per room. Stamp, join and snapshot the room
@@ -472,7 +521,10 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 
     // Presence (server/presence.ts): "online" / "offline" go out when the user's first socket
     // appears / last one leaves anywhere; the new socket gets the whole list from memory.
-    socket.on("disconnect", () => presence.remove(email));
+    socket.on("disconnect", () => {
+      presence.remove(email);
+      touchLastSeen(userId);
+    });
     presence.add(email);
     socket.emit("presence:list", presence.list());
   });

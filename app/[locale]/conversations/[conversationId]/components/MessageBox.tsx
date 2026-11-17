@@ -174,6 +174,31 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
   );
 };
 
+// at most this many faces under the last message, then "+N"
+const SEEN_AVATARS_MAX = 5;
+
+// Read receipts: small faces of who has seen the message (names on hover / for screen readers).
+const SeenAvatars: React.FC<{ users: FullMessageType["seen"] }> = ({ users }) => {
+  const t = useTranslations("chat");
+  const label = t("seen_by", { names: users.map((user) => user.name).join(", ") });
+  const extra = users.length - SEEN_AVATARS_MAX;
+  return (
+    <div className="flex items-center gap-0.5 self-end" title={label} aria-label={label} role="img">
+      {users.slice(0, SEEN_AVATARS_MAX).map((user) => (
+        <Image
+          key={user.id}
+          src={user.image || "/images/placeholder.jpg"}
+          alt=""
+          width={16}
+          height={16}
+          className="h-4 w-4 rounded-full object-cover"
+        />
+      ))}
+      {extra > 0 && <span className="pl-0.5 text-[10px] text-muted-foreground">+{extra}</span>}
+    </div>
+  );
+};
+
 const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true, pending }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -216,10 +241,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
 
   const systemText = useSystemText();
 
-  const seenList = (data.seen || [])
-    .filter((user) => user.email !== data?.sender?.email)
-    .map((user) => user.name)
-    .join(", ");
+  // who has seen it besides its sender and the user (shown under the chat's last message)
+  const seenBy = (data.seen || []).filter(
+    (user) => user.email !== data?.sender?.email && user.email !== myEmail
+  );
 
   // grouped messages sit closer together, under the first one's header
   const container = clsx("flex gap-3 px-4", showHeader ? "pt-4 pb-1" : "py-0.5", isOwn && "justify-end");
@@ -387,15 +412,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
         {reactions.length > 0 && (
           <ReactionChips reactions={reactions} myEmail={myEmail} onReact={react} />
         )}
-        {isLast && isOwn && seenList.length > 0 && (
-          <div
-            className="
-           text-xs
-           font-light
-           text-muted-foreground">
-            {t("chat.seen_by", { names: seenList })}
-          </div>
-        )}
+        {isLast && seenBy.length > 0 && <SeenAvatars users={seenBy} />}
       </div>
     </div>
   );

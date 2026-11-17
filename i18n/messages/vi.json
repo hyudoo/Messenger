@@ -77,6 +77,8 @@
     "search": "Tìm cuộc trò chuyện",
     "no_results": "Không tìm thấy cuộc trò chuyện nào.",
     "last_from": "{name}: {text}",
+    "typing": "Đang soạn tin…",
+    "typing_group": "{count, plural, other {{names} đang soạn tin…}}",
     "you": "Bạn",
     "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
     "last_recalled": "Tin nhắn đã được thu hồi."
@@ -119,6 +121,7 @@
     "copy_failed": "Không sao chép được!",
     "more_actions": "Tuỳ chọn tin nhắn",
     "recall_tap_again": "Chạm lần nữa để thu hồi",
+    "unread_divider": "Tin nhắn mới",
     "recalled": "Tin nhắn đã được thu hồi",
     "edited": "Đã chỉnh sửa",
     "editing": "Đang sửa tin nhắn",
@@ -231,6 +234,10 @@
     "you_subject": "Bạn",
     "you_object": "bạn",
     "someone": "Ai đó"
+  },
+  "presence": {
+    "just_now": "Vừa mới hoạt động",
+    "active_ago": "Hoạt động {time} trước"
   },
   "reactions": {
     "add": "Thả cảm xúc",
