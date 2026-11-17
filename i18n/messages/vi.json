@@ -83,7 +83,9 @@
     "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
     "last_recalled": "Tin nhắn đã được thu hồi.",
     "last_voice": "Đã gửi một tin nhắn thoại.",
-    "last_file": "Đã gửi tệp {name}."
+    "last_file": "Đã gửi tệp {name}.",
+    "muted": "Đã tắt thông báo",
+    "pinned": "Đã ghim"
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -153,14 +155,23 @@
     "play": "Phát",
     "pause": "Tạm dừng",
     "seek": "Tua tin nhắn thoại",
-    "open_file": "Mở {name}"
+    "open_file": "Mở {name}",
+    "forward": "Chuyển tiếp",
+    "forwarded": "Đã chuyển tiếp",
+    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ)."
   },
   "profile": {
     "close": "Đóng bảng thông tin",
     "delete": "Xoá",
     "email": "Email",
     "joined": "Tham gia",
-    "leave": "Rời nhóm"
+    "leave": "Rời nhóm",
+    "search": "Tìm kiếm",
+    "mute": "Tắt thông báo",
+    "unmute": "Bật thông báo",
+    "pin": "Ghim",
+    "unpin": "Bỏ ghim",
+    "pin_limit": "Chỉ ghim được tối đa 5 cuộc trò chuyện."
   },
   "confirm_delete": {
     "title": "Xoá cuộc trò chuyện",
@@ -299,5 +310,24 @@
     "zoom_in": "Phóng to",
     "zoom_out": "Thu nhỏ",
     "counter": "{current} / {total}"
+  },
+  "search": {
+    "title": "Tìm trong cuộc trò chuyện",
+    "placeholder": "Tìm tin nhắn",
+    "back": "Quay lại",
+    "searching": "Đang tìm…",
+    "no_results": "Không có tin nhắn nào khớp.",
+    "failed": "Tìm kiếm thất bại, thử lại sau."
+  },
+  "forward": {
+    "title": "Chuyển tiếp tin nhắn",
+    "search": "Tìm cuộc trò chuyện",
+    "loading": "Đang tải…",
+    "load_failed": "Không tải được danh sách cuộc trò chuyện.",
+    "no_results": "Không tìm thấy cuộc trò chuyện nào.",
+    "send": "Gửi",
+    "sending": "Đang gửi…",
+    "sent": "Đã gửi",
+    "retry": "Thử lại"
   }
 }

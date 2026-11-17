@@ -66,6 +66,7 @@ const MessageNotifications = () => {
         !message ||
         message.isCall ||
         message.systemType || // group events aren't worth a notification
+        update.muted || // the user muted the conversation
         message.sender?.email === me ||
         getNotificationState() !== "on" ||
         isPushActive() // the service worker shows it

@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { format } from "date-fns";
 import {
   HiArrowUturnLeft,
+  HiArrowUturnRight,
   HiOutlineDocumentDuplicate,
   HiPencil,
   HiPlus,
@@ -17,7 +18,13 @@ import {
 import { EmojiPickerPanel } from "@/app/components/EmojiPicker";
 import useComposer from "@/app/hooks/useComposer";
 import useDateLocale from "@/app/hooks/useDateLocale";
-import { canEditMessage, canRecallMessage, canReplyToMessage } from "@/app/libs/message-actions";
+import {
+  canEditMessage,
+  canForwardMessage,
+  canRecallMessage,
+  canReplyToMessage,
+} from "@/app/libs/message-actions";
+import { useForward } from "./ForwardDialog";
 import { FullMessageType } from "@/app/types";
 import { QUICK_REACTIONS } from "./MessageReactions";
 import { MessageSnippet } from "./MessageReply";
@@ -143,6 +150,18 @@ const MessageMenuSheet: React.FC<MessageMenuSheetProps> = ({
               }}>
               <HiArrowUturnLeft size={20} aria-hidden className="text-muted-foreground" />
               {t("chat.reply")}
+            </button>
+          )}
+          {canForwardMessage(message) && (
+            <button
+              type="button"
+              className={item}
+              onClick={() => {
+                close();
+                useForward.getState().open(message);
+              }}>
+              <HiArrowUturnRight size={20} aria-hidden className="text-muted-foreground" />
+              {t("chat.forward")}
             </button>
           )}
           {message.body && (

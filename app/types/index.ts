@@ -1,7 +1,8 @@
 import { CallType, Conversation, Message, User } from "@prisma/client";
 
 // What Prisma returns for a user: hashedPassword is omitted globally (app/libs/prismadb.ts).
-export type SafeUser = Omit<User, "hashedPassword">;
+// a user row as queries return it (app/libs/prismadb.ts omits these fields)
+export type SafeUser = Omit<User, "hashedPassword" | "mutedConversationIds" | "pinnedConversationIds">;
 
 // A reaction as MESSAGE_INCLUDE loads it (app/libs/message-include.ts).
 export type MessageReaction = {
@@ -34,7 +35,13 @@ export type FullConversationType = Conversation & {
   messages: FullMessageType[];
   // messages from others the user hasn't seen (inbox only; missing on socket payloads)
   unreadCount?: number;
+  // the user's own settings (inbox only): no notifications / kept at the top
+  muted?: boolean;
+  pinned?: boolean;
 };
+
+// Payload of "conversation:settings": the user changed their settings of a conversation.
+export type ConversationSettings = { id: string; muted: boolean; pinned: boolean };
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
 // notifications), a seen update (messages only) or a group change (users with name / ownerId:
@@ -44,6 +51,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
     Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId" | "name" | "isGroup">
   > & {
     lastMessageAt?: string;
+    // the recipient muted this conversation: no notification
+    muted?: boolean;
   };
 
 export type ConversationWithUsers = Conversation & {

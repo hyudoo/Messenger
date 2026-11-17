@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { HiArrowUturnLeft } from "react-icons/hi2";
 
 import { ReplyPreview } from "@/app/types";
+import useMessageJump from "@/app/hooks/useMessageJump";
 
 type Snippetable = Pick<ReplyPreview, "body" | "image" | "isCall" | "deletedAt"> & {
   attachment?: ReplyPreview["attachment"];
@@ -34,18 +35,20 @@ export const MessageSnippet: React.FC<{ message: Snippetable }> = ({ message }) 
   return <>{message.body}</>;
 };
 
-// The ids of rendered messages (Body) are message-<id>; a reply's quote scrolls to the original
-// and flashes it, when it is loaded (older pages may not be).
+// The ids of rendered messages (Body) are message-<id>; a reply's quote asks Body to show the
+// original (useMessageJump), which loads older pages first when it isn't loaded.
 export const messageElementId = (id: string) => `message-${id}`;
 
-const jumpTo = (id: string) => {
+// Scrolls a rendered message into the middle and flashes it; false when it isn't rendered.
+export const flashMessage = (id: string) => {
   const element = document.getElementById(messageElementId(id));
   if (!element) {
-    return;
+    return false;
   }
   element.scrollIntoView({ behavior: "smooth", block: "center" });
   element.classList.add("message-flash");
   setTimeout(() => element.classList.remove("message-flash"), 1600);
+  return true;
 };
 
 // Above a reply: who and what it answers. A button, so the original can be reached by keyboard.
@@ -57,7 +60,7 @@ export const ReplyQuote: React.FC<{ reply: ReplyPreview; isOwn: boolean }> = ({
   return (
     <button
       type="button"
-      onClick={() => jumpTo(reply.id)}
+      onClick={() => useMessageJump.getState().request(reply.id)}
       title={t("reply_jump")}
       className={clsx(
         "flex max-w-full items-center gap-1.5 rounded-xl bg-muted/60 px-3 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted",

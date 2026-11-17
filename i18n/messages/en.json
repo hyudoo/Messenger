@@ -83,7 +83,9 @@
     "unread": "{count, plural, one {# unread message} other {# unread messages}}",
     "last_recalled": "Message unsent.",
     "last_voice": "Sent a voice message.",
-    "last_file": "Sent the file {name}."
+    "last_file": "Sent the file {name}.",
+    "muted": "Muted",
+    "pinned": "Pinned"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -153,14 +155,23 @@
     "play": "Play",
     "pause": "Pause",
     "seek": "Seek voice message",
-    "open_file": "Open {name}"
+    "open_file": "Open {name}",
+    "forward": "Forward",
+    "forwarded": "Forwarded",
+    "jump_not_found": "Couldn't find this message (it may be too old)."
   },
   "profile": {
     "close": "Close panel",
     "delete": "Delete",
     "email": "Email",
     "joined": "Joined",
-    "leave": "Leave group"
+    "leave": "Leave group",
+    "search": "Search",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pin_limit": "You can pin at most 5 conversations."
   },
   "confirm_delete": {
     "title": "Delete conversation",
@@ -299,5 +310,24 @@
     "zoom_in": "Zoom in",
     "zoom_out": "Zoom out",
     "counter": "{current} / {total}"
+  },
+  "search": {
+    "title": "Search in conversation",
+    "placeholder": "Search messages",
+    "back": "Back",
+    "searching": "Searching…",
+    "no_results": "No matching messages.",
+    "failed": "Search failed, try again later."
+  },
+  "forward": {
+    "title": "Forward message",
+    "search": "Search conversations",
+    "loading": "Loading…",
+    "load_failed": "Couldn't load your conversations.",
+    "no_results": "No conversations found.",
+    "send": "Send",
+    "sending": "Sending…",
+    "sent": "Sent",
+    "retry": "Retry"
   }
 }

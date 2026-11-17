@@ -30,11 +30,19 @@ import useComposer from "@/app/hooks/useComposer";
 import useSystemText from "@/app/hooks/useSystemText";
 import {
   canEditMessage,
+  canForwardMessage,
   canReactToMessage,
   canRecallMessage,
   canReplyToMessage,
 } from "@/app/libs/message-actions";
-import { HiArrowUturnLeft, HiEllipsisHorizontal, HiPencil, HiTrash } from "react-icons/hi2";
+import {
+  HiArrowUturnLeft,
+  HiArrowUturnRight,
+  HiEllipsisHorizontal,
+  HiPencil,
+  HiTrash,
+} from "react-icons/hi2";
+import { useForward } from "./ForwardDialog";
 import MessageMenuSheet from "./MessageMenuSheet";
 import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
@@ -145,6 +153,16 @@ const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = (
           title={t("reply")}
           className={button}>
           <HiArrowUturnLeft size={16} aria-hidden />
+        </button>
+      )}
+      {canForwardMessage(message) && (
+        <button
+          type="button"
+          onClick={() => useForward.getState().open(message)}
+          aria-label={t("forward")}
+          title={t("forward")}
+          className={button}>
+          <HiArrowUturnRight size={16} aria-hidden />
         </button>
       )}
       {canEditMessage(message, myId) && (
@@ -298,6 +316,12 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             <div className="text-xs text-muted-foreground">
               {format(new Date(data.createdAt), "p", { locale: dateLocale })}
             </div>
+          </div>
+        )}
+        {data.forwarded && !recalled && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <HiArrowUturnRight size={12} aria-hidden />
+            {t("chat.forwarded")}
           </div>
         )}
         {data.replyTo && !recalled && <ReplyQuote reply={data.replyTo} isOwn={isOwn} />}

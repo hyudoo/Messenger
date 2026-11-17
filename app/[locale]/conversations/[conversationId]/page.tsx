@@ -2,6 +2,7 @@ import getConversationById from "@/app/actions/getConversationById";
 import getMessages from "@/app/actions/getMessages";
 import getUsers from "@/app/actions/getUsers";
 import getCurrentUser from "@/app/actions/getCurrentUser";
+import getConversationSettings from "@/app/actions/getConversationSettings";
 import { findFirstUnread } from "@/app/libs/unread";
 
 import Header from "./components/Header";
@@ -30,9 +31,10 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
 
   // only loaded once membership is confirmed; older pages load on scroll
   // the users: people a group member may add (the drawer's picker)
-  const [{ messages, hasMore }, users] = await Promise.all([
+  const [{ messages, hasMore }, users, settings] = await Promise.all([
     getMessages(conversation.id),
     conversation.isGroup ? getUsers() : Promise.resolve([]),
+    getConversationSettings(conversation.id),
   ]);
   // where the "new messages" divider goes (before this page's "seen" marks them read)
   const currentUser = await getCurrentUser();
@@ -41,7 +43,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   return (
     <div className="lg:pl-80 h-full">
       <div className="h-full flex flex-col">
-        <Header conversation={conversation} users={users} />
+        <Header conversation={conversation} users={users} settings={settings} />
         <Body
           initialMessages={messages}
           initialHasMore={hasMore}

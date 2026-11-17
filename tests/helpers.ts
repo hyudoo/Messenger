@@ -25,6 +25,7 @@ export const createPrismaMock = () => {
   const model = () => ({
     findFirst: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     findMany: vi.fn().mockResolvedValue([]),
     count: vi.fn(),
     create: vi.fn(),

@@ -15,6 +15,7 @@ import useDateLocale from "@/app/hooks/useDateLocale";
 import useSystemText from "@/app/hooks/useSystemText";
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { formatUnread } from "@/app/libs/unread";
+import { HiBellSlash, HiMapPin } from "react-icons/hi2";
 
 interface ConversationBoxProps {
   data: FullConversationType;
@@ -133,6 +134,13 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
             )}>
             {title}
           </p>
+          {(data.muted || data.pinned) && (
+            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+              {data.pinned && <HiMapPin size={14} aria-label={t("pinned")} />}
+              {data.muted && <HiBellSlash size={14} aria-label={t("muted")} />}
+            </span>
+          )}
+          <span className="flex-1" />
           {lastMessage?.createdAt && (
             <p
               className={clsx(
@@ -164,7 +172,10 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
           </p>
           {unread > 0 && (
             <span
-              className="shrink-0 rounded-full bg-sky-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white"
+              className={clsx(
+                "shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none text-white",
+                data.muted ? "bg-muted-foreground" : "bg-sky-500"
+              )}
               aria-label={t("unread", { count: unread })}>
               {formatUnread(unread)}
             </span>

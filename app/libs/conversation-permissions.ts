@@ -26,6 +26,9 @@ export const canRemoveMember = (
 
 export const MAX_GROUP_NAME_LENGTH = 100;
 
+// conversations a user may pin to the top of their inbox
+export const MAX_PINNED = 5;
+
 // A group name as stored (trimmed), or null when it is missing, blank or too long.
 export const normalizeGroupName = (name: unknown) => {
   const trimmed = typeof name === "string" ? name.trim() : "";

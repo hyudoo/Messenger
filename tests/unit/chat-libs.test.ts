@@ -12,6 +12,7 @@ import {
 import {
   canEditMessage,
   canRecallMessage,
+  canForwardMessage,
   canReactToMessage,
   canReplyToMessage,
 } from "@/app/libs/message-actions";
@@ -175,6 +176,14 @@ describe("message actions", () => {
   it("replies to anything still there", () => {
     expect(canReplyToMessage(message({ senderId: "other" }))).toBe(true);
     expect(canReplyToMessage(message({ deletedAt: new Date() }))).toBe(false);
+  });
+
+  it("forwards a person's message with content", () => {
+    expect(canForwardMessage(message({ senderId: "other" }))).toBe(true);
+    expect(canForwardMessage({ ...message(), body: null, image: "x" })).toBe(true);
+    expect(canForwardMessage({ ...message(), body: null })).toBe(false);
+    expect(canForwardMessage(message({ isCall: true }))).toBe(false);
+    expect(canForwardMessage(message({ systemType: "left" }))).toBe(false);
   });
 
   it("reacts to anything still there except a call", () => {

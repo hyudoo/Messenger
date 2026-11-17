@@ -15,6 +15,9 @@ import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { ImageViewerProvider } from "./ImageViewer";
+import ForwardDialog from "./ForwardDialog";
+import { flashMessage } from "./MessageReply";
+import { onMessageJump } from "@/app/hooks/useMessageJump";
 import { format, isToday, isYesterday } from "date-fns";
 
 interface BodyProps {
@@ -35,6 +38,9 @@ interface MessagePage {
   messages: FullMessageType[];
   hasMore: boolean;
 }
+
+// how many older pages a jump to a message (search, reply quote) may load to find it
+const MAX_JUMP_PAGES = 10;
 
 // how close to the top (px) scrolling has to get before older messages load
 const LOAD_OLDER_THRESHOLD = 120;
@@ -108,6 +114,9 @@ const Body: React.FC<BodyProps> = ({
   const scrollToBottomRef = useRef(true);
   const nearBottomRef = useRef(true);
   const isFirstLayoutRef = useRef(true);
+  // a message to show once the older pages loaded for it are rendered
+  const pendingJumpRef = useRef<string | null>(null);
+  const hasMoreRef = useRef(initialHasMore);
   // the latest messages for the socket handlers, which are registered once per conversation
   const messagesRef = useRef(messages);
 
@@ -120,8 +129,50 @@ const Body: React.FC<BodyProps> = ({
 
   useLayoutEffect(() => {
     messagesRef.current = messages;
+    hasMoreRef.current = hasMore;
     myEmailRef.current = myEmail;
   });
+
+  // Showing a message (search result, reply quote): at once when it is loaded, else after
+  // loading older pages until it turns up (at most MAX_JUMP_PAGES).
+  useEffect(
+    () =>
+      onMessageJump(async (messageId) => {
+        if (flashMessage(messageId)) {
+          return;
+        }
+        const pages: FullMessageType[][] = [];
+        let cursor = messagesRef.current[0]?.id;
+        let more = hasMoreRef.current;
+        let found = false;
+        try {
+          for (let page = 0; page < MAX_JUMP_PAGES && more && cursor && !found; page++) {
+            const { data } = await axios.get<MessagePage>(
+              `/api/conversations/${conversationId}/messages`,
+              { params: { before: cursor } }
+            );
+            pages.unshift(data.messages);
+            found = data.messages.some((message) => message.id === messageId);
+            cursor = data.messages[0]?.id;
+            more = data.hasMore;
+          }
+        } catch {
+          // shown below as "not found"
+        }
+        if (pages.length > 0) {
+          pendingJumpRef.current = found ? messageId : null;
+          setMessages((current) => {
+            const known = new Set(current.map((message) => message.id));
+            return [...pages.flat().filter((message) => !known.has(message.id)), ...current];
+          });
+          setHasMore(more);
+        }
+        if (!found) {
+          toast.error(t("jump_not_found"));
+        }
+      }),
+    [conversationId, t]
+  );
 
   useEffect(() => {
     // "seen" only while the user can actually see the chat: not from a hidden tab, and again
@@ -276,7 +327,12 @@ const Body: React.FC<BodyProps> = ({
   useLayoutEffect(() => {
     const container = containerRef.current;
     const previousHeight = heightBeforePrependRef.current;
-    if (container && previousHeight !== null) {
+    if (pendingJumpRef.current) {
+      // older pages loaded for a jump: go to that message instead of keeping the place
+      flashMessage(pendingJumpRef.current);
+      pendingJumpRef.current = null;
+      heightBeforePrependRef.current = null;
+    } else if (container && previousHeight !== null) {
       container.scrollTop += container.scrollHeight - previousHeight;
       heightBeforePrependRef.current = null;
     } else if (scrollToBottomRef.current) {
@@ -477,6 +533,7 @@ const Body: React.FC<BodyProps> = ({
           </button>
         )}
       </div>
+      <ForwardDialog />
     </ImageViewerProvider>
   );
 };

@@ -16,7 +16,7 @@ import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
-import { ConversationUpdate, FullConversationType } from "@/app/types";
+import { ConversationSettings, ConversationUpdate, FullConversationType } from "@/app/types";
 import { matchesSearch } from "@/app/libs/search";
 import { formatUnread } from "@/app/libs/unread";
 
@@ -53,7 +53,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
   // Tab title badge: "(3) Messenger" while there are unread messages. Re-applied after
   // navigations, which reset the title from the page metadata.
-  const totalUnread = items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0);
+  // muted conversations don't count (their own badges still show, greyed)
+  const totalUnread = items.reduce(
+    (sum, item) => sum + (item.muted ? 0 : (item.unreadCount ?? 0)),
+    0
+  );
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\+?\) /, "");
     const apply = () => {
@@ -67,7 +71,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
   }, [totalUnread, conversationId]);
 
-  const visibleItems = items.filter((item) =>
+  // pinned conversations first (each part keeps its order: latest activity first)
+  const visibleItems = [
+    ...items.filter((item) => item.pinned),
+    ...items.filter((item) => !item.pinned),
+  ].filter((item) =>
     matchesSearch(
       query,
       item.name,
@@ -176,7 +184,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
 
     socket.on("conversation:new", newHandler);
+    // the user's own settings, changed in another tab or the chat's drawer
+    const settingsHandler = (settings: ConversationSettings) => {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === settings.id ? { ...item, muted: settings.muted, pinned: settings.pinned } : item
+        )
+      );
+    };
+
     socket.on("conversation:typing", typingHandler);
+    socket.on("conversation:settings", settingsHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
     socket.on("connect", resyncHandler);
@@ -185,6 +203,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
       socket.off("conversation:typing", typingHandler);
+      socket.off("conversation:settings", settingsHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
     };

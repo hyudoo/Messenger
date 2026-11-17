@@ -23,9 +23,11 @@ interface HeaderProps {
   };
   // everyone but the user (groups: who can be added)
   users: SafeUser[];
+  // the user's own settings of this conversation
+  settings: { muted: boolean; pinned: boolean };
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation, users }) => {
+const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
   const t = useTranslations();
   const router = useRouter();
   const otherUser = useOtherUser(conversation);
@@ -69,6 +71,7 @@ const Header: React.FC<HeaderProps> = ({ conversation, users }) => {
       <ProfileDrawer
         data={conversation}
         users={users}
+        settings={settings}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />

@@ -1,0 +1,60 @@
+import { NextResponse } from "next/server";
+
+import getConversationForUser from "@/app/actions/getConversationForUser";
+import getCurrentUser from "@/app/actions/getCurrentUser";
+import prisma from "@/app/libs/prismadb";
+import { NOT_RECALLED, NOT_SYSTEM } from "@/app/libs/message-include";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
+import { logError } from "@/app/libs/log";
+
+interface IParams {
+  conversationId?: string;
+}
+
+const MAX_QUERY_LENGTH = 100;
+const MAX_RESULTS = 30;
+
+// GET ?q=: the conversation's text messages containing q (case-insensitive), newest first.
+// Recalled messages and group events are left out. Members only.
+export async function GET(request: Request, { params }: { params: Promise<IParams> }) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    const limited = await rateLimit("search", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
+    }
+
+    const conversation = await getConversationForUser((await params).conversationId, currentUser.id);
+    if (!conversation) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    const query = (new URL(request.url).searchParams.get("q") ?? "").trim();
+    if (!query || query.length > MAX_QUERY_LENGTH) {
+      return new NextResponse("Invalid query", { status: 400 });
+    }
+
+    const messages = await prisma.message.findMany({
+      where: {
+        conversationId: conversation.id,
+        body: { contains: query, mode: "insensitive" },
+        AND: [NOT_RECALLED, NOT_SYSTEM],
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: MAX_RESULTS,
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        sender: { select: { name: true, email: true, image: true } },
+      },
+    });
+    return NextResponse.json(messages);
+  } catch (error) {
+    logError("message_search", error);
+    return new NextResponse("Error", { status: 500 });
+  }
+}

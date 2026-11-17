@@ -27,6 +27,12 @@ export const canEditMessage = (message: Actionable, userId: string, now = Date.n
 export const canRecallMessage = (message: Actionable, userId: string) =>
   isLive(message) && message.senderId === userId;
 
+// Anyone in the conversation may forward a person's message that is still there and has
+// content (text, image, file or voice), to another conversation they are in.
+export const canForwardMessage = (
+  message: Actionable & { image?: string | null; attachment?: unknown }
+) => isLive(message) && !!(message.body || message.image || message.attachment);
+
 // Anyone in the conversation may reply to a message that is still there.
 export const canReplyToMessage = (message: Actionable) => isLive(message);
 
