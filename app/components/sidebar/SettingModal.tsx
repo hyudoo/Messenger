@@ -16,6 +16,7 @@ import Input from "../inputs/Input";
 import Modal from "../modals/Modal";
 import Button from "../Button";
 import { Theme, useTheme } from "../providers/ThemeProvider";
+import { getNotificationState, setNotificationsEnabled } from "@/app/libs/notifications";
 
 interface SettingModalProps {
   isOpen: boolean;
@@ -49,6 +50,17 @@ const SettingModal: React.FC<SettingModalProps> = ({
   // Chosen here, applied on Save: switching the locale navigates to /<locale>/..., which remounts
   // everything under app/[locale] and would close the modal mid-edit
   const [selectedLocale, setSelectedLocale] = useState(locale);
+  // Notifications apply at once, like the theme. Read from the browser while the modal is open
+  // (never on the server, where the modal is closed); bumped to re-read after a change.
+  const [, setNotificationVersion] = useState(0);
+  const notificationState = isOpen ? getNotificationState() : "unsupported";
+  const toggleNotifications = async () => {
+    const next = await setNotificationsEnabled(notificationState !== "on");
+    setNotificationVersion((version) => version + 1);
+    if (next === "denied") {
+      toast.error(t("settings.notifications_denied"));
+    }
+  };
 
   const {
     register,
@@ -222,6 +234,45 @@ const SettingModal: React.FC<SettingModalProps> = ({
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="border-b border-border pb-12">
+            <h2 className="text-base font-semibold leading-7 text-foreground">
+              {t("settings.notifications_title")}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              {t("settings.notifications_description")}
+            </p>
+            <div className="mt-6">
+              {notificationState === "unsupported" || notificationState === "denied" ? (
+                <p className="text-sm text-muted-foreground">
+                  {notificationState === "denied"
+                    ? t("settings.notifications_denied")
+                    : t("settings.notifications_unsupported")}
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={notificationState === "on"}
+                  onClick={toggleNotifications}
+                  className="flex items-center gap-3 text-sm font-medium text-foreground">
+                  <span
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 shrink-0 rounded-full transition",
+                      notificationState === "on" ? "bg-sky-500" : "bg-muted"
+                    )}>
+                    <span
+                      className={clsx(
+                        "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition",
+                        notificationState === "on" ? "left-[22px]" : "left-0.5"
+                      )}
+                    />
+                  </span>
+                  {t("settings.notifications_toggle")}
+                </button>
+              )}
             </div>
           </div>
         </div>

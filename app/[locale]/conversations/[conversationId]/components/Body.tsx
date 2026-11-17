@@ -10,7 +10,11 @@ import { HiArrowDown } from "react-icons/hi2";
 import { getSocket, subscribeConversation } from "@/app/libs/socket-client";
 import useConversation from "@/app/hooks/useConversation";
 import MessageBox from "./MessageBox";
-import { FullMessageType } from "@/app/types";
+import { FullMessageType, SafeUser } from "@/app/types";
+import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
+import useDateLocale from "@/app/hooks/useDateLocale";
+import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
+import { format, isToday, isYesterday } from "date-fns";
 
 interface BodyProps {
   initialMessages: FullMessageType[];
@@ -33,6 +37,38 @@ const appendNew = (current: FullMessageType[], incoming: FullMessageType[]) => {
   const known = new Set(current.map((message) => message.id));
   const fresh = incoming.filter((message) => !known.has(message.id));
   return fresh.length > 0 ? [...current, ...fresh] : current;
+};
+
+// A pending outbox entry drawn like a message of the current user.
+const outboxMessage = (item: OutboxItem, me: Partial<SafeUser>): FullMessageType =>
+  ({
+    id: item.clientId,
+    body: item.payload.message ?? null,
+    image: item.payload.image ?? null,
+    createdAt: item.createdAt,
+    conversationId: item.conversationId,
+    sender: me,
+    seen: [],
+    reactions: [],
+  }) as unknown as FullMessageType;
+
+// "Today", "Yesterday" or the date, between the messages of different days
+const DayDivider: React.FC<{ date: Date | string }> = ({ date }) => {
+  const t = useTranslations("chat");
+  const dateLocale = useDateLocale();
+  const day = new Date(date);
+  const label = isToday(day)
+    ? t("today")
+    : isYesterday(day)
+      ? t("yesterday")
+      : format(day, "PPP", { locale: dateLocale });
+  return (
+    <div className="flex items-center gap-3 px-4 pt-6 pb-2" role="separator" aria-label={label}>
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
 };
 
 const Body: React.FC<BodyProps> = ({
@@ -58,7 +94,10 @@ const Body: React.FC<BodyProps> = ({
   const messagesRef = useRef(messages);
 
   const { conversationId } = useConversation();
-  const myEmail = useSession().data?.user?.email;
+  const sessionUser = useSession().data?.user;
+  const myEmail = sessionUser?.email;
+  const outbox = useOutbox((state) => state.items);
+  const { retry, discard } = useOutbox.getState();
   const myEmailRef = useRef(myEmail);
 
   useLayoutEffect(() => {
@@ -166,6 +205,46 @@ const Body: React.FC<BodyProps> = ({
     scrollToBottomRef.current = false;
   }, [messages]);
 
+  // This conversation's outbox entries not in the list yet. A sent one is dropped as soon as its
+  // message is in the list (socket or resync), so it never shows twice.
+  // (by id, or by the clientId messages:new echoes when it beats the HTTP response)
+  const knownIds = new Set(messages.map((message) => message.id));
+  const knownClientIds = new Set(messages.map((message) => message.clientId));
+  const isDelivered = (item: OutboxItem) =>
+    knownClientIds.has(item.clientId) || (!!item.message && knownIds.has(item.message.id));
+  const outboxHere = outbox.filter(
+    (item) => item.conversationId === conversationId && !isDelivered(item)
+  );
+  const outboxDone = outbox.filter(
+    (item) => item.conversationId === conversationId && isDelivered(item)
+  );
+  useEffect(() => {
+    outboxDone.forEach((item) => discard(item.clientId));
+  });
+
+  // a message the user just sent always scrolls into view
+  const outboxCount = outboxHere.length;
+  const previousOutboxCount = useRef(outboxCount);
+  useLayoutEffect(() => {
+    if (outboxCount > previousOutboxCount.current) {
+      bottomRef.current?.scrollIntoView();
+    }
+    previousOutboxCount.current = outboxCount;
+  }, [outboxCount]);
+
+  const me: Partial<SafeUser> = {
+    name: sessionUser?.name ?? null,
+    email: sessionUser?.email ?? null,
+    image: sessionUser?.image ?? null,
+  };
+  const shown: { message: FullMessageType; item?: OutboxItem }[] = [
+    ...messages.map((message) => ({ message })),
+    ...outboxHere.map((item) => ({
+      message: item.message ?? outboxMessage(item, me),
+      item,
+    })),
+  ];
+
   const loadOlder = async () => {
     const oldest = messages[0];
     if (loadingOlderRef.current || !hasMore || !oldest) {
@@ -232,13 +311,29 @@ const Body: React.FC<BodyProps> = ({
             </button>
           </div>
         )}
-        {messages.map((message, i) => (
-          <MessageBox
-            isLast={i === messages.length - 1}
-            key={message.id}
-            data={message}
-          />
-        ))}
+        {shown.map(({ message, item }, i) => {
+          const previous = shown[i - 1]?.message;
+          return (
+            <div key={item?.clientId ?? message.id}>
+              {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
+              <MessageBox
+                isLast={i === shown.length - 1}
+                showHeader={startsGroup(previous, message)}
+                data={message}
+                pending={
+                  item && item.status !== "sent"
+                    ? {
+                        status: item.status,
+                        tooFast: item.tooFast,
+                        onRetry: () => retry(item.clientId),
+                        onDiscard: () => discard(item.clientId),
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          );
+        })}
         <div className="pt-24" ref={bottomRef} />
       </div>
       {unseenCount > 0 && (

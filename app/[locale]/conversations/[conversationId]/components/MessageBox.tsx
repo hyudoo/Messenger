@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
 import { FullMessageType } from "@/app/types";
@@ -16,6 +16,7 @@ import {
 
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { JUMBO_EMOJI_MAX, countEmojiOnly } from "@/app/libs/emoji";
+import { splitLinks } from "@/app/libs/linkify";
 
 import axios from "axios";
 import { toast } from "react-hot-toast";
@@ -27,7 +28,31 @@ import { ReactionChips, ReactionPicker } from "./MessageReactions";
 interface MessageBoxProps {
   data: FullMessageType;
   isLast?: boolean;
+  // false: continues the previous message of the same sender (no avatar / name / time)
+  showHeader?: boolean;
+  // a message from the outbox that the server hasn't confirmed yet (app/hooks/useOutbox.ts)
+  pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
 }
+
+// The body with http(s) links clickable (opened in a new tab, without the referrer).
+const MessageText: React.FC<{ text: string; isOwn: boolean }> = ({ text, isOwn }) => (
+  <>
+    {splitLinks(text).map((segment, i) =>
+      segment.type === "link" ? (
+        <a
+          key={i}
+          href={segment.value}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          className={clsx("underline underline-offset-2", isOwn ? "text-white" : "text-sky-600 dark:text-sky-400")}>
+          {segment.value}
+        </a>
+      ) : (
+        <Fragment key={i}>{segment.value}</Fragment>
+      )
+    )}
+  </>
+);
 
 // A call message: direction, how it went (callStatus, kept by server/call-log.ts) and, once
 // answered and hung up, its duration. Calls from before callStatus existed show the direction only.
@@ -67,7 +92,7 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call
   );
 };
 
-const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
+const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true, pending }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
   const session = useSession();
@@ -94,8 +119,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
     .map((user) => user.name)
     .join(", ");
 
-  const container = clsx("flex gap-3 p-4", isOwn && "justify-end");
-  const avatar = clsx(isOwn && "order-2");
+  // grouped messages sit closer together, under the first one's header
+  const container = clsx("flex gap-3 px-4", showHeader ? "pt-4 pb-1" : "py-0.5", isOwn && "justify-end");
+  // keeps the avatar's width when it is hidden, so grouped bubbles line up
+  const avatar = clsx("shrink-0", isOwn && "order-2", !showHeader && "invisible h-0");
   // min-w-0 lets a long message shrink and wrap instead of widening the row
   const body = clsx("flex min-w-0 max-w-[80%] flex-col gap-2 sm:max-w-md", isOwn && "items-end");
   // only a few emoji: shown large, without a bubble
@@ -109,7 +136,9 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
         emojiCount === 1 ? "text-5xl" : "text-4xl"
       )
     : clsx(
-        "text-sm w-fit max-w-full overflow-hidden",
+        "text-sm w-fit max-w-full overflow-hidden transition-opacity",
+        pending?.status === "sending" && "opacity-60",
+        pending?.status === "failed" && "ring-2 ring-rose-500",
         isOwn ? "bg-sky-500 text-white" : "bg-muted",
         // rounded-2xl, not rounded-full: a pill shape breaks once a message wraps
         data.image ? "rounded-md p-0" : "rounded-2xl py-2 px-3"
@@ -121,13 +150,18 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
         <Avatar user={data.sender} />
       </div>
       <div className={body}>
-        <div className="flex items-center gap-1">
-          <div className="text-sm text-muted-foreground">{data.sender.name}</div>
-          <div className="text-xs text-muted-foreground">
-            {format(new Date(data.createdAt), "p", { locale: dateLocale })}
+        {showHeader && (
+          <div className="flex items-center gap-1">
+            <div className="text-sm text-muted-foreground">{data.sender.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {format(new Date(data.createdAt), "p", { locale: dateLocale })}
+            </div>
           </div>
-        </div>
-        <div className={clsx("group flex items-center gap-1", isOwn && "flex-row-reverse")}>
+        )}
+        <div
+          className={clsx("group flex max-w-full items-center gap-1", isOwn && "flex-row-reverse")}
+          // the time of a grouped message, on hover
+          title={showHeader ? undefined : format(new Date(data.createdAt), "p", { locale: dateLocale })}>
           <div className={message}>
             {data.image && (
               <ImageModal
@@ -153,12 +187,31 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
             )}
             {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
             {data.body && (
-              <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">{data.body}</div>
+              <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                <MessageText text={data.body} isOwn={isOwn && !jumbo} />
+              </div>
             )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
           </div>
-          <ReactionPicker onReact={react} mine={myReaction} />
+          {/* nothing to react to before the server has the message */}
+          {!pending && <ReactionPicker onReact={react} mine={myReaction} />}
         </div>
+        {pending?.status === "sending" && (
+          <div className="text-xs font-light text-muted-foreground">{t("chat.sending")}</div>
+        )}
+        {pending?.status === "failed" && (
+          <div className="flex items-center gap-2 text-xs" role="alert">
+            <span className="text-rose-500">
+              {pending.tooFast ? t("chat.send_too_fast") : t("chat.send_failed")}
+            </span>
+            <button type="button" onClick={pending.onRetry} className="font-medium text-sky-500 hover:underline">
+              {t("chat.retry")}
+            </button>
+            <button type="button" onClick={pending.onDiscard} className="text-muted-foreground hover:underline">
+              {t("chat.discard")}
+            </button>
+          </div>
+        )}
         {reactions.length > 0 && (
           <ReactionChips reactions={reactions} myEmail={myEmail} onReact={react} />
         )}

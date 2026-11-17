@@ -9,6 +9,8 @@ import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 
 const MAX_MESSAGE_LENGTH = 5000;
+// the sender's tab id for an optimistic message (app/hooks/useOutbox.ts); only echoed back
+const CLIENT_ID = /^[\w-]{1,64}$/;
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
       return tooManyRequests(limited.retryAfter);
     }
 
-    const { message, isCall, callType, image, conversationId } = await request.json();
+    const { message, isCall, callType, image, conversationId, clientId } = await request.json();
 
     const conversation = await getConversationForUser(
       conversationId,
@@ -78,7 +80,12 @@ export async function POST(request: Request) {
       select: { lastMessageAt: true },
     });
 
-    emitToConversation(conversation.id, "messages:new", newMessage);
+    // clientId lets the sending tab swap its optimistic copy for this message, whichever of the
+    // socket event and the HTTP response arrives first
+    emitToConversation(conversation.id, "messages:new", {
+      ...newMessage,
+      ...(typeof clientId === "string" && CLIENT_ID.test(clientId) && { clientId }),
+    });
 
     conversation.users.forEach((user) => {
       if (!user.email) {
@@ -96,6 +103,9 @@ export async function POST(request: Request) {
         id: conversation.id,
         lastMessageAt,
         messages: [newMessage],
+        // for the desktop notification's title (MessageNotifications)
+        name: conversation.name,
+        isGroup: conversation.isGroup,
       });
     });
 

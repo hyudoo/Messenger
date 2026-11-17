@@ -1,18 +1,19 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useRouter } from "@/i18n/navigation";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { format, isToday } from "date-fns";
 import { useSession } from "next-auth/react";
 import clsx from "clsx";
 
+import { Link } from "@/i18n/navigation";
 import Avatar from "@/app/components/Avatar";
 import useOtherUser from "@/app/hooks/useOtherUser";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { FullConversationType } from "@/app/types";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
+import { formatUnread } from "@/app/libs/unread";
 
 interface ConversationBoxProps {
   data: FullConversationType;
@@ -27,39 +28,25 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
   const dateLocale = useDateLocale();
   const otherUser = useOtherUser(data);
   const session = useSession();
-  const router = useRouter();
-
-  const handleClick = useCallback(() => {
-    router.push(`/conversations/${data.id}`);
-  }, [data, router]);
 
   const lastMessage = useMemo(() => {
     const messages = data.messages || [];
     return messages[messages.length - 1];
   }, [data.messages]);
 
-  const userEmail = useMemo(
-    () => session.data?.user?.email,
-    [session.data?.user?.email]
-  );
+  const userEmail = session.data?.user?.email;
 
   const hasSeen = useMemo(() => {
-    if (!lastMessage) {
+    if (!lastMessage || !userEmail) {
       return false;
     }
-    const seenArray = lastMessage.seen || [];
-
-    if (!userEmail) {
-      return false;
-    }
-    return seenArray.filter((user) => user.email === userEmail).length !== 0;
+    return (lastMessage.seen || []).some((user) => user.email === userEmail);
   }, [userEmail, lastMessage]);
 
-  const lastMessageText = useMemo(() => {
-    if (lastMessage?.image) {
-      return t("last_image");
-    }
+  // the server's count (inbox load / resync), kept up to date by ConversationList
+  const unread = data.unreadCount ?? (hasSeen || !lastMessage ? 0 : 1);
 
+  const lastMessageText = useMemo(() => {
     if (lastMessage?.isCall) {
       // older calls have no callType: video
       const kind = lastMessage.callType ?? "video";
@@ -76,15 +63,27 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
         : t("last_call", { kind });
     }
 
-    if (lastMessage?.body) {
-      return lastMessage?.body;
+    const text = lastMessage?.image ? t("last_image") : lastMessage?.body;
+    if (!text) {
+      return t("no_messages");
     }
-    return t("no_messages");
-  }, [lastMessage, t]);
+    // who wrote it: "You: …" for one's own, "Name: …" in groups (in a 1:1 chat it's obvious)
+    const fromMe = !!userEmail && lastMessage?.sender?.email === userEmail;
+    if (fromMe) {
+      return t("last_from", { name: t("you"), text });
+    }
+    if (data.isGroup && lastMessage?.sender?.name) {
+      return t("last_from", { name: lastMessage.sender.name, text });
+    }
+    return text;
+  }, [lastMessage, t, userEmail, data.isGroup]);
+
+  const title = data.name || otherUser.name;
 
   return (
-    <div
-      onClick={handleClick}
+    <Link
+      href={`/conversations/${data.id}`}
+      aria-current={selected ? "page" : undefined}
       className={clsx(
         `
         w-full
@@ -97,6 +96,9 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
         rounded-lg
         transition
         cursor-pointer
+        focus:outline-none
+        focus-visible:ring-2
+        focus-visible:ring-sky-500
       `,
         selected ? "bg-muted" : "bg-background"
       )}>
@@ -106,36 +108,45 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
         <Avatar user={otherUser} />
       )}
       <div className="min-w-0 flex-1">
-        <div className="focus:outline-none">
-          <span className="absolute inset-0" aria-hidden="true" />
-          <div className="flex justify-between items-center mb-1">
-            <p className="text-md font-medium text-foreground">
-              {data.name || otherUser.name}
-            </p>
-            {lastMessage?.createdAt && (
-              <p
-                className="text-xs
-                text-muted-foreground
-                font-light">
-                {/* time for today's messages, date for older ones */}
-                {isToday(new Date(lastMessage.createdAt))
-                  ? format(new Date(lastMessage.createdAt), "p", { locale: dateLocale })
-                  : format(new Date(lastMessage.createdAt), "P", { locale: dateLocale })}
-              </p>
-            )}
-          </div>
+        <div className="flex justify-between items-center gap-2 mb-1">
           <p
             className={clsx(
-              `
-          truncate 
-          text-sm`,
-              hasSeen ? "text-muted-foreground" : "text-foreground font-medium"
+              "text-md truncate text-foreground",
+              unread > 0 ? "font-semibold" : "font-medium"
+            )}>
+            {title}
+          </p>
+          {lastMessage?.createdAt && (
+            <p
+              className={clsx(
+                "shrink-0 text-xs",
+                unread > 0 ? "font-medium text-sky-500" : "font-light text-muted-foreground"
+              )}>
+              {/* time for today's messages, date for older ones */}
+              {isToday(new Date(lastMessage.createdAt))
+                ? format(new Date(lastMessage.createdAt), "p", { locale: dateLocale })
+                : format(new Date(lastMessage.createdAt), "P", { locale: dateLocale })}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <p
+            className={clsx(
+              "min-w-0 flex-1 truncate text-sm",
+              unread > 0 ? "text-foreground font-medium" : "text-muted-foreground"
             )}>
             {lastMessageText}
           </p>
+          {unread > 0 && (
+            <span
+              className="shrink-0 rounded-full bg-sky-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white"
+              aria-label={t("unread", { count: unread })}>
+              {formatUnread(unread)}
+            </span>
+          )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 

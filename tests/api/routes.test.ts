@@ -668,9 +668,9 @@ describe("GET /api/conversations/[id]/messages (after / latest)", () => {
 
 describe("GET /api/conversations", () => {
   it("returns the caller's conversations", async () => {
-    prisma.conversation.findMany.mockResolvedValue([{ id: CONVERSATION }]);
+    prisma.conversation.findMany.mockResolvedValue([{ id: CONVERSATION, messages: [] }]);
     const response = await listConversations();
-    expect(await response.json()).toEqual([{ id: CONVERSATION }]);
+    expect(await response.json()).toEqual([{ id: CONVERSATION, messages: [], unreadCount: 0 }]);
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userIds: { has: ME } } })
     );
@@ -728,5 +728,67 @@ describe("GET /api/health", () => {
   it("is 503 without the socket server", async () => {
     globalThis.io = undefined;
     expect((await health()).status).toBe(503);
+  });
+});
+
+describe("unread counts in the conversation list", () => {
+  const last = (senderId: string, seenIds: string[]) => ({ id: MESSAGE, senderId, seenIds });
+
+  it("scans only conversations whose last message is unread", async () => {
+    prisma.conversation.findMany.mockResolvedValue([
+      { id: CONVERSATION, messages: [last(OTHER, [OTHER])] },
+      { id: "eeeeeeeeeeeeeeeeeeeeeeee", messages: [last(OTHER, [OTHER, ME])] },
+      { id: "ffffffffffffffffffffffff", messages: [last(ME, [ME])] },
+    ]);
+    // newest first: two unread from OTHER, then one ME has seen
+    prisma.message.findMany.mockResolvedValue([
+      { senderId: OTHER, seenIds: [OTHER] },
+      { senderId: OTHER, seenIds: [OTHER] },
+      { senderId: OTHER, seenIds: [OTHER, ME] },
+    ]);
+
+    const body = await (await listConversations()).json();
+
+    expect(body.map((item: { unreadCount: number }) => item.unreadCount)).toEqual([2, 0, 0]);
+    expect(prisma.message.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { conversationId: CONVERSATION }, take: 100 })
+    );
+  });
+});
+
+describe("POST /api/messages clientId", () => {
+  const send = (body: Record<string, unknown>) =>
+    sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, ...body }));
+
+  beforeEach(() => {
+    asMember();
+    prisma.message.create.mockResolvedValue({ id: MESSAGE, createdAt: new Date() });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+  });
+
+  it("echoes the sender's clientId in messages:new only", async () => {
+    await send({ message: "hi", clientId: "local-1-0" });
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:new",
+      expect.objectContaining({ id: MESSAGE, clientId: "local-1-0" })
+    );
+    // never stored
+    expect(prisma.message.create.mock.calls[0][0].data).not.toHaveProperty("clientId");
+  });
+
+  it("drops a malformed clientId", async () => {
+    await send({ message: "hi", clientId: "<script>" });
+    expect(mocks.emitToConversation.mock.calls[0][2]).not.toHaveProperty("clientId");
+  });
+
+  it("sends the conversation's name and kind for notifications", async () => {
+    await send({ message: "hi" });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      other.email,
+      "conversation:update",
+      expect.objectContaining({ id: CONVERSATION, isGroup: null })
+    );
   });
 });

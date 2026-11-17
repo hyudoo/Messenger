@@ -4,7 +4,8 @@ import { SafeUser } from "@/app/types";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { MdOutlineGroupAdd } from "react-icons/md";
 import clsx from "clsx";
 import { find } from "lodash";
@@ -12,8 +13,11 @@ import { find } from "lodash";
 import useConversation from "@/app/hooks/useConversation";
 import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
+import SearchInput from "@/app/components/inputs/SearchInput";
 import ConversationBox from "./ConversationBox";
-import { FullConversationType } from "@/app/types";
+import { ConversationUpdate, FullConversationType } from "@/app/types";
+import { matchesSearch } from "@/app/libs/search";
+import { formatUnread } from "@/app/libs/unread";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
@@ -26,11 +30,43 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   const t = useTranslations("conversations");
   const router = useRouter();
+  const myEmail = useSession().data?.user?.email;
 
   const { conversationId, isOpen } = useConversation();
+
+  // the socket handlers below are registered per conversation, not per session change
+  const myEmailRef = useRef(myEmail);
+  useLayoutEffect(() => {
+    myEmailRef.current = myEmail;
+  });
+
+  // Tab title badge: "(3) Messenger" while there are unread messages. Re-applied after
+  // navigations, which reset the title from the page metadata.
+  const totalUnread = items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0);
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\) /, "");
+    const apply = () => {
+      document.title = totalUnread > 0 ? `(${formatUnread(totalUnread)}) ${base}` : base;
+    };
+    apply();
+    const frame = requestAnimationFrame(apply);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.title = base;
+    };
+  }, [totalUnread, conversationId]);
+
+  const visibleItems = items.filter((item) =>
+    matchesSearch(
+      query,
+      item.name,
+      ...item.users.filter((user) => user.email !== myEmail).map((user) => user.name)
+    )
+  );
 
   // The server puts every socket in its user's room on connect, so these
   // per-user events need no explicit subscription.
@@ -49,12 +85,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
     // A new message also carries lastMessageAt: that conversation moves to the top.
     // "Seen" updates don't, so the order stays put. A member leaving a group sends the
     // new member list instead of messages.
-    const updateHandler = (
-      conversation: Pick<FullConversationType, "id"> &
-        Partial<Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId">> & {
-          lastMessageAt?: string;
-        }
-    ) => {
+    const updateHandler = (conversation: ConversationUpdate) => {
       if (conversation.users && conversation.id === conversationId) {
         // the open chat's header and drawer come from the server component
         router.refresh();
@@ -66,7 +97,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
         }
         const updated = {
           ...target,
-          ...(conversation.messages && { messages: conversation.messages }),
+          ...(conversation.messages && {
+            messages: conversation.messages,
+            unreadCount: nextUnread(target, conversation),
+          }),
           ...(conversation.users && {
             users: conversation.users,
             userIds: conversation.userIds ?? target.userIds,
@@ -81,6 +115,21 @@ const ConversationList: React.FC<ConversationListProps> = ({
         }
         return [updated, ...current.filter((item) => item.id !== updated.id)];
       });
+    };
+
+    // A message the user has seen (or sent) clears the count; a new one from someone else adds
+    // one, unless it arrived in the chat the user is looking at (Body marks it seen right away).
+    const nextUnread = (target: FullConversationType, update: ConversationUpdate) => {
+      const last = update.messages?.[update.messages.length - 1];
+      const me = myEmailRef.current;
+      if (!last || last.sender?.email === me || last.seen?.some((user) => user.email === me)) {
+        return 0;
+      }
+      const watching =
+        update.id === conversationId && document.visibilityState === "visible";
+      return update.lastMessageAt && !watching
+        ? (target.unreadCount ?? 0) + 1
+        : target.unreadCount ?? 0;
     };
 
     // Events sent while the socket was down are lost (sleep, network change), so every
@@ -157,13 +206,19 @@ const ConversationList: React.FC<ConversationListProps> = ({
               <MdOutlineGroupAdd size={20} />
             </button>
           </div>
-          {items.map((item) => (
+          {items.length > 0 && (
+            <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
+          )}
+          {visibleItems.map((item) => (
             <ConversationBox
               key={item.id}
               data={item}
               selected={conversationId === item.id}
             />
           ))}
+          {query && visibleItems.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t("no_results")}</p>
+          )}
         </div>
       </aside>
     </>

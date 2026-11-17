@@ -16,7 +16,8 @@
     "offline": "Offline",
     "members": "{count, plural, one {# member} other {# members}}",
     "select_placeholder": "Select...",
-    "no_options": "No options"
+    "no_options": "No options",
+    "clear": "Clear search"
   },
   "theme": {
     "toggle": "Toggle light / dark theme",
@@ -72,7 +73,12 @@
     "no_messages": "Started a conversation.",
     "last_call_declined": "{kind, select, audio {Audio call declined} other {Video call declined}}",
     "last_call_missed": "{kind, select, audio {Missed audio call} other {Missed video call}}",
-    "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}"
+    "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}",
+    "search": "Search conversations",
+    "no_results": "No conversations found.",
+    "last_from": "{name}: {text}",
+    "you": "You",
+    "unread": "{count, plural, one {# unread message} other {# unread messages}}"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -95,7 +101,13 @@
     "call_duration": "Duration {duration}",
     "send_quick": "Send {emoji}",
     "audio_call": "Audio call",
-    "new_messages": "{count, plural, one {# new message} other {# new messages}}"
+    "new_messages": "{count, plural, one {# new message} other {# new messages}}",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "sending": "Sending...",
+    "retry": "Retry",
+    "discard": "Discard",
+    "image_uploading": "Uploading image..."
   },
   "profile": {
     "close": "Close panel",
@@ -116,7 +128,9 @@
     "members": "Members"
   },
   "users": {
-    "title": "People"
+    "title": "People",
+    "search": "Search by name or email",
+    "no_results": "Nobody found."
   },
   "settings": {
     "profile_title": "Profile",
@@ -127,7 +141,12 @@
     "appearance_title": "Appearance",
     "appearance_description": "Color mode applies right away in this browser; the language applies when you save.",
     "theme": "Color mode",
-    "language": "Language"
+    "language": "Language",
+    "notifications_title": "Notifications",
+    "notifications_description": "Desktop notifications for new messages while this tab is hidden. Applies at once in this browser.",
+    "notifications_toggle": "New message notifications",
+    "notifications_denied": "Your browser blocks notifications from this site. Allow them in the browser's site settings.",
+    "notifications_unsupported": "This browser does not support notifications."
   },
   "upload": {
     "unsupported_type": "Only JPG, PNG, GIF or WEBP images are supported",
@@ -177,5 +196,8 @@
     "title": "Leave group",
     "description": "You will no longer receive messages from this group. To come back, someone has to create a new group with you.",
     "confirm": "Leave"
+  },
+  "notifications": {
+    "image": "Sent an image."
   }
 }

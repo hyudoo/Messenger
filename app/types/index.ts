@@ -15,12 +15,25 @@ export type FullMessageType = Message & {
   seen: SafeUser[];
   // missing where only a preview is loaded (the conversation list)
   reactions?: MessageReaction[];
+  // messages:new only: the sending tab's outbox id (app/hooks/useOutbox.ts)
+  clientId?: string;
 };
 
 export type FullConversationType = Conversation & {
   users: SafeUser[];
   messages: FullMessageType[];
+  // messages from others the user hasn't seen (inbox only; missing on socket payloads)
+  unreadCount?: number;
 };
+
+// Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
+// notifications), a seen update (messages only) or a new member list (users, after a leave).
+export type ConversationUpdate = Pick<FullConversationType, "id"> &
+  Partial<
+    Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId" | "name" | "isGroup">
+  > & {
+    lastMessageAt?: string;
+  };
 
 export type ConversationWithUsers = Conversation & {
   users: SafeUser[];

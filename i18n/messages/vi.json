@@ -16,7 +16,8 @@
     "offline": "Ngoại tuyến",
     "members": "{count} thành viên",
     "select_placeholder": "Chọn...",
-    "no_options": "Không có lựa chọn"
+    "no_options": "Không có lựa chọn",
+    "clear": "Xoá tìm kiếm"
   },
   "theme": {
     "toggle": "Đổi giao diện sáng / tối",
@@ -72,7 +73,12 @@
     "no_messages": "Bắt đầu cuộc trò chuyện.",
     "last_call_declined": "{kind, select, audio {Cuộc gọi thoại bị từ chối} other {Cuộc gọi video bị từ chối}}",
     "last_call_missed": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
-    "last_call_ended": "{kind, select, audio {Cuộc gọi thoại} other {Cuộc gọi video}} · {duration}"
+    "last_call_ended": "{kind, select, audio {Cuộc gọi thoại} other {Cuộc gọi video}} · {duration}",
+    "search": "Tìm cuộc trò chuyện",
+    "no_results": "Không tìm thấy cuộc trò chuyện nào.",
+    "last_from": "{name}: {text}",
+    "you": "Bạn",
+    "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}"
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -95,7 +101,13 @@
     "call_duration": "Thời lượng {duration}",
     "send_quick": "Gửi {emoji}",
     "audio_call": "Gọi thoại",
-    "new_messages": "{count, plural, one {# tin nhắn mới} other {# tin nhắn mới}}"
+    "new_messages": "{count, plural, one {# tin nhắn mới} other {# tin nhắn mới}}",
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "sending": "Đang gửi...",
+    "retry": "Thử lại",
+    "discard": "Bỏ",
+    "image_uploading": "Đang tải ảnh lên..."
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -116,7 +128,9 @@
     "members": "Thành viên"
   },
   "users": {
-    "title": "Mọi người"
+    "title": "Mọi người",
+    "search": "Tìm theo tên hoặc email",
+    "no_results": "Không tìm thấy ai."
   },
   "settings": {
     "profile_title": "Hồ sơ",
@@ -127,7 +141,12 @@
     "appearance_title": "Giao diện",
     "appearance_description": "Chế độ màu áp dụng ngay trên trình duyệt này, ngôn ngữ áp dụng khi bấm Lưu.",
     "theme": "Chế độ màu",
-    "language": "Ngôn ngữ"
+    "language": "Ngôn ngữ",
+    "notifications_title": "Thông báo",
+    "notifications_description": "Báo tin nhắn mới trên máy khi tab này đang ẩn. Áp dụng ngay trên trình duyệt này.",
+    "notifications_toggle": "Thông báo tin nhắn mới",
+    "notifications_denied": "Trình duyệt đang chặn thông báo của trang này. Hãy cho phép trong phần cài đặt trang của trình duyệt.",
+    "notifications_unsupported": "Trình duyệt này không hỗ trợ thông báo."
   },
   "upload": {
     "unsupported_type": "Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP",
@@ -177,5 +196,8 @@
     "title": "Rời nhóm",
     "description": "Bạn sẽ không nhận được tin nhắn của nhóm này nữa. Muốn quay lại thì phải có người tạo nhóm mới với bạn.",
     "confirm": "Rời nhóm"
+  },
+  "notifications": {
+    "image": "Đã gửi một hình ảnh."
   }
 }
