@@ -179,6 +179,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
   const session = useSession();
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // touch screens: a grouped message's time, shown by a tap (there is no hover title)
+  const [timeShown, setTimeShown] = useState(false);
 
   const myEmail = session.data?.user?.email;
   const isOwn = myEmail === data?.sender?.email;
@@ -208,6 +210,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
     direction: swipeDirection,
     onLongPress: actionable ? () => setMenuOpen(true) : undefined,
     onSwipe: actionable && canReplyToMessage(data) ? () => startReply(data) : undefined,
+    onTap: showHeader ? undefined : () => setTimeShown((shown) => !shown),
   });
 
   const seenList = (data.seen || [])
@@ -340,6 +343,13 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             onReact={react}
             mine={myReaction}
           />
+        )}
+        {timeShown && !showHeader && (
+          <time
+            dateTime={new Date(data.createdAt).toISOString()}
+            className="text-xs font-light text-muted-foreground">
+            {format(new Date(data.createdAt), "p", { locale: dateLocale })}
+          </time>
         )}
         {data.editedAt && !recalled && (
           <div className="text-xs font-light text-muted-foreground">{t("chat.edited")}</div>

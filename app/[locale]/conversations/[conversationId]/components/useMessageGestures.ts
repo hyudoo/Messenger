@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// Touch gestures on a message bubble (mobile): hold to open the message menu, swipe
-// sideways (towards the middle of the screen) to reply. Mouse input never triggers them.
+// Touch gestures on a message bubble (mobile): tap (show the time), hold to open the
+// message menu, swipe sideways (towards the middle of the screen) to reply.
+// Mouse input never triggers them.
 export const LONG_PRESS_MS = 450;
 // how far (px) a swipe must pull the bubble to reply, and the most it moves
 export const SWIPE_TRIGGER = 56;
@@ -19,6 +20,8 @@ interface Options {
   onLongPress?: () => void;
   // undefined: this message can't be replied to (no swipe)
   onSwipe?: () => void;
+  // a tap that didn't land on a link, button or image (those keep their own action)
+  onTap?: () => void;
 }
 
 const vibrate = () => {
@@ -28,7 +31,7 @@ const vibrate = () => {
   }
 };
 
-const useMessageGestures = ({ direction, onLongPress, onSwipe }: Options) => {
+const useMessageGestures = ({ direction, onLongPress, onSwipe, onTap }: Options) => {
   // how far the bubble is pulled, always >= 0 (the caller applies the direction)
   const [pull, setPull] = useState(0);
   const mode = useRef<Mode>("idle");
@@ -98,6 +101,11 @@ const useMessageGestures = ({ direction, onLongPress, onSwipe }: Options) => {
       event.preventDefault();
     } else if (mode.current === "swipe" && armed.current) {
       onSwipe?.();
+    } else if (
+      mode.current === "pending" &&
+      !(event.target instanceof Element && event.target.closest("a, button, img"))
+    ) {
+      onTap?.();
     }
     mode.current = "idle";
     armed.current = false;

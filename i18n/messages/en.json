@@ -212,6 +212,9 @@
     "more": "More emoji",
     "react_with": "React with {emoji}",
     "reacted_by": "{emoji} {names}",
+    "title": "Message reactions",
+    "all": "All {count}",
+    "tap_to_remove": "Tap to remove",
     "you": "You",
     "failed": "Couldn't add the reaction!"
   },

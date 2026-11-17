@@ -132,16 +132,15 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
               </button>
             </>
           )}
-          <HiEllipsisHorizontal
-            size={32}
-            role="button"
+          <button
+            type="button"
             aria-label={t("chat.details")}
+            title={t("chat.details")}
+            aria-haspopup="dialog"
             onClick={() => setDrawerOpen(true)}
-            className="text-sky-500
-            cursor-pointer
-            hover:text-sky-600
-            transition"
-          />
+            className="rounded-full text-sky-500 transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+            <HiEllipsisHorizontal size={32} aria-hidden />
+          </button>
         </div>
       </div>
     </>

@@ -212,6 +212,9 @@
     "more": "Biểu tượng khác",
     "react_with": "Thả {emoji}",
     "reacted_by": "{emoji} {names}",
+    "title": "Cảm xúc về tin nhắn",
+    "all": "Tất cả {count}",
+    "tap_to_remove": "Chạm để gỡ",
     "you": "Bạn",
     "failed": "Không thả được cảm xúc!"
   },
