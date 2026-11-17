@@ -221,6 +221,8 @@
     "prompt_body": "Get a desktop notification for new messages, even with this tab closed.",
     "prompt_enable": "Turn on",
     "prompt_later": "Not now",
-    "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings."
+    "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings.",
+    "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
+    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}"
   }
 }

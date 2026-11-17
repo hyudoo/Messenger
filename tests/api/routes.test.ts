@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
   pushNewMessage: vi.fn(),
+  pushIncomingCall: vi.fn(),
 }));
 
 vi.mock("@/app/libs/prismadb", () => ({
@@ -41,7 +42,10 @@ vi.mock("@/app/libs/s3", async (importOriginal) => ({
   markUploadsUsed: mocks.markUploadsUsed,
   deleteUploadedObjects: mocks.deleteUploadedObjects,
 }));
-vi.mock("@/app/libs/message-push", () => ({ pushNewMessage: mocks.pushNewMessage }));
+vi.mock("@/app/libs/message-push", () => ({
+  pushNewMessage: mocks.pushNewMessage,
+  pushIncomingCall: mocks.pushIncomingCall,
+}));
 vi.mock("bcrypt",() => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
 
 import { POST as sendMessage } from "@/app/api/messages/route";
@@ -119,7 +123,7 @@ describe("POST /api/messages", () => {
     );
   });
 
-  it("sends a Web Push to the other members, not for calls", async () => {
+  it("sends a Web Push to the other members (a ringing one for calls)", async () => {
     asMember();
     await send({ message: "hi" });
     expect(mocks.pushNewMessage).toHaveBeenCalledWith(
@@ -132,8 +136,16 @@ describe("POST /api/messages", () => {
     );
 
     mocks.pushNewMessage.mockClear();
-    await send({ isCall: true });
+    await send({ isCall: true, callType: "audio" });
     expect(mocks.pushNewMessage).not.toHaveBeenCalled();
+    // a call gets the ringing push instead
+    expect(mocks.pushIncomingCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callType: "audio",
+        startedAt: expect.any(Date),
+        recipientIds: [OTHER],
+      })
+    );
   });
 
   it("rejects empty and too long messages", async () => {

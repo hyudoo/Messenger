@@ -72,6 +72,10 @@ export interface PushPayload {
   // opened when there is no tab (with the locale) / pushed in an open tab (without it)
   url: string;
   path: string;
+  // calls: stays on screen until clicked / closed ...
+  requireInteraction?: boolean;
+  // ... or until the ringing ends (ms since the epoch); not shown at all after that
+  expiresAt?: number;
 }
 
 // Sends a notification to every browser of these users, written in each subscription's locale.
@@ -79,7 +83,7 @@ export interface PushPayload {
 export const sendPush = async (
   userIds: string[],
   build: (locale: string) => PushPayload,
-  { topic }: { topic?: string } = {}
+  { topic, ttlSeconds = PUSH_TTL_SECONDS }: { topic?: string; ttlSeconds?: number } = {}
 ) => {
   if (userIds.length === 0 || !configure()) {
     return;
@@ -99,7 +103,7 @@ export const sendPush = async (
             },
             JSON.stringify(build(subscription.locale)),
             // topic: a newer push for the same conversation replaces one still queued
-            { TTL: PUSH_TTL_SECONDS, urgency: "high", ...(topic && { topic }) }
+            { TTL: ttlSeconds, urgency: "high", ...(topic && { topic }) }
           );
         } catch (error) {
           const status = (error as { statusCode?: number }).statusCode;

@@ -221,6 +221,8 @@
     "prompt_body": "Nhận thông báo trên máy khi có tin nhắn mới, kể cả khi đã đóng tab.",
     "prompt_enable": "Bật thông báo",
     "prompt_later": "Để sau",
-    "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt."
+    "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt.",
+    "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
+    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}"
   }
 }

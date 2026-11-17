@@ -36,6 +36,9 @@ type CallRow = {
   callEndedAt?: Date;
 };
 const CALLS: Record<string, CallRow> = {};
+
+const pushMissedCall = vi.hoisted(() => vi.fn());
+vi.mock("@/app/libs/message-push", () => ({ pushMissedCall }));
 const callById = (id: string) => Object.values(CALLS).find((call) => call.id === id);
 
 // user id -> the session token's exp (seconds), for the expiry test
@@ -67,7 +70,10 @@ vi.mock("@/app/libs/prismadb", () => ({
       findUnique: vi.fn(async ({ where }: any) =>
         MEMBERS[where.id]
           ? {
-              users: MEMBERS[where.id].map((id) => ({ email: emailOf(id) })),
+              id: where.id,
+              name: null,
+              isGroup: where.id === GROUP,
+              users: MEMBERS[where.id].map(userOf),
               messages: CALLS[where.id] ? [{ id: CALLS[where.id].id }] : [],
             }
           : null
@@ -152,6 +158,7 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
 
 afterEach(async () => {
   RECENT_CALLS.length = 0;
+  pushMissedCall.mockClear();
   Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
@@ -473,6 +480,15 @@ describe("socket server", () => {
       caller.emit("call:cancel", CONVERSATION);
       caller.emit("call:leave", CONVERSATION); // as Room.tsx does
       await vi.waitFor(() => expect(CALLS[CONVERSATION].callStatus).toBe("missed"));
+      // the callee gets a "missed call" push (not the caller)
+      expect(pushMissedCall).toHaveBeenCalledTimes(1);
+      expect(pushMissedCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversation: expect.objectContaining({ id: CONVERSATION }),
+          sender: expect.objectContaining({ id: ME }),
+          recipientIds: [OTHER],
+        })
+      );
 
       // a second call: the caller (two tabs on the call screen, which is not an answer) closes them
       CALLS[CONVERSATION] = { id: "call-2", senderId: ME, callStatus: "ringing" };

@@ -21,7 +21,8 @@ vi.mock("web-push", () => ({
 
 import { GET, POST, DELETE } from "@/app/api/push/route";
 import { isPushEndpoint, sendPush } from "@/app/libs/web-push";
-import { pushNewMessage } from "@/app/libs/message-push";
+import { pushIncomingCall, pushMissedCall, pushNewMessage } from "@/app/libs/message-push";
+import { CALL_RING_TIMEOUT_MS } from "@/app/libs/call";
 
 const ENDPOINT = "https://fcm.googleapis.com/fcm/send/abc123";
 const subscription = (endpoint = ENDPOINT) => ({
@@ -174,7 +175,7 @@ describe("pushNewMessage", () => {
     ]);
     await pushNewMessage({
       conversation: { id: CONVERSATION, name: null, isGroup: null },
-      sender: { id: ME, name: "Huy", image: null },
+      sender: { name: "Huy", image: null },
       body: null,
       image: "https://bucket/x.png",
       recipientIds: [OTHER],
@@ -195,7 +196,7 @@ describe("pushNewMessage", () => {
     prisma.webPushSubscription.findMany.mockResolvedValue([stored("s1", OTHER)]);
     await pushNewMessage({
       conversation: { id: CONVERSATION, name: "Nhóm", isGroup: true },
-      sender: { id: ME, name: "Huy", image: "https://avatars.githubusercontent.com/u/1" },
+      sender: { name: "Huy", image: "https://avatars.githubusercontent.com/u/1" },
       body: "x".repeat(500),
       image: null,
       recipientIds: [OTHER],
@@ -205,5 +206,53 @@ describe("pushNewMessage", () => {
     expect(sent.body.startsWith("Huy: x")).toBe(true);
     expect(sent.body.length).toBeLessThanOrEqual(180);
     expect(sent.icon).toBe("https://avatars.githubusercontent.com/u/1");
+  });
+});
+
+describe("call pushes", () => {
+  const sent = () => JSON.parse(mocks.sendNotification.mock.calls[0][1] as string);
+  const options = () => mocks.sendNotification.mock.calls[0][2];
+  const call = {
+    conversation: { id: CONVERSATION, name: null, isGroup: null },
+    sender: { name: "Huy", image: null },
+    recipientIds: [OTHER],
+  };
+
+  beforeEach(() => {
+    prisma.webPushSubscription.findMany.mockResolvedValue([stored("s1", OTHER, "vi")]);
+  });
+
+  it("rings only while the call rings, and stays on screen until then", async () => {
+    const startedAt = new Date();
+    await pushIncomingCall({ ...call, callType: "audio", startedAt });
+    expect(sent()).toEqual(
+      expect.objectContaining({
+        title: "Huy",
+        body: "Cuộc gọi thoại đến",
+        tag: `call-${CONVERSATION}`,
+        requireInteraction: true,
+        expiresAt: startedAt.getTime() + CALL_RING_TIMEOUT_MS,
+        path: `/conversations/${CONVERSATION}`,
+      })
+    );
+    expect(options()).toEqual(
+      expect.objectContaining({
+        TTL: CALL_RING_TIMEOUT_MS / 1000,
+        topic: `call${CONVERSATION}`,
+      })
+    );
+    expect(options().topic.length).toBeLessThanOrEqual(32);
+  });
+
+  it("replaces the ringing notification with a missed call, kept like a message", async () => {
+    await pushMissedCall({ ...call, callType: null });
+    expect(sent()).toEqual(
+      expect.objectContaining({ body: "Cuộc gọi video nhỡ", tag: `call-${CONVERSATION}` })
+    );
+    expect(sent().expiresAt).toBeUndefined();
+    expect(sent().requireInteraction).toBe(false);
+    expect(options()).toEqual(
+      expect.objectContaining({ TTL: 12 * 60 * 60, topic: `call${CONVERSATION}` })
+    );
   });
 });

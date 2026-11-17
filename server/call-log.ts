@@ -5,6 +5,7 @@ import prisma from "../app/libs/prismadb";
 import { MESSAGE_INCLUDE } from "../app/libs/message-include";
 import { conversationRoom, userRoom } from "../app/libs/socket-rooms";
 import { logError } from "../app/libs/log";
+import { pushMissedCall } from "../app/libs/message-push";
 
 // The call message (the one /api/messages created with isCall, status "ringing") records how the
 // call went. Only the socket server sees who joins and leaves the call room, so it moves the status:
@@ -70,10 +71,26 @@ export const moveCall = async (
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: {
-      users: { select: { email: true } },
+      id: true,
+      name: true,
+      isGroup: true,
+      users: { select: { id: true, email: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true } },
     },
   });
+
+  // "Missed call" for the ones who were called (also replaces their ringing notification);
+  // in the background, it never throws
+  if (to === "missed" && conversation && message.sender) {
+    void pushMissedCall({
+      conversation,
+      sender: message.sender,
+      callType: message.callType,
+      recipientIds: conversation.users
+        .map((user) => user.id)
+        .filter((id) => id !== message.senderId),
+    });
+  }
   if (conversation?.messages[0]?.id === message.id) {
     const rooms = conversation.users.flatMap((user) => (user.email ? [userRoom(user.email)] : []));
     if (rooms.length > 0) {
