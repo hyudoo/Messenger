@@ -30,3 +30,9 @@ export const emitToConversation = (
 ) => {
   getIO()?.to(conversationRoom(conversationId)).emit(event, payload);
 };
+
+// Takes every socket of the user (all tabs, every instance with the Redis adapter) out of the
+// conversation room, so someone who left a group or lost a deleted conversation stops receiving it.
+export const removeUserFromConversationRoom = (email: string, conversationId: string) => {
+  getIO()?.in(userRoom(email)).socketsLeave(conversationRoom(conversationId));
+};

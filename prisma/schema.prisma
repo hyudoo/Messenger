@@ -56,6 +56,9 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   name          String?
   isGroup       Boolean?
+  // Groups only: the member who may delete the group for everyone (the creator; passed on to another
+  // member when they leave). Missing on groups from before it existed: any member may delete those.
+  ownerId       String?  @db.ObjectId
 
   messages Message[]
 

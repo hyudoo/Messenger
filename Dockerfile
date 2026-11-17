@@ -52,5 +52,10 @@ USER node
 
 EXPOSE 3000
 
+# /api/health answers 200 once the database is reachable and socket.io is up (the deploy job waits for
+# "healthy"). PORT comes from the env file at run time; node 22 has fetch built in
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+
 # tsx as a loader keeps a single node process, so SIGTERM from `docker stop` reaches the server
 CMD ["node", "--import", "tsx", "server.ts"]

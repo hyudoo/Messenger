@@ -28,3 +28,21 @@ const getMessages = async (conversationId: string, before?: string) => {
 };
 
 export default getMessages;
+
+// The messages newer than message `after`, oldest first, at most one page; `hasMore` means more
+// than a page arrived since (the client then reloads the latest page instead). Used to catch up
+// after a socket reconnect. Throws on a database error. Callers must check membership first.
+export const getMessagesAfter = async (conversationId: string, after: string) => {
+  const page = await prisma.message.findMany({
+    where: { conversationId },
+    include: MESSAGE_INCLUDE,
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: MESSAGE_PAGE_SIZE + 1,
+    cursor: { id: after },
+    skip: 1,
+  });
+  return {
+    messages: page.slice(0, MESSAGE_PAGE_SIZE),
+    hasMore: page.length > MESSAGE_PAGE_SIZE,
+  };
+};

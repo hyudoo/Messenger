@@ -95,8 +95,8 @@ vi.mock("@/app/libs/prismadb", () => ({
   },
 }));
 
-import { initSocketServer } from "@/server/socket";
-import { emitToConversation } from "@/app/libs/socket-server";
+import { closeSocketServer, initSocketServer } from "@/server/socket";
+import { emitToConversation, removeUserFromConversationRoom } from "@/app/libs/socket-server";
 import { callRoom, conversationRoom } from "@/app/libs/socket-rooms";
 
 // ---- harness ----
@@ -580,5 +580,39 @@ describe.skipIf(!process.env.TEST_REDIS_URL)("socket server on two instances (Re
     const guest = (await connected(two.url, OTHER)).socket;
     expect(await joinCall(host, GROUP)).toEqual({ ok: true, isHost: true });
     expect(await joinCall(guest, GROUP)).toEqual({ ok: true, isHost: false });
+  });
+});
+
+describe("socket server lifecycle", () => {
+  it("takes every tab of a user out of a conversation room", async () => {
+    const { io, url } = await startServer();
+    const tab1 = (await connected(url, ME)).socket;
+    const tab2 = (await connected(url, ME)).socket;
+    const other = (await connected(url, OTHER)).socket;
+    [tab1, tab2, other].forEach((socket) => socket.emit("conversation:join", CONVERSATION));
+    await vi.waitFor(async () =>
+      expect(await io.in(conversationRoom(CONVERSATION)).fetchSockets()).toHaveLength(3)
+    );
+
+    removeUserFromConversationRoom(emailOf(ME), CONVERSATION);
+
+    await vi.waitFor(async () => {
+      const left = await io.in(conversationRoom(CONVERSATION)).fetchSockets();
+      expect(left.map((socket) => socket.data.userId)).toEqual([OTHER]);
+    });
+  });
+
+  it("drops every socket (clients reconnect) and stops listening on shutdown", async () => {
+    const { io, url } = await startServer();
+    const { socket } = await connected(url, ME);
+    const disconnected = next<string>(socket, "disconnect");
+
+    await closeSocketServer(io, 0);
+
+    // a transport close, not "io server disconnect": socket.io clients only reconnect on their
+    // own after the former, and they should, to the instance that replaces this one
+    expect(await disconnected).toBe("transport close");
+    const error = await next<Error>(client(url, ME), "connect_error");
+    expect(error).toBeInstanceOf(Error);
   });
 });

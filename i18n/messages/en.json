@@ -94,14 +94,16 @@
     "call_missed": "Missed call",
     "call_duration": "Duration {duration}",
     "send_quick": "Send {emoji}",
-    "audio_call": "Audio call"
+    "audio_call": "Audio call",
+    "new_messages": "{count, plural, one {# new message} other {# new messages}}"
   },
   "profile": {
     "close": "Close panel",
     "delete": "Delete",
     "email": "Email",
     "emails": "Emails",
-    "joined": "Joined"
+    "joined": "Joined",
+    "leave": "Leave group"
   },
   "confirm_delete": {
     "title": "Delete conversation",
@@ -170,5 +172,10 @@
     "reacted_by": "{emoji} {names}",
     "you": "You",
     "failed": "Couldn't add the reaction!"
+  },
+  "confirm_leave": {
+    "title": "Leave group",
+    "description": "You will no longer receive messages from this group. To come back, someone has to create a new group with you.",
+    "confirm": "Leave"
   }
 }

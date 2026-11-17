@@ -15,17 +15,26 @@ import { toast } from "react-hot-toast";
 interface ConfirmModalProps {
   isOpen?: boolean;
   onClose: () => void;
+  // delete: the conversation for every member; leave: a group, for the caller only
+  action?: "delete" | "leave";
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose }) => {
+const ConfirmModal: React.FC<ConfirmModalProps> = ({
+  isOpen,
+  onClose,
+  action = "delete",
+}) => {
   const t = useTranslations();
   const router = useRouter();
   const { conversationId } = useConversation();
   const [isLoading, setIsLoading] = useState(false);
-  const onDelete = useCallback(() => {
+  const onConfirm = useCallback(() => {
     setIsLoading(true);
-    axios
-      .delete(`/api/conversations/${conversationId}`)
+    const request =
+      action === "leave"
+        ? axios.post(`/api/conversations/${conversationId}/leave`)
+        : axios.delete(`/api/conversations/${conversationId}`);
+    request
       .then(() => {
         onClose();
         router.push("/conversations");
@@ -33,7 +42,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose }) => {
       })
       .catch(() => toast.error(t("common.error")))
       .finally(() => setIsLoading(false));
-  }, [router, conversationId, onClose, t]);
+  }, [router, conversationId, onClose, t, action]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -68,18 +77,20 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, onClose }) => {
           <DialogTitle
             as="h3"
             className="text-base font-semibold leading-6 text-foreground">
-            {t("confirm_delete.title")}
+            {action === "leave" ? t("confirm_leave.title") : t("confirm_delete.title")}
           </DialogTitle>
           <div className="mt-2">
             <p className="text-sm text-muted-foreground">
-              {t("confirm_delete.description")}
+              {action === "leave"
+                ? t("confirm_leave.description")
+                : t("confirm_delete.description")}
             </p>
           </div>
         </div>
       </div>
       <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-        <Button disabled={isLoading} danger onClick={onDelete}>
-          {t("common.delete")}
+        <Button disabled={isLoading} danger onClick={onConfirm}>
+          {action === "leave" ? t("confirm_leave.confirm") : t("common.delete")}
         </Button>
         <Button disabled={isLoading} secondary onClick={onClose}>
           {t("common.cancel")}

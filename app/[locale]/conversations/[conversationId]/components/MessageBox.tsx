@@ -96,7 +96,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
 
   const container = clsx("flex gap-3 p-4", isOwn && "justify-end");
   const avatar = clsx(isOwn && "order-2");
-  const body = clsx("flex flex-col gap-2", isOwn && "items-end");
+  // min-w-0 lets a long message shrink and wrap instead of widening the row
+  const body = clsx("flex min-w-0 max-w-[80%] flex-col gap-2 sm:max-w-md", isOwn && "items-end");
   // only a few emoji: shown large, without a bubble
   const emojiCount =
     !data.image && !data.isCall && data.body ? countEmojiOnly(data.body) : 0;
@@ -108,9 +109,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
         emojiCount === 1 ? "text-5xl" : "text-4xl"
       )
     : clsx(
-        "text-sm w-fit overflow-hidden",
+        "text-sm w-fit max-w-full overflow-hidden",
         isOwn ? "bg-sky-500 text-white" : "bg-muted",
-        data.image ? "rounded-md p-0" : "rounded-full py-2 px-3"
+        // rounded-2xl, not rounded-full: a pill shape breaks once a message wraps
+        data.image ? "rounded-md p-0" : "rounded-2xl py-2 px-3"
       );
 
   return (
@@ -149,7 +151,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast }) => {
                 translate"
               />
             )}
-            {data.body && <div>{data.body}</div>}
+            {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
+            {data.body && (
+              <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">{data.body}</div>
+            )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
           </div>
           <ReactionPicker onReact={react} mine={myReaction} />

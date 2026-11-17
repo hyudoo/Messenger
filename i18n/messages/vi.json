@@ -94,14 +94,16 @@
     "call_missed": "Cuộc gọi nhỡ",
     "call_duration": "Thời lượng {duration}",
     "send_quick": "Gửi {emoji}",
-    "audio_call": "Gọi thoại"
+    "audio_call": "Gọi thoại",
+    "new_messages": "{count, plural, one {# tin nhắn mới} other {# tin nhắn mới}}"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
     "delete": "Xoá",
     "email": "Email",
     "emails": "Email",
-    "joined": "Tham gia"
+    "joined": "Tham gia",
+    "leave": "Rời nhóm"
   },
   "confirm_delete": {
     "title": "Xoá cuộc trò chuyện",
@@ -170,5 +172,10 @@
     "reacted_by": "{emoji} {names}",
     "you": "Bạn",
     "failed": "Không thả được cảm xúc!"
+  },
+  "confirm_leave": {
+    "title": "Rời nhóm",
+    "description": "Bạn sẽ không nhận được tin nhắn của nhóm này nữa. Muốn quay lại thì phải có người tạo nhóm mới với bạn.",
+    "confirm": "Rời nhóm"
   }
 }

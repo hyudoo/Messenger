@@ -3,6 +3,7 @@
 import { SafeUser } from "@/app/types";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
+import axios from "axios";
 import { useEffect, useState } from "react";
 import { MdOutlineGroupAdd } from "react-icons/md";
 import clsx from "clsx";
@@ -46,12 +47,18 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
 
     // A new message also carries lastMessageAt: that conversation moves to the top.
-    // "Seen" updates don't, so the order stays put.
+    // "Seen" updates don't, so the order stays put. A member leaving a group sends the
+    // new member list instead of messages.
     const updateHandler = (
-      conversation: Pick<FullConversationType, "id" | "messages"> & {
-        lastMessageAt?: string;
-      }
+      conversation: Pick<FullConversationType, "id"> &
+        Partial<Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId">> & {
+          lastMessageAt?: string;
+        }
     ) => {
+      if (conversation.users && conversation.id === conversationId) {
+        // the open chat's header and drawer come from the server component
+        router.refresh();
+      }
       setItems((current) => {
         const target = current.find((item) => item.id === conversation.id);
         if (!target) {
@@ -59,7 +66,12 @@ const ConversationList: React.FC<ConversationListProps> = ({
         }
         const updated = {
           ...target,
-          messages: conversation.messages,
+          ...(conversation.messages && { messages: conversation.messages }),
+          ...(conversation.users && {
+            users: conversation.users,
+            userIds: conversation.userIds ?? target.userIds,
+            ownerId: conversation.ownerId ?? null,
+          }),
           ...(conversation.lastMessageAt && {
             lastMessageAt: new Date(conversation.lastMessageAt),
           }),
@@ -71,7 +83,16 @@ const ConversationList: React.FC<ConversationListProps> = ({
       });
     };
 
-    const removeHandler = (conversation: FullConversationType) => {
+    // Events sent while the socket was down are lost (sleep, network change), so every
+    // (re)connection reloads the list. Also covers the gap between server render and connect.
+    const resyncHandler = () => {
+      axios
+        .get<FullConversationType[]>("/api/conversations")
+        .then(({ data }) => setItems(data))
+        .catch(() => {}); // keep what is shown; the next reconnect tries again
+    };
+
+    const removeHandler = (conversation: Pick<FullConversationType, "id">) => {
       setItems((current) => {
         return [...current.filter((convo) => convo.id !== conversation.id)];
       });
@@ -83,8 +104,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
     socket.on("conversation:new", newHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
+    socket.on("connect", resyncHandler);
 
     return () => {
+      socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);

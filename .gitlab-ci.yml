@@ -108,9 +108,32 @@ deploy:
     # migrations: a change db push can't apply safely (e.g. a new unique index over duplicate data) fails the job here
     # while the previous version keeps serving. A rollback does not undo it, so keep schema changes additive
     - docker compose run --rm --no-deps app npx prisma db push --skip-generate
+    # The image now serving, to go back to if the new one never becomes healthy (empty on the first deploy)
+    - PREVIOUS_IMAGE="$(docker inspect -f '{{.Config.Image}}' messenger 2>/dev/null || true)"
     # The app's image was checked above; --pull missing only fetches redis:7-alpine on the first deploy.
     # depends_on starts the redis service too (data survives in the redis-data volume)
     - docker compose up -d --no-build --pull missing app
+    # Wait for the Dockerfile's HEALTHCHECK (/api/health: database + socket.io). A container that crashes or
+    # stays unhealthy fails the job and the previous image is started again, so the site stays up
+    - |
+      status=starting
+      for i in $(seq 1 30); do
+        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' messenger 2>/dev/null || echo missing)"
+        case "$status" in
+          healthy|unhealthy|exited|dead|missing) break ;;
+        esac
+        sleep 5
+      done
+      if [ "$status" != healthy ]; then
+        echo "The new container is $status after the health checks. Its last logs:"
+        docker logs --tail 100 messenger || true
+        if [ -n "$PREVIOUS_IMAGE" ] && [ "$PREVIOUS_IMAGE" != "$APP_IMAGE" ]; then
+          echo "Starting the previous image $PREVIOUS_IMAGE again"
+          APP_IMAGE="$PREVIOUS_IMAGE" docker compose up -d --no-build app
+        fi
+        exit 1
+      fi
+      echo "messenger is healthy"
     # Every deploy leaves a tagged image behind; keep the newest KEEP_IMAGES for rollbacks and remove the rest
     # (one still used by a container is skipped), then the untagged leftovers of builds
     - |

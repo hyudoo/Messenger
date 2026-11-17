@@ -163,6 +163,9 @@ const resendRingingCalls = async (io: AppServer, socket: AppSocket) => {
   );
 };
 
+// the Redis adapter's connections, closed by closeSocketServer
+let adapterClients: RedisClient[] = [];
+
 // With Redis configured (REDIS_URL or REDIS_HOST), sockets on every instance
 // share rooms through Redis, so emits (including emitToUser/emitToConversation
 // from route handlers) reach all of them. Without it everything stays in this
@@ -188,6 +191,7 @@ const attachRedisAdapter = async (io: AppServer): Promise<RedisClient | null> =>
     ),
   ]);
   io.adapter(createAdapter(pubClient, subClient));
+  adapterClients = [pubClient, subClient];
   console.log("> socket.io uses the Redis adapter");
   // the publishing client is not in subscriber mode, so it also runs commands
   return pubClient;
@@ -423,4 +427,18 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 
   setIO(io);
   return io;
+};
+
+// Graceful shutdown (server.ts, on SIGTERM / SIGINT): drops every socket (a transport close, so
+// clients reconnect on their own, to the next instance), which runs the
+// disconnect handlers (peer-left, call log, offline), and stops the HTTP server it is attached
+// to. Waits for those handlers' pending database writes before closing Redis.
+export const closeSocketServer = async (io: AppServer, settleMs = 1000) => {
+  await new Promise<void>((resolve) => io.close(() => resolve()));
+  // the call-log moves started by the disconnects are fire-and-forget; give them a moment
+  await new Promise((resolve) => setTimeout(resolve, settleMs));
+  await Promise.all(
+    adapterClients.map((client) => client.close().catch(() => client.destroy()))
+  );
+  adapterClients = [];
 };

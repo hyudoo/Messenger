@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   CONVERSATION,
@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   emitToUser: vi.fn(),
   emitToConversation: vi.fn(),
+  removeUserFromConversationRoom: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
 }));
@@ -32,6 +33,7 @@ vi.mock("@/app/actions/getCurrentUser", () => ({ default: mocks.currentUser }));
 vi.mock("@/app/libs/socket-server", () => ({
   emitToUser: mocks.emitToUser,
   emitToConversation: mocks.emitToConversation,
+  removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/app/libs/s3")>()),
@@ -45,7 +47,12 @@ import { POST as toggleReaction } from "@/app/api/messages/[messageId]/reactions
 import { DELETE as deleteConversation } from "@/app/api/conversations/[conversationId]/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
-import { POST as createConversation } from "@/app/api/conversations/route";
+import {
+  GET as listConversations,
+  POST as createConversation,
+} from "@/app/api/conversations/route";
+import { POST as leaveConversation } from "@/app/api/conversations/[conversationId]/leave/route";
+import { GET as health } from "@/app/api/health/route";
 import { POST as register } from "@/app/api/register/route";
 import { POST as updateSettings } from "@/app/api/settings/route";
 import { POST as requestUpload } from "@/app/api/uploads/route";
@@ -505,5 +512,221 @@ describe("POST /api/uploads", () => {
     const body = await (await ask({ contentType: "image/png", size: 100 })).json();
     expect(body.fileUrl).toMatch(new RegExp(`/uploads/${ME}/[0-9a-f-]{36}\\.png$`));
     expect(body.headers).toEqual({ "Content-Type": "image/png", "x-amz-tagging": "status=pending" });
+  });
+});
+
+// ---- groups: owner-only delete, leaving ----
+const THIRD = "ffffffffffffffffffffffff";
+const third = user(THIRD);
+const group = (ownerId: string | null, users = [me, other, third]) => ({
+  id: CONVERSATION,
+  userIds: users.map((member) => member.id),
+  users,
+  isGroup: true,
+  ownerId,
+});
+
+describe("DELETE /api/conversations/[id] (groups)", () => {
+  const remove = () =>
+    deleteConversation(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, null, { method: "DELETE" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("refuses a group owned by someone else and deletes nothing", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    expect((await remove()).status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(mocks.emitToUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["its owner", ME],
+    ["any member of a group from before owners", null],
+  ])("lets %s delete it and empties the room", async (_, ownerId) => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ownerId));
+    prisma.conversation.update.mockResolvedValue({});
+    prisma.conversation.delete.mockResolvedValue({ id: CONVERSATION });
+
+    expect((await remove()).status).toBe(200);
+    expect(prisma.conversation.delete).toHaveBeenCalled();
+    [me, other, third].forEach((member) =>
+      expect(mocks.removeUserFromConversationRoom).toHaveBeenCalledWith(member.email, CONVERSATION)
+    );
+  });
+});
+
+describe("POST /api/conversations/[id]/leave", () => {
+  const leave = () =>
+    leaveConversation(
+      jsonRequest(`/api/conversations/${CONVERSATION}/leave`, null),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns 404 to non-members", async () => {
+    asNonMember();
+    expect((await leave()).status).toBe(404);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("refuses to leave a 1:1 chat", async () => {
+    asMember();
+    expect((await leave()).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("disconnects the caller, hands the group on and tells everyone", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [other, third]));
+
+    expect((await leave()).status).toBe(200);
+
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { users: { disconnect: { id: ME } }, ownerId: OTHER },
+      include: { users: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(me.email, "conversation:remove", {
+      id: CONVERSATION,
+    });
+    expect(mocks.removeUserFromConversationRoom).toHaveBeenCalledWith(me.email, CONVERSATION);
+    [other, third].forEach((member) =>
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        member.email,
+        "conversation:update",
+        expect.objectContaining({ id: CONVERSATION, userIds: [OTHER, THIRD], ownerId: OTHER })
+      )
+    );
+    expect(mocks.emitToUser).not.toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.anything()
+    );
+  });
+
+  it("keeps the owner when someone else leaves", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [other, third]));
+
+    await leave();
+
+    expect(prisma.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { users: { disconnect: { id: ME } } } })
+    );
+  });
+
+  it("deletes the group when the last member leaves", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME, [me]));
+    prisma.conversation.update.mockResolvedValue({});
+    prisma.conversation.delete.mockResolvedValue({ id: CONVERSATION });
+
+    expect((await leave()).status).toBe(200);
+    expect(prisma.conversation.delete).toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/conversations/[id]/messages (after / latest)", () => {
+  const get = (query: string) =>
+    olderMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/messages${query}`, null, {
+        method: "GET",
+      }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns the messages after the cursor, oldest first", async () => {
+    asMember();
+    prisma.message.findMany.mockResolvedValue([{ id: "m1" }, { id: "m2" }]);
+
+    const body = await (await get(`?after=${MESSAGE}`)).json();
+
+    expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cursor: { id: MESSAGE },
+        skip: 1,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      })
+    );
+    expect(body).toEqual({ messages: [{ id: "m1" }, { id: "m2" }], hasMore: false });
+  });
+
+  it("returns the latest page without a cursor", async () => {
+    asMember();
+    prisma.message.findMany.mockResolvedValue([{ id: "m2" }, { id: "m1" }]);
+
+    const body = await (await get("")).json();
+
+    expect(prisma.message.findMany.mock.calls[0][0]).not.toHaveProperty("cursor");
+    expect(body.messages.map((message: { id: string }) => message.id)).toEqual(["m1", "m2"]);
+  });
+
+  it("rejects before and after together", async () => {
+    asMember();
+    expect((await get(`?before=${MESSAGE}&after=${MESSAGE}`)).status).toBe(400);
+  });
+});
+
+describe("GET /api/conversations", () => {
+  it("returns the caller's conversations", async () => {
+    prisma.conversation.findMany.mockResolvedValue([{ id: CONVERSATION }]);
+    const response = await listConversations();
+    expect(await response.json()).toEqual([{ id: CONVERSATION }]);
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userIds: { has: ME } } })
+    );
+  });
+
+  it("answers 500 on a database error (the client keeps its list)", async () => {
+    prisma.conversation.findMany.mockRejectedValue(new Error("down"));
+    expect((await listConversations()).status).toBe(500);
+  });
+
+  it("returns 401 when signed out", async () => {
+    mocks.currentUser.mockResolvedValue(null);
+    expect((await listConversations()).status).toBe(401);
+  });
+});
+
+describe("POST /api/conversations (group owner)", () => {
+  it("makes the creator the group's owner", async () => {
+    prisma.user.count.mockResolvedValue(2);
+    prisma.conversation.create.mockResolvedValue(group(ME));
+    await createConversation(
+      jsonRequest("/api/conversations", {
+        isGroup: true,
+        name: "Team",
+        members: [{ value: OTHER }, { value: THIRD }],
+      })
+    );
+    expect(prisma.conversation.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ ownerId: ME }) })
+    );
+  });
+});
+
+describe("GET /api/health", () => {
+  const io = globalThis.io;
+  afterEach(() => {
+    globalThis.io = io;
+  });
+
+  it("is ok when the database answers and socket.io runs", async () => {
+    globalThis.io = {} as typeof globalThis.io;
+    const response = await health();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: "ok", database: true, socket: true });
+  });
+
+  it("is 503 when the database is down", async () => {
+    globalThis.io = {} as typeof globalThis.io;
+    prisma.$runCommandRaw.mockRejectedValue(new Error("down"));
+    const response = await health();
+    expect(response.status).toBe(503);
+    expect((await response.json()).database).toBe(false);
+  });
+
+  it("is 503 without the socket server", async () => {
+    globalThis.io = undefined;
+    expect((await health()).status).toBe(503);
   });
 });

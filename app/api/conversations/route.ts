@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { findConversationsForUser } from "@/app/actions/getConversation";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
@@ -18,6 +19,21 @@ const notifyMembers = (conversation: ConversationWithUsers) => {
     }
   });
 };
+
+// The conversation list as the inbox shows it (same as the server-rendered one); the client reloads
+// it after a socket reconnect, since events sent while it was disconnected are lost.
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    return NextResponse.json(await findConversationsForUser(currentUser.id));
+  } catch (error) {
+    console.log(error, "ERROR_CONVERSATIONS_LIST");
+    return new NextResponse("Error", { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -58,6 +74,7 @@ export async function POST(request: Request) {
         data: {
           name: groupName,
           isGroup: true,
+          ownerId: currentUser.id,
           users: {
             connect: [...memberIds, currentUser.id].map((id) => ({ id })),
           },
