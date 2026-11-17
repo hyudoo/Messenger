@@ -5,6 +5,7 @@ import { HiArrowLeftOnRectangle, HiUsers } from "react-icons/hi2";
 import { signOut } from "next-auth/react";
 
 import { usePathname } from "@/i18n/navigation";
+import { removePushSubscription } from "@/app/libs/push-client";
 import useConversation from "./useConversation";
 
 const useRoutes = () => {
@@ -30,8 +31,12 @@ const useRoutes = () => {
       },
       {
         label: t("logout"),
-        // back to the login page in the current language
-        onclick: () => signOut({ callbackUrl: `/${locale}` }),
+        // back to the login page in the current language; this browser stops getting the
+        // user's push notifications first (it is subscribed again on the next sign-in)
+        onclick: async () => {
+          await removePushSubscription();
+          await signOut({ callbackUrl: `/${locale}` });
+        },
         href: "#",
         icon: HiArrowLeftOnRectangle,
       },

@@ -75,7 +75,17 @@ const nextConfig = {
   // Next's own header is noise and tells attackers the framework
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // the push service worker: always fetched fresh, so an update reaches browsers at once
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+    ];
   },
   images: {
     remotePatterns: [

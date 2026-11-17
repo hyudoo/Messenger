@@ -14,6 +14,7 @@ import useConversation from "@/app/hooks/useConversation";
 import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
+import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
 import { ConversationUpdate, FullConversationType } from "@/app/types";
 import { matchesSearch } from "@/app/libs/search";
@@ -206,6 +207,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
               <MdOutlineGroupAdd size={20} />
             </button>
           </div>
+          <NotificationPrompt />
           {items.length > 0 && (
             <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
           )}

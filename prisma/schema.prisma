@@ -26,9 +26,27 @@ model User {
   seenMessageIds String[]  @db.ObjectId
   seenMessages   Message[] @relation("Seen", fields: [seenMessageIds], references: [id])
 
-  accounts  Account[]
-  messages  Message[]
-  reactions Reaction[]
+  accounts          Account[]
+  messages          Message[]
+  reactions         Reaction[]
+  pushSubscriptions WebPushSubscription[]
+}
+
+// A browser's Web Push subscription (app/libs/web-push.ts). One row per browser endpoint: signing
+// in as someone else in the same browser moves it to that user.
+model WebPushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  // the language the notifications are written in (the app's locale when subscribing)
+  locale    String
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Account {

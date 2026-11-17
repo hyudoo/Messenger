@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   removeUserFromConversationRoom: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
+  pushNewMessage: vi.fn(),
 }));
 
 vi.mock("@/app/libs/prismadb", () => ({
@@ -40,7 +41,8 @@ vi.mock("@/app/libs/s3", async (importOriginal) => ({
   markUploadsUsed: mocks.markUploadsUsed,
   deleteUploadedObjects: mocks.deleteUploadedObjects,
 }));
-vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
+vi.mock("@/app/libs/message-push", () => ({ pushNewMessage: mocks.pushNewMessage }));
+vi.mock("bcrypt",() => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
 
 import { POST as sendMessage } from "@/app/api/messages/route";
 import { POST as toggleReaction } from "@/app/api/messages/[messageId]/reactions/route";
@@ -115,6 +117,23 @@ describe("POST /api/messages", () => {
     expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: CONVERSATION, userIds: { has: ME } } })
     );
+  });
+
+  it("sends a Web Push to the other members, not for calls", async () => {
+    asMember();
+    await send({ message: "hi" });
+    expect(mocks.pushNewMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation: expect.objectContaining({ id: CONVERSATION }),
+        sender: me,
+        body: "hi",
+        recipientIds: [OTHER],
+      })
+    );
+
+    mocks.pushNewMessage.mockClear();
+    await send({ isCall: true });
+    expect(mocks.pushNewMessage).not.toHaveBeenCalled();
   });
 
   it("rejects empty and too long messages", async () => {

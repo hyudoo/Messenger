@@ -161,7 +161,7 @@
     "theme": "Color mode",
     "language": "Language",
     "notifications_title": "Notifications",
-    "notifications_description": "Desktop notifications for new messages while this tab is hidden. Applies at once in this browser.",
+    "notifications_description": "Desktop notifications for new messages while you aren't looking at this window, even with the tab closed (where the browser supports it). Applies in this browser.",
     "notifications_toggle": "New message notifications",
     "notifications_denied": "Your browser blocks notifications from this site. Allow them in the browser's site settings.",
     "notifications_unsupported": "This browser does not support notifications."
@@ -216,6 +216,11 @@
     "confirm": "Leave"
   },
   "notifications": {
-    "image": "Sent an image."
+    "image": "Sent an image.",
+    "prompt_title": "Turn on message notifications",
+    "prompt_body": "Get a desktop notification for new messages, even with this tab closed.",
+    "prompt_enable": "Turn on",
+    "prompt_later": "Not now",
+    "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings."
   }
 }

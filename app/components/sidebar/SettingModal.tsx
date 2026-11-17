@@ -55,7 +55,7 @@ const SettingModal: React.FC<SettingModalProps> = ({
   const [, setNotificationVersion] = useState(0);
   const notificationState = isOpen ? getNotificationState() : "unsupported";
   const toggleNotifications = async () => {
-    const next = await setNotificationsEnabled(notificationState !== "on");
+    const next = await setNotificationsEnabled(notificationState !== "on", locale);
     setNotificationVersion((version) => version + 1);
     if (next === "denied") {
       toast.error(t("settings.notifications_denied"));

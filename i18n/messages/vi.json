@@ -161,7 +161,7 @@
     "theme": "Chế độ màu",
     "language": "Ngôn ngữ",
     "notifications_title": "Thông báo",
-    "notifications_description": "Báo tin nhắn mới trên máy khi tab này đang ẩn. Áp dụng ngay trên trình duyệt này.",
+    "notifications_description": "Báo tin nhắn mới trên máy khi bạn không xem cửa sổ này, kể cả khi đã đóng tab (nếu trình duyệt hỗ trợ). Áp dụng trên trình duyệt này.",
     "notifications_toggle": "Thông báo tin nhắn mới",
     "notifications_denied": "Trình duyệt đang chặn thông báo của trang này. Hãy cho phép trong phần cài đặt trang của trình duyệt.",
     "notifications_unsupported": "Trình duyệt này không hỗ trợ thông báo."
@@ -216,6 +216,11 @@
     "confirm": "Rời nhóm"
   },
   "notifications": {
-    "image": "Đã gửi một hình ảnh."
+    "image": "Đã gửi một hình ảnh.",
+    "prompt_title": "Bật thông báo tin nhắn",
+    "prompt_body": "Nhận thông báo trên máy khi có tin nhắn mới, kể cả khi đã đóng tab.",
+    "prompt_enable": "Bật thông báo",
+    "prompt_later": "Để sau",
+    "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt."
   }
 }

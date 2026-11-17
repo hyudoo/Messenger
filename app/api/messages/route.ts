@@ -8,6 +8,7 @@ import prisma from "@/app/libs/prismadb";
 import { MESSAGE_INCLUDE, NOT_RECALLED } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
+import { pushNewMessage } from "@/app/libs/message-push";
 
 const MAX_MESSAGE_LENGTH = 5000;
 // the sender's tab id for an optimistic message (app/hooks/useOutbox.ts); only echoed back
@@ -125,6 +126,20 @@ export async function POST(request: Request) {
         isGroup: conversation.isGroup,
       });
     });
+
+    // Web Push to the others' browsers, for when their tabs are closed (in the background: it never
+    // fails or holds up the send)
+    if (isCall !== true) {
+      void pushNewMessage({
+        conversation,
+        sender: currentUser,
+        body: newMessage.body,
+        image: newMessage.image,
+        recipientIds: conversation.users
+          .map((user) => user.id)
+          .filter((id) => id !== currentUser.id),
+      });
+    }
 
     return NextResponse.json(newMessage);
   } catch (error) {
