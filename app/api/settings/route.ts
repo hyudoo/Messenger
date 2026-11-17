@@ -4,6 +4,8 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 import prisma from "@/app/libs/prismadb";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
+import { logError } from "@/app/libs/log";
 
 const MAX_NAME_LENGTH = 100;
 
@@ -12,6 +14,11 @@ export async function POST(request: Request) {
     const currentUser = await getCurrentUser();
     if (!currentUser?.id) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = await rateLimit("settings", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const { name, image } = await request.json();
@@ -30,7 +37,7 @@ export async function POST(request: Request) {
       try {
         await markUploadsUsed([image]);
       } catch (error) {
-        console.log(error, "ERROR_MARK_UPLOAD_USED");
+        logError("mark_upload_used", error);
         return new NextResponse("Image not found", { status: 400 });
       }
     }
@@ -52,7 +59,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(updatedUser);
   } catch (error) {
-    console.log(error, "ERROR_SETTINGS");
+    logError("settings", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

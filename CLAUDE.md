@@ -1,79 +1,74 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Topic details live in `.claude/rules/*.md`. Each of them is loaded only while working on the files its `paths:` frontmatter lists, so read the one for your topic directly when you need it before touching those files (see "Topic rules" below).
 
 ## Commands
 
-- `npm run dev` — runs the custom server (`tsx server.ts`): Next dev (Turbopack) + socket.io on http://localhost:3000. `next dev` alone has no realtime. Changes under `server/` need a restart (no watch).
-- `npm run build` / `npm start` — production build (Turbopack) / serve (`start` also goes through `server.ts`)
-- `npm run lint` — ESLint 9 CLI (`eslint .`) with `eslint.config.mjs`, which spreads `eslint-config-next/core-web-vitals` (native flat config, includes the React Compiler hook rules); covers `server.ts` and `server/` too
-- `npm test` — Vitest (`vitest run`); `npx vitest run tests/api/routes.test.ts -t "DELETE"` runs one file / matching tests; `npm run test:watch` to watch
-- `npx tsc --noEmit` — typecheck
-- `npx prisma db push` — sync `prisma/schema.prisma` to MongoDB, including its `@@index`es (no migrations; MongoDB provider)
-- `npx prisma generate` — regenerate the client (also runs on `postinstall`)
+- `docker compose up -d redis`: this project's own Redis (`messenger_redis`, `127.0.0.1:${REDIS_PORT}`, password `REDIS_PASSWORD` from `.env`).
+  - Needed before `npm run dev` whenever `REDIS_HOST` / `REDIS_URL` is set, since the server exits if Redis is unreachable at boot.
+  - In compose, the `app` service reaches it as `redis:6379` (compose overrides `REDIS_HOST` / `REDIS_PORT` and clears `REDIS_URL`).
+- `npm run dev`: runs the custom server (`tsx watch server.ts`), i.e. Next dev (Turbopack) + socket.io on http://localhost:3000. `next dev` alone has no realtime.
+  - Code under `app/` hot-reloads through Next.
+  - `tsx watch` restarts the whole process when a file it loaded itself changes: `server.ts`, `server/`, the `app/libs` files the socket server imports, `next.config.js`.
+  - It ignores dot folders and `node_modules`. `.env` changes need a manual restart.
+- `npm run build` / `npm start`: production build (Turbopack) / serve. `start` also goes through `server.ts`. Both share `.next/`, so run `npm run build` again after a dev session before `npm start`.
+- `npm run lint`: ESLint 9 (`eslint .`, flat config spreading `eslint-config-next/core-web-vitals`, React Compiler hook rules included). It also covers `server.ts` and `server/`.
+- `npm test`: Vitest. `npx vitest run tests/api/routes.test.ts -t "DELETE"` runs one file / matching tests.
+  - Redis tests need `TEST_REDIS_URL` (see `.claude/rules/testing.md`).
+  - Run from `E:\gitlab\Messenger` (uppercase drive), or every Vitest file fails.
+- `npx tsc --noEmit`: typecheck.
+- `npx prisma db push`: sync `prisma/schema.prisma` to MongoDB, including its `@@index`es (no migrations). `npx prisma generate` regenerates the client (also on `postinstall`).
+- Both `package-lock.json` and `yarn.lock` are committed (npm keeps both in sync).
 
-Tests live in `tests/`: `unit/` (libs, `proxy.ts`, message-file parity and the theme init script), `api/` (route handlers called directly, with Prisma, `getCurrentUser`, socket emits and S3 calls mocked; `tests/helpers.ts` has the Prisma mock and fixtures), `socket/` (a real socket.io server from `initSocketServer` on a random port, real `socket.io-client`s; only `getToken` and Prisma are mocked). Tests needing Redis are skipped unless `TEST_REDIS_URL` is set: `docker run --rm -p 6390:6379 redis:7-alpine`, then `TEST_REDIS_URL=redis://localhost:6390 npm test`. Test env vars (fake AWS, bucket) are in `vitest.config.mts`, which also inlines `next-intl` (its ESM imports `next/server` without an extension, which Node can't resolve). Vitest stays on 3.x: Vitest 5 fails every file with "Cannot read properties of undefined (reading 'config')" when the shell reports the drive as `e:\` instead of `E:\`, which is how this workspace opens.
+## Environment
 
-Both `package-lock.json` and `yarn.lock` are committed (npm keeps both in sync).
+Copy `.env.example` to `.env`.
 
-`npm run dev` and `npm start` share `.next/`, so run `npm run build` again after a dev session before `npm start`.
-
-Copy `.env.example` to `.env`: `DATABASE_URL` (MongoDB), `NEXTAUTH_SECRET`, AWS (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, optional `NEXT_PUBLIC_S3_PUBLIC_URL`), GitHub and Google OAuth credentials. Optional: `REDIS_URL` (several instances), `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS` (TURN for calls), `TRUST_PROXY=true` (behind a proxy that sets `X-Real-IP`).
+- **Required:**
+  - `DATABASE_URL` (MongoDB), `NEXTAUTH_SECRET`;
+  - AWS: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, optional `NEXT_PUBLIC_S3_PUBLIC_URL`;
+  - GitHub and Google OAuth credentials.
+- **Optional:**
+  - Redis for several instances: `REDIS_URL`, or `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` (`getRedisUrl()` in `app/libs/redis-url.ts`; `REDIS_URL` wins).
+  - `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS`: TURN for calls.
+  - `TRUST_PROXY=true`: behind a proxy that sets `X-Real-IP`.
+  - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: Web Push. Generate with `npx web-push generate-vapid-keys`; read at run time; keep the pair stable.
+- Production gets its `.env` from the CI variable `ENV_FILE`.
 
 ## Architecture
 
-Next.js 16 App Router messenger app (React 19), TypeScript, Tailwind 3, Prisma 6 + MongoDB, NextAuth v4, socket.io for realtime, WebRTC for 1:1 video calls, S3 for uploads. UI strings are partly in Vietnamese. Path alias `@/*` maps to the repo root.
+Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex flag, iterate with `Array.from`), Tailwind 3, Prisma 6 + MongoDB, NextAuth v4 (JWT), socket.io (optional Redis adapter), WebRTC 1:1 calls, S3 uploads, Web Push, zustand, next-intl. Path alias `@/*` = repo root.
 
-**i18n (next-intl, same setup as the portfolio CMS)**
-- Locales `vi` (default) and `en`; URLs are always prefixed (`/vi/conversations`). `i18n/routing.ts`, `i18n/request.ts` (loads `i18n/messages/<locale>.json`), `i18n/navigation.ts`. Every page lives under `app/[locale]/`, whose `layout.tsx` is the root layout (`<html lang>`, providers). `app/api` and the shared folders (`components`, `hooks`, `libs`, `actions`…) stay outside `[locale]`.
-- **Every visible string goes through `t()`** and into both `vi.json` and `en.json` (same keys, same ICU placeholders — `tests/unit/i18n-theme.test.ts` enforces it; plurals as `{count, plural, one {# member} other {# members}}`). `global.d.ts` types `t()` keys from `vi.json`, so a missing key fails `tsc`. Client: `useTranslations("ns")`; server: `getTranslations`. Libs return codes, not text (`validatePassword` → `auth.password_rules.<code>`, `UploadError.code` → `upload.<code>`).
-- **Navigation:** use `Link`, `useRouter`, `usePathname`, `redirect` from `@/i18n/navigation`, never `next/link` / `next/navigation` (they drop the locale). `usePathname()` returns the path without the locale. `useParams` from `next/navigation` is fine.
-- Dates: `format(date, "p", { locale: useDateLocale() })` (`app/hooks/useDateLocale.ts`).
-- `proxy.ts` runs the next-intl middleware and, for `/conversations`, `/users`, `/room`, checks the NextAuth JWT (`getToken`) and redirects signed-out users to `/<locale>` (the login page). Its matcher skips `api`, `socket.io`, `_next` and files.
-- The language is switched by `LanguageToggle` (sidebar, mobile footer, login page) and in the settings modal; next-intl remembers it in the `NEXT_LOCALE` cookie.
+- `app/[locale]/`: every page. `app/api/**/route.ts`: mutations, called with `axios`.
+- `app/actions/`: plain async server functions that call Prisma, not Server Actions. `getSession` / `getCurrentUser` are `cache()`d.
+- `app/libs/`: shared logic.
+- `server.ts` + `server/`: one process for Next and socket.io. Route handlers reach it through `globalThis.io` (`emitToUser` / `emitToConversation`), so no serverless.
 
-**Theme (dark mode, same provider as the portfolio FE/CMS)**
-- `app/components/providers/ThemeProvider.tsx`: `light` / `dark` / `system` (default), stored in `localStorage.theme`, applied as the `dark` class on `<html>` (Tailwind `darkMode: "class"`). `THEME_INIT_SCRIPT` runs in `<head>` before paint so dark users get no light flash — keep it in the `[locale]` layout. `ThemeToggle` flips light/dark; the settings modal offers all three.
-- Colors are tokens (CSS variables in `app/globals.css`, light in `:root`, dark in `.dark`; wired in `tailwind.config.js`): `bg-background`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border` (also the default for plain `border`), `ring-input`. **Use tokens, not raw grays/white/black**, so both themes work; brand colors (sky, rose, green, purple) are fine. The call screen (`app/[locale]/room`) is always dark (video) and keeps raw colors. react-select (`Select.tsx`) and toasts (`ToasterContext`) are themed explicitly.
+### Rules that apply everywhere
+- **i18n:** every visible string goes through `t()` and into both `i18n/messages/vi.json` and `en.json` (same keys and placeholders; a test and `tsc` enforce it). Navigate with `@/i18n/navigation`, never `next/link` / `next/navigation`.
+- **Theme:** use the color tokens (`bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border-border`), not raw grays/white/black. The call screen is the exception.
+- **Membership:** anything keyed by a conversation id goes through `getConversationForUser(id, userId)`, which returns null for "missing" and "not a member" alike.
+- **Messages:** every message sent to the chat view uses `MESSAGE_INCLUDE` (`app/libs/message-include.ts`). A `messages:update` replaces the client's copy, so a message without `reactions` / `replyTo` would wipe them.
+- **Users:** `app/libs/prismadb.ts` globally omits `hashedPassword`, so user rows are safe to send to clients. Type them on the client as `SafeUser`, not Prisma's `User`.
+- **After a DB write:** route handlers emit over socket.io. Socket data is plain JSON, so dates arrive as ISO strings. Server components may pass `Date`s.
+- **Errors:** log with `logError(tag, error, context?)` (`app/libs/log.ts`), never with secrets or message text in the context.
+- **Rate limiting:** key on `x-client-ip` (set by `server.ts`), never on `X-Forwarded-For`.
+- **External hosts:** a new image / upload / CDN host goes into `next.config.js`: `images.remotePatterns` and the CSP lists.
+- **Next 15/16:**
+  - `params` is a `Promise` (`const { id } = await params`).
+  - Route files export only handlers / config, so shared values live in `app/libs/`.
+  - Middleware is `proxy.ts`.
+- **React 19 / Compiler:** `useRef` needs an initial value; use `useWatch({ control, name })`, not `watch()`. No `setState` in effects: use `useSyncExternalStore` for browser-only values.
 
-Next 15/16 rules that bite here: `params` in pages and route handlers is a `Promise` (`const { id } = await params`); route files may only export handlers/config, so shared values such as `authOptions` live in `app/libs/`; route protection is `proxy.ts` (Next 16's name for middleware); `useRef` needs an initial value under React 19 types; with react-hook-form use `useWatch({ control, name })`, not `watch()` (the React Compiler lint rule flags it).
-
-**Data flow**
-- Server components fetch data via functions in `app/actions/` (e.g. `getCurrentUser`, `getConversations`, `getMessages`) that call Prisma directly — plain async server functions, not Server Actions. `getSession` / `getCurrentUser` are wrapped in React `cache()`, so call them freely within a request.
-- **Membership rule:** anything keyed by a conversation id (pages, `/api/messages`, `seen`, the messages page API, DELETE) must go through `getConversationForUser(id, userId)`, which returns null for "missing" and "not a member" alike. The socket server does its own check for `conversation:join` / `call:join`.
-- **Passwords:** `app/libs/prismadb.ts` sets a global `omit: { user: { hashedPassword: true } }` (Prisma 6), so user rows are safe to pass to client components and sockets. Only the credentials `authorize` in `app/libs/auth.ts` opts back in. Client code types users as `SafeUser` (`app/types`), not Prisma's `User`. Password rules live in `app/libs/password.ts` and run on both the form and `/api/register`.
-- Conversation lists load only the last message (`take: 1`); keep it that way when changing `getConversations`.
-- Messages are paginated: `getMessages(id, before?)` returns 50 at a time (oldest first) plus `hasMore`; the page loads the latest page and `Body.tsx` fetches older ones from `GET /api/conversations/[id]/messages?before=<messageId>` when scrolled near the top.
-- Deleting a conversation (`DELETE /api/conversations/[id]`) disconnects the members in the same transaction (`users: { set: [] }`, so `User.conversationIds` is updated — MongoDB many-to-many is not cleaned by a delete), then in the background pulls the deleted message ids from members' `User.seenMessageIds` (`$runCommandRaw` `$pull`) and removes unreferenced images from S3.
-- **Rate limits** (`app/libs/rate-limit.ts`, async): register per IP, credentials login per IP and per IP+email (inside `authorize`, error code in `app/libs/auth-errors.ts`), messages and uploads per user; limits in `LIMITS`. Counters are in Redis when `REDIS_URL` is set, else in memory; requests never wait for Redis (only a ready client is used, commands time out after 500 ms) and fall back to memory. The IP comes from the `x-client-ip` header that `server.ts` sets from the socket (or from `X-Real-IP` when `TRUST_PROXY=true`); never key on `X-Forwarded-For`.
-- Mutations go through Route Handlers in `app/api/**/route.ts`, called from client components with `axios`. After writing to the DB, each handler emits over socket.io via `emitToUser` / `emitToConversation` (`app/libs/socket-server.ts`).
-- Server components pass Prisma objects (with `Date` fields) straight to client components; React 19's RSC serialization handles `Date`. Data arriving over socket.io is plain JSON, so dates there are ISO strings.
-- `app/libs/prismadb.ts` holds a global Prisma singleton (shared by Next and the socket server).
-
-**Auth**
-- `authOptions` lives in `app/libs/auth.ts` (GitHub, Google, Credentials with bcrypt; JWT sessions; Prisma adapter, cast because its types predate Prisma's `omit`); `app/api/auth/[...nextauth]/route.ts` only wraps it. `bcrypt` is listed in `serverExternalPackages`.
-- `proxy.ts` protects `/conversations`, `/users`, `/room` (see i18n above); unauthenticated users go to `/<locale>`, the `(site)` route group with `AuthForm`.
-- Socket connections are authenticated in `server/socket.ts` by decoding the NextAuth session cookie with `getToken` (`token.email`, `token.sub` = user id).
-
-**Realtime (socket.io)**
-- `server.ts` creates one HTTP server for Next and socket.io and awaits `initSocketServer` before listening; `server/socket.ts` stores the io server on `globalThis.io`, which is how route handlers reach it (same process — no serverless/Vercel).
-- Several instances: set `REDIS_URL` and the Redis adapter (`@socket.io/redis-adapter`) shares rooms, so emits from any instance reach every socket. Presence and call rooms are read with `io.fetchSockets()` / `io.in(room).fetchSockets()`, which ask the whole cluster — don't reintroduce in-memory counters. If Redis is unreachable at boot the server exits after 10 s. Long-polling across instances needs sticky sessions at the load balancer.
-- Client: one shared socket from `getSocket()` (`app/libs/socket-client.ts`). It is connected by `useActiveChannel` (mounted via `ActiveStatus` in the root layout) once the session is authenticated.
-- Rooms (`app/libs/socket-rooms.ts`): `user:<email>` (joined automatically on connect), `conversation:<id>` (client calls `subscribeConversation`, server checks membership), `call:<roomId>`.
-- Events — conversation room: `messages:new`, `messages:update` (bound in `conversations/[conversationId]/components/Body.tsx`). User room: `conversation:new`, `conversation:update`, `conversation:remove`, `call:incoming` (rendered by `IncomingCallModal`) (bound in `conversations/components/ConversationList.tsx`). A `conversation:update` that carries `lastMessageAt` (new message) moves that conversation to the top; one without it (seen) updates in place.
-- Presence: `presence:online` is sent on every connection (clients add idempotently, so concurrent tabs can't race) and `presence:offline` once `fetchSockets` finds no socket left for that user; `presence:list` on connect. They carry emails into the zustand store `useActiveList`; components read it through `useIsActive(email)` so only the affected avatar re-renders.
-
-**Video calls**
-- Starting a call (`app/[locale]/conversations/[conversationId]/components/Header.tsx`) posts a message with `isCall: true` to `/api/messages`, which also emits `call:incoming` to the other participants. Accepting navigates to `/room/<conversationId>` (room id == conversation id).
-- `call:join` (with ack) admits at most 2 conversation members and picks the host: the socket stamps itself (strictly increasing `nextJoinStamp`, not raw `Date.now()` — ties made both peers host), joins and snapshots the room in one synchronous step, then ranks peers by stamp. Keep those three steps free of `await`. Signalling events `call:ready`, `call:offer`, `call:answer`, `call:ice-candidate` are relayed as-is to the other peer; `call:leave` or a disconnect sends `call:peer-left`.
-- `app/[locale]/room/[roomId]/components/Room.tsx` does peer-to-peer WebRTC. Its socket listeners are registered once per room and call the latest handlers through `handlersRef` (filled in a `useLayoutEffect`), so the effect depends on `roomId` only — don't add the handlers to its deps.
-- ICE servers come from `getIceServers(userId)` (`app/libs/ice-servers.ts`), passed in by the room page: STUN, plus TURN when `TURN_URLS` and `TURN_SECRET` are set, with short-lived credentials in coturn's `use-auth-secret` scheme (no static TURN password in the browser).
-
-**Uploads (S3)**
-- `ImageUploadButton` → `uploadImage` (`app/libs/upload.ts`) asks `POST /api/uploads` for a presigned PUT URL plus the headers to send (`app/libs/s3.ts`), uploads straight from the browser, and stores the returned public URL (message `image` or user `image`).
-- Content type, length and the tag `status=pending` are signed into the URL (`x-amz-tagging` is kept a header via `unhoistableHeaders`; in the query string S3 ignores it). Allowed types and the 10MB limit live in `app/libs/upload.ts`. Keys are `uploads/<userId>/<uuid>.<ext>`.
-- Before saving a message image or avatar, routes call `markUploadsUsed` (removes the pending tag; fails, and the route returns 400, if the object doesn't exist). A bucket lifecycle rule expiring objects tagged `status=pending` removes uploads that were never used.
-- `/api/messages` and `/api/settings` only accept the caller's own uploads: `isUploadedFileUrl(url, userId)` matches the exact key format and the owner id in it. Settings also keeps the user's existing image (e.g. an OAuth avatar).
-- Cleanup: `cleanUpUploads(urls)` (`app/libs/upload-cleanup.ts`) deletes S3 objects that no user avatar or message image references any more; it runs in the background after a replaced avatar or a deleted conversation.
-- The bucket must allow public `GetObject` on `uploads/*` (or sit behind CloudFront via `NEXT_PUBLIC_S3_PUBLIC_URL`) and have CORS allowing `PUT` from the app origin.
-- `images.remotePatterns` in `next.config.js` allows only this app's upload host (`NEXT_PUBLIC_S3_PUBLIC_URL`, else `<bucket>.s3.<region>.amazonaws.com`, read at build time) plus the GitHub and Google avatar hosts. Any other image host makes `next/image` throw, so new image sources must be added there.
+### Topic rules (`.claude/rules/`)
+| File | Topic |
+| --- | --- |
+| `chat.md` | conversation list, unread, optimistic outbox, pagination, reconnect resync, typing, reply / edit / recall, emoji, reactions, groups, deleting |
+| `realtime.md` | socket server, Redis adapter, rooms, events, presence, session expiry, shutdown |
+| `calls.md` | WebRTC calls: audio / video, ringing, host election, decline / cancel, call log, ICE / TURN |
+| `notifications.md` | desktop notifications, Web Push for messages and calls, `sw.js` |
+| `uploads.md` | S3 presigned uploads, pending tag, ownership, cleanup, image hosts |
+| `auth.md` | NextAuth, `proxy.ts`, passwords, rate limits |
+| `i18n-theme.md` | next-intl details, navigation, dates, theme provider and tokens |
+| `ci-deploy.md` | GitLab CI, Docker image, health check, rollback, security headers |
+| `testing.md` | test layout, mocks, Redis tests, Vitest quirks |

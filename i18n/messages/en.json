@@ -16,7 +16,8 @@
     "offline": "Offline",
     "members": "{count, plural, one {# member} other {# members}}",
     "select_placeholder": "Select...",
-    "no_options": "No options"
+    "no_options": "No options",
+    "clear": "Clear search"
   },
   "theme": {
     "toggle": "Toggle light / dark theme",
@@ -68,8 +69,17 @@
     "new_group": "New group chat",
     "empty": "Select a chat or start a new conversation.",
     "last_image": "Sent an image.",
-    "last_call": "Video call",
-    "no_messages": "Started a conversation."
+    "last_call": "{kind, select, audio {Audio call} other {Video call}}",
+    "no_messages": "Started a conversation.",
+    "last_call_declined": "{kind, select, audio {Audio call declined} other {Video call declined}}",
+    "last_call_missed": "{kind, select, audio {Missed audio call} other {Missed video call}}",
+    "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}",
+    "search": "Search conversations",
+    "no_results": "No conversations found.",
+    "last_from": "{name}: {text}",
+    "you": "You",
+    "unread": "{count, plural, one {# unread message} other {# unread messages}}",
+    "last_recalled": "Message unsent."
   },
   "chat": {
     "placeholder": "Write a message",
@@ -83,15 +93,47 @@
     "send_failed": "Couldn't send the message!",
     "send_too_fast": "You're sending too fast, wait a few seconds and try again!",
     "seen_by": "Seen by {names}.",
-    "outgoing_call": "Outgoing call",
-    "incoming_call": "Incoming call"
+    "outgoing_call": "{kind, select, audio {Outgoing audio call} other {Outgoing video call}}",
+    "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
+    "call_declined_by_other": "Call declined",
+    "call_declined_by_you": "You declined the call",
+    "call_no_answer": "No answer",
+    "call_missed": "Missed call",
+    "call_duration": "Duration {duration}",
+    "send_quick": "Send {emoji}",
+    "audio_call": "Audio call",
+    "new_messages": "{count, plural, one {# new message} other {# new messages}}",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "sending": "Sending...",
+    "retry": "Retry",
+    "discard": "Discard",
+    "image_uploading": "Uploading image...",
+    "reply": "Reply",
+    "edit": "Edit",
+    "recall": "Unsend",
+    "recall_confirm": "Unsend?",
+    "recall_failed": "Couldn't unsend the message!",
+    "recalled": "Message unsent",
+    "edited": "Edited",
+    "editing": "Editing message",
+    "replying_to": "Replying to {name}",
+    "cancel_compose": "Cancel",
+    "save_edit": "Save changes",
+    "edit_failed": "Couldn't edit the message!",
+    "edit_expired": "This message can no longer be edited.",
+    "reply_image": "Photo",
+    "reply_call": "Call",
+    "reply_jump": "Go to the original message",
+    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}"
   },
   "profile": {
     "close": "Close panel",
     "delete": "Delete",
     "email": "Email",
     "emails": "Emails",
-    "joined": "Joined"
+    "joined": "Joined",
+    "leave": "Leave group"
   },
   "confirm_delete": {
     "title": "Delete conversation",
@@ -104,7 +146,9 @@
     "members": "Members"
   },
   "users": {
-    "title": "People"
+    "title": "People",
+    "search": "Search by name or email",
+    "no_results": "Nobody found."
   },
   "settings": {
     "profile_title": "Profile",
@@ -113,9 +157,14 @@
     "photo": "Photo",
     "change_photo": "Change",
     "appearance_title": "Appearance",
-    "appearance_description": "Applies right away in this browser.",
+    "appearance_description": "Color mode applies right away in this browser; the language applies when you save.",
     "theme": "Color mode",
-    "language": "Language"
+    "language": "Language",
+    "notifications_title": "Notifications",
+    "notifications_description": "Desktop notifications for new messages while you aren't looking at this window, even with the tab closed (where the browser supports it). Applies in this browser.",
+    "notifications_toggle": "New message notifications",
+    "notifications_denied": "Your browser blocks notifications from this site. Allow them in the browser's site settings.",
+    "notifications_unsupported": "This browser does not support notifications."
   },
   "upload": {
     "unsupported_type": "Only JPG, PNG, GIF or WEBP images are supported",
@@ -124,7 +173,7 @@
     "failed": "Upload failed"
   },
   "call": {
-    "is_calling": "is calling you.",
+    "incoming": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
     "hint": "The call starts as soon as you accept",
     "decline": "Decline",
     "accept": "Accept",
@@ -133,6 +182,47 @@
     "camera_on": "Turn camera on",
     "mic_off": "Mute",
     "mic_on": "Unmute",
-    "leave": "Leave call"
+    "leave": "Leave call",
+    "status_waiting": "Waiting for {name}…",
+    "status_connecting": "Connecting…",
+    "status_reconnecting": "Connection lost, retrying…",
+    "status_failed": "Couldn't connect",
+    "camera_is_off": "{name} turned off the camera",
+    "muted": "Muted",
+    "you": "You",
+    "declined": "{name} declined the call",
+    "no_answer": "{name} didn't answer",
+    "audio_call": "Audio call",
+    "camera_error": "Can't turn the camera on!"
+  },
+  "emoji": {
+    "open": "Choose an emoji",
+    "search": "Search emoji",
+    "clear": "Clear",
+    "no_results": "No emoji found",
+    "loading": "Loading…"
+  },
+  "reactions": {
+    "add": "React",
+    "more": "More emoji",
+    "react_with": "React with {emoji}",
+    "reacted_by": "{emoji} {names}",
+    "you": "You",
+    "failed": "Couldn't add the reaction!"
+  },
+  "confirm_leave": {
+    "title": "Leave group",
+    "description": "You will no longer receive messages from this group. To come back, someone has to create a new group with you.",
+    "confirm": "Leave"
+  },
+  "notifications": {
+    "image": "Sent an image.",
+    "prompt_title": "Turn on message notifications",
+    "prompt_body": "Get a desktop notification for new messages, even with this tab closed.",
+    "prompt_enable": "Turn on",
+    "prompt_later": "Not now",
+    "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings.",
+    "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
+    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}"
   }
 }

@@ -5,6 +5,8 @@ import { getMessages, getTranslations } from "next-intl/server";
 
 import { routing } from "@/i18n/routing";
 import ActiveStatus from "@/app/components/ActiveStatus";
+import IncomingCall from "@/app/components/IncomingCall";
+import MessageNotifications from "@/app/components/MessageNotifications";
 import {
   THEME_INIT_SCRIPT,
   ThemeProvider,
@@ -51,6 +53,8 @@ export default async function LocaleLayout({
           <NextIntlClientProvider messages={messages}>
             <AuthContext>
               <ActiveStatus />
+              <IncomingCall />
+              <MessageNotifications />
               <ToasterContext />
               {children}
             </AuthContext>

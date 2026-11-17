@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { findConversationsForUser } from "@/app/actions/getConversation";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToUser } from "@/app/libs/socket-server";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import prisma from "@/app/libs/prismadb";
 import { ConversationWithUsers } from "@/app/types";
+import { logError } from "@/app/libs/log";
 
 const MAX_GROUP_NAME_LENGTH = 100;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -19,11 +22,31 @@ const notifyMembers = (conversation: ConversationWithUsers) => {
   });
 };
 
+// The conversation list as the inbox shows it (same as the server-rendered one); the client reloads
+// it after a socket reconnect, since events sent while it was disconnected are lost.
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    return NextResponse.json(await findConversationsForUser(currentUser.id));
+  } catch (error) {
+    logError("conversations_list", error);
+    return new NextResponse("Error", { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = await rateLimit("conversation", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const { userId, isGroup, members, name } = await request.json();
@@ -58,6 +81,7 @@ export async function POST(request: Request) {
         data: {
           name: groupName,
           isGroup: true,
+          ownerId: currentUser.id,
           users: {
             connect: [...memberIds, currentUser.id].map((id) => ({ id })),
           },
@@ -110,7 +134,7 @@ export async function POST(request: Request) {
     notifyMembers(newConversation);
     return NextResponse.json(newConversation);
   } catch (error: any) {
-    console.log(error, "ERROR_CONVERSATIONS");
+    logError("conversations", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

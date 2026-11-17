@@ -5,6 +5,7 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { createPresignedUpload, publicUrlFor } from "@/app/libs/s3";
 import { IMAGE_TYPES, MAX_IMAGE_SIZE } from "@/app/libs/upload";
+import { logError } from "@/app/libs/log";
 
 export async function POST(request: Request) {
   try {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ uploadUrl, headers, fileUrl: publicUrlFor(key) });
   } catch (error) {
-    console.log(error, "ERROR_UPLOADS");
+    logError("uploads", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

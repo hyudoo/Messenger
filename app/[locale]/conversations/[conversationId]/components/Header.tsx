@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
 import axios from "axios";
+import { toast } from "react-hot-toast";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
 import { useIsActive } from "@/app/hooks/useActiveList";
@@ -45,13 +46,24 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
   //   router.push(`/room/${conversation.id}`);
   // }, [conversation, router]);
 
-  const handleVideoCall = useCallback(() => {
-    axios.post("/api/messages", {
-      isCall: true,
-      conversationId: conversation.id,
-    });
-    router.push(`/room/${conversation.id}`);
-  }, [conversation, router]);
+  // The call message is what rings the callee (call:incoming): if it fails (rate limit, server
+  // error) nobody would ring, so say so instead of leaving the caller waiting in an empty room.
+  // The room reads the kind back from this call message (getCallType).
+  const handleCall = useCallback(
+    async (callType: "audio" | "video") => {
+      try {
+        await axios.post("/api/messages", {
+          isCall: true,
+          callType,
+          conversationId: conversation.id,
+        });
+        router.push(`/room/${conversation.id}`);
+      } catch {
+        toast.error(t("common.error"));
+      }
+    },
+    [conversation, router, t]
+  );
 
   return (
     <>
@@ -100,25 +112,25 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
           </div>
         </div>
         <div className="flex gap-4">
-          {/* <HiPhone
-            size={32}
-            onClick={() => handleCall()}
-            className="text-sky-500
-            cursor-pointer
-            hover:text-sky-600
-            transition"
-          /> */}
           {!conversation.isGroup && (
-            <HiVideoCamera
-              size={32}
-              role="button"
-              aria-label={t("chat.video_call")}
-              onClick={() => handleVideoCall()}
-              className="text-sky-500
-              cursor-pointer
-              hover:text-sky-600
-              transition"
-            />
+            <>
+              <button
+                type="button"
+                aria-label={t("chat.audio_call")}
+                title={t("chat.audio_call")}
+                onClick={() => handleCall("audio")}
+                className="text-sky-500 transition hover:text-sky-600">
+                <HiPhone size={28} />
+              </button>
+              <button
+                type="button"
+                aria-label={t("chat.video_call")}
+                title={t("chat.video_call")}
+                onClick={() => handleCall("video")}
+                className="text-sky-500 transition hover:text-sky-600">
+                <HiVideoCamera size={32} />
+              </button>
+            </>
           )}
           <HiEllipsisHorizontal
             size={32}

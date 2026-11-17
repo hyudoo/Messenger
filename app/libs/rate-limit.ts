@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "redis";
 
-// Fixed-window rate limiting. Counters live in Redis when REDIS_URL is set (shared
+import { getRedisUrl } from "./redis-url";
+import { logError } from "./log";
+
+// Fixed-window rate limiting. Counters live in Redis when it is configured (shared
 // by every instance), otherwise in this process's memory. If Redis fails, the
 // in-memory counter is used for that request so limits never block everyone.
 
@@ -30,7 +33,14 @@ export const LIMITS = {
   login: { limit: 10, windowMs: 15 * 60_000 }, // per IP + email
   loginIp: { limit: 50, windowMs: 15 * 60_000 }, // per IP, any email
   message: { limit: 20, windowMs: 10_000 }, // per user
+  reaction: { limit: 30, windowMs: 10_000 }, // per user
   upload: { limit: 20, windowMs: 60_000 }, // per user
+  conversation: { limit: 20, windowMs: 60_000 }, // per user: opening / creating chats
+  settings: { limit: 10, windowMs: 60_000 }, // per user
+  // per user: every page load of every tab re-sends its push subscription
+  push: { limit: 30, windowMs: 60_000 },
+  // per user: every incoming message and tab focus marks seen, so this is generous
+  seen: { limit: 120, windowMs: 60_000 },
 } as const;
 
 type LimitName = keyof typeof LIMITS;
@@ -45,7 +55,7 @@ interface LimitResult {
 // (Awaiting connect() here would hang every request while Redis is unreachable,
 // since node-redis keeps retrying without settling the promise.)
 const readyRedisClient = () => {
-  const url = process.env.REDIS_URL;
+  const url = getRedisUrl();
   if (!url) {
     return null;
   }
@@ -60,7 +70,7 @@ const readyRedisClient = () => {
       // reconnect attempts fire this repeatedly; log at most once a minute
       if (Date.now() - lastRedisErrorLog > 60_000) {
         lastRedisErrorLog = Date.now();
-        console.log(error, "REDIS_RATE_LIMIT_ERROR");
+        logError("redis_rate_limit", error);
       }
     });
     client.connect().catch(() => {});
@@ -130,7 +140,7 @@ export const rateLimit = async (name: LimitName, key: string): Promise<LimitResu
     try {
       return await withTimeout(hitRedis(client, bucketKey, limit, windowMs));
     } catch (error) {
-      console.log(error, "ERROR_RATE_LIMIT_REDIS");
+      logError("rate_limit_redis", error);
     }
   }
   return hitMemory(bucketKey, limit, windowMs);

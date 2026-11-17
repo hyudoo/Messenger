@@ -16,7 +16,8 @@
     "offline": "Ngoại tuyến",
     "members": "{count} thành viên",
     "select_placeholder": "Chọn...",
-    "no_options": "Không có lựa chọn"
+    "no_options": "Không có lựa chọn",
+    "clear": "Xoá tìm kiếm"
   },
   "theme": {
     "toggle": "Đổi giao diện sáng / tối",
@@ -68,8 +69,17 @@
     "new_group": "Tạo nhóm chat",
     "empty": "Chọn một cuộc trò chuyện hoặc bắt đầu một cuộc trò chuyện mới.",
     "last_image": "Đã gửi một hình ảnh.",
-    "last_call": "Cuộc trò chuyện bằng video",
-    "no_messages": "Bắt đầu cuộc trò chuyện."
+    "last_call": "{kind, select, audio {Cuộc gọi thoại} other {Cuộc gọi video}}",
+    "no_messages": "Bắt đầu cuộc trò chuyện.",
+    "last_call_declined": "{kind, select, audio {Cuộc gọi thoại bị từ chối} other {Cuộc gọi video bị từ chối}}",
+    "last_call_missed": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
+    "last_call_ended": "{kind, select, audio {Cuộc gọi thoại} other {Cuộc gọi video}} · {duration}",
+    "search": "Tìm cuộc trò chuyện",
+    "no_results": "Không tìm thấy cuộc trò chuyện nào.",
+    "last_from": "{name}: {text}",
+    "you": "Bạn",
+    "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
+    "last_recalled": "Tin nhắn đã được thu hồi."
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -83,15 +93,47 @@
     "send_failed": "Gửi tin nhắn không thành công!",
     "send_too_fast": "Bạn gửi tin quá nhanh, chờ vài giây rồi thử lại!",
     "seen_by": "{names} đã xem.",
-    "outgoing_call": "Cuộc gọi đi",
-    "incoming_call": "Cuộc gọi đến"
+    "outgoing_call": "{kind, select, audio {Cuộc gọi thoại đi} other {Cuộc gọi video đi}}",
+    "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
+    "call_declined_by_other": "Cuộc gọi bị từ chối",
+    "call_declined_by_you": "Bạn đã từ chối cuộc gọi",
+    "call_no_answer": "Không có người trả lời",
+    "call_missed": "Cuộc gọi nhỡ",
+    "call_duration": "Thời lượng {duration}",
+    "send_quick": "Gửi {emoji}",
+    "audio_call": "Gọi thoại",
+    "new_messages": "{count, plural, one {# tin nhắn mới} other {# tin nhắn mới}}",
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "sending": "Đang gửi...",
+    "retry": "Thử lại",
+    "discard": "Bỏ",
+    "image_uploading": "Đang tải ảnh lên...",
+    "reply": "Trả lời",
+    "edit": "Sửa",
+    "recall": "Thu hồi",
+    "recall_confirm": "Thu hồi?",
+    "recall_failed": "Không thu hồi được tin nhắn!",
+    "recalled": "Tin nhắn đã được thu hồi",
+    "edited": "Đã chỉnh sửa",
+    "editing": "Đang sửa tin nhắn",
+    "replying_to": "Đang trả lời {name}",
+    "cancel_compose": "Huỷ",
+    "save_edit": "Lưu thay đổi",
+    "edit_failed": "Không sửa được tin nhắn!",
+    "edit_expired": "Đã quá thời gian sửa tin nhắn này.",
+    "reply_image": "Hình ảnh",
+    "reply_call": "Cuộc gọi",
+    "reply_jump": "Xem tin nhắn gốc",
+    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
     "delete": "Xoá",
     "email": "Email",
     "emails": "Email",
-    "joined": "Tham gia"
+    "joined": "Tham gia",
+    "leave": "Rời nhóm"
   },
   "confirm_delete": {
     "title": "Xoá cuộc trò chuyện",
@@ -104,7 +146,9 @@
     "members": "Thành viên"
   },
   "users": {
-    "title": "Mọi người"
+    "title": "Mọi người",
+    "search": "Tìm theo tên hoặc email",
+    "no_results": "Không tìm thấy ai."
   },
   "settings": {
     "profile_title": "Hồ sơ",
@@ -113,9 +157,14 @@
     "photo": "Ảnh đại diện",
     "change_photo": "Thay đổi",
     "appearance_title": "Giao diện",
-    "appearance_description": "Áp dụng ngay trên trình duyệt này.",
+    "appearance_description": "Chế độ màu áp dụng ngay trên trình duyệt này, ngôn ngữ áp dụng khi bấm Lưu.",
     "theme": "Chế độ màu",
-    "language": "Ngôn ngữ"
+    "language": "Ngôn ngữ",
+    "notifications_title": "Thông báo",
+    "notifications_description": "Báo tin nhắn mới trên máy khi bạn không xem cửa sổ này, kể cả khi đã đóng tab (nếu trình duyệt hỗ trợ). Áp dụng trên trình duyệt này.",
+    "notifications_toggle": "Thông báo tin nhắn mới",
+    "notifications_denied": "Trình duyệt đang chặn thông báo của trang này. Hãy cho phép trong phần cài đặt trang của trình duyệt.",
+    "notifications_unsupported": "Trình duyệt này không hỗ trợ thông báo."
   },
   "upload": {
     "unsupported_type": "Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP",
@@ -124,7 +173,7 @@
     "failed": "Tải ảnh lên thất bại"
   },
   "call": {
-    "is_calling": "đang gọi cho bạn.",
+    "incoming": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
     "hint": "Cuộc gọi sẽ bắt đầu ngay sau khi bạn chấp nhận",
     "decline": "Từ chối",
     "accept": "Chấp nhận",
@@ -133,6 +182,47 @@
     "camera_on": "Bật camera",
     "mic_off": "Tắt micro",
     "mic_on": "Bật micro",
-    "leave": "Rời cuộc gọi"
+    "leave": "Rời cuộc gọi",
+    "status_waiting": "Đang chờ {name}…",
+    "status_connecting": "Đang kết nối…",
+    "status_reconnecting": "Mất kết nối, đang thử lại…",
+    "status_failed": "Không thể kết nối",
+    "camera_is_off": "{name} đã tắt camera",
+    "muted": "Đã tắt micro",
+    "you": "Bạn",
+    "declined": "{name} đã từ chối cuộc gọi",
+    "no_answer": "{name} không trả lời",
+    "audio_call": "Cuộc gọi thoại",
+    "camera_error": "Không bật được camera!"
+  },
+  "emoji": {
+    "open": "Chọn biểu tượng cảm xúc",
+    "search": "Tìm biểu tượng",
+    "clear": "Xoá",
+    "no_results": "Không tìm thấy biểu tượng nào",
+    "loading": "Đang tải…"
+  },
+  "reactions": {
+    "add": "Thả cảm xúc",
+    "more": "Biểu tượng khác",
+    "react_with": "Thả {emoji}",
+    "reacted_by": "{emoji} {names}",
+    "you": "Bạn",
+    "failed": "Không thả được cảm xúc!"
+  },
+  "confirm_leave": {
+    "title": "Rời nhóm",
+    "description": "Bạn sẽ không nhận được tin nhắn của nhóm này nữa. Muốn quay lại thì phải có người tạo nhóm mới với bạn.",
+    "confirm": "Rời nhóm"
+  },
+  "notifications": {
+    "image": "Đã gửi một hình ảnh.",
+    "prompt_title": "Bật thông báo tin nhắn",
+    "prompt_body": "Nhận thông báo trên máy khi có tin nhắn mới, kể cả khi đã đóng tab.",
+    "prompt_enable": "Bật thông báo",
+    "prompt_later": "Để sau",
+    "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt.",
+    "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
+    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}"
   }
 }

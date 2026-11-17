@@ -1,5 +1,7 @@
 import axios from "axios";
 import { useCallback, useState } from "react";
+import { toast } from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { SafeUser } from "@/app/types";
 
@@ -11,6 +13,7 @@ interface UserBoxProps {
 }
 
 const UserBox: React.FC<UserBoxProps> = ({ data }) => {
+  const t = useTranslations("common");
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -22,15 +25,22 @@ const UserBox: React.FC<UserBoxProps> = ({ data }) => {
       .then((data) => {
         router.push(`/conversations/${data.data.id}`);
       })
+      .catch(() => toast.error(t("error")))
       .finally(() => setIsLoading(false));
-  }, [data, router]);
+  }, [data, router, t]);
 
   return (
     <>
       {isLoading && <LoadingModal />}
-      <div
+      <button
+        type="button"
         onClick={handleClick}
+        disabled={isLoading}
         className="w-full
+            text-left
+            focus:outline-none
+            focus-visible:ring-2
+            focus-visible:ring-sky-500
             relative
             flex
             items-center
@@ -50,7 +60,7 @@ const UserBox: React.FC<UserBoxProps> = ({ data }) => {
             </div>
           </div>
         </div>
-      </div>
+      </button>
     </>
   );
 };

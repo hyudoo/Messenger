@@ -26,8 +26,27 @@ model User {
   seenMessageIds String[]  @db.ObjectId
   seenMessages   Message[] @relation("Seen", fields: [seenMessageIds], references: [id])
 
-  accounts Account[]
-  messages Message[]
+  accounts          Account[]
+  messages          Message[]
+  reactions         Reaction[]
+  pushSubscriptions WebPushSubscription[]
+}
+
+// A browser's Web Push subscription (app/libs/web-push.ts). One row per browser endpoint: signing
+// in as someone else in the same browser moves it to that user.
+model WebPushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  // the language the notifications are written in (the app's locale when subscribing)
+  locale    String
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Account {
@@ -55,6 +74,9 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   name          String?
   isGroup       Boolean?
+  // Groups only: the member who may delete the group for everyone (the creator; passed on to another
+  // member when they leave). Missing on groups from before it existed: any member may delete those.
+  ownerId       String?  @db.ObjectId
 
   messages Message[]
 
@@ -68,11 +90,32 @@ model Message {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   body      String?
   isCall    Boolean?
+  // Calls only: audio or video. Missing on calls from before audio calls existed = video.
+  callType       CallType?
+  // Calls only, kept by the socket server (server/call-log.ts): ringing -> answered -> ended, or
+  // ringing -> declined / missed. Duration = callEndedAt - callAnsweredAt. Missing on older calls.
+  callStatus     CallStatus?
+  callAnsweredAt DateTime?
+  callEndedAt    DateTime?
   image     String?
   createdAt DateTime @default(now())
+  // set when the sender edits the body (PATCH /api/messages/[messageId])
+  editedAt  DateTime?
+  // set when the sender recalls the message (DELETE /api/messages/[messageId]): body, image and
+  // reactions are removed, the row stays so the chat shows "message recalled" in its place
+  deletedAt DateTime?
+
+  // the message this one replies to (same conversation). NoAction: required by MongoDB for a
+  // self-relation; the original is never hard-deleted on its own (recall keeps the row, and a
+  // conversation delete removes both)
+  replyToId String?   @db.ObjectId
+  replyTo   Message?  @relation("Replies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Message[] @relation("Replies")
 
   seenIds String[] @db.ObjectId
   seen    User[]   @relation("Seen", fields: [seenIds], references: [id])
+
+  reactions Reaction[]
 
   conversationId String       @db.ObjectId
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -81,4 +124,34 @@ model Message {
   sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+// An emoji reaction to a message (POST /api/messages/[messageId]/reactions). One per user per
+// message: the same emoji again removes it, another one replaces it. Deleted with the message
+// (or the user) through the cascade.
+model Reaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  emoji     String
+  createdAt DateTime @default(now())
+
+  messageId String  @db.ObjectId
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+enum CallType {
+  audio
+  video
+}
+
+enum CallStatus {
+  ringing
+  answered
+  declined
+  missed
+  ended
 }

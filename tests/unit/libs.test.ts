@@ -1,9 +1,11 @@
 import { createHmac } from "crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { getIceServers } from "@/app/libs/ice-servers";
 import { validatePassword } from "@/app/libs/password";
 import { LIMITS, clientIp, rateLimit } from "@/app/libs/rate-limit";
+import { getRedisUrl } from "@/app/libs/redis-url";
 import { createPresignedUpload, isUploadedFileUrl } from "@/app/libs/s3";
 import { ME, OTHER, S3_BASE, resetRateLimits, uploadUrl } from "../helpers";
 
@@ -99,6 +101,32 @@ describe("rateLimit (in memory)", () => {
   });
 });
 
+describe("getRedisUrl", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is null when nothing is configured", () => {
+    expect(getRedisUrl()).toBeNull();
+  });
+
+  it("builds the URL from host, port and an encoded password", () => {
+    vi.stubEnv("REDIS_HOST", "localhost");
+    vi.stubEnv("REDIS_PORT", "6380");
+    vi.stubEnv("REDIS_PASSWORD", "p@ss:w/rd#1");
+    expect(getRedisUrl()).toBe("redis://:p%40ss%3Aw%2Frd%231@localhost:6380");
+  });
+
+  it("defaults the port and omits auth without a password", () => {
+    vi.stubEnv("REDIS_HOST", "redis");
+    expect(getRedisUrl()).toBe("redis://redis:6379");
+  });
+
+  it("prefers REDIS_URL when both are set", () => {
+    vi.stubEnv("REDIS_HOST", "localhost");
+    vi.stubEnv("REDIS_URL", "rediss://cloud:6380");
+    expect(getRedisUrl()).toBe("rediss://cloud:6380");
+  });
+});
+
 // needs a real Redis: TEST_REDIS_URL=redis://localhost:6390 npm test
 describe.skipIf(!process.env.TEST_REDIS_URL)("rateLimit (Redis)", () => {
   afterEach(() => {
@@ -171,5 +199,32 @@ describe("getIceServers", () => {
     expect(turn.credential).toBe(
       createHmac("sha1", "shared-secret").update(String(turn.username)).digest("base64")
     );
+  });
+});
+
+describe("call duration", () => {
+  it("is the time from answer to hang-up, from Dates or ISO strings (socket.io)", () => {
+    const answered = new Date("2026-11-16T10:00:00Z");
+    expect(
+      callDurationSeconds({ callAnsweredAt: answered, callEndedAt: new Date("2026-11-16T10:03:25.400Z") })
+    ).toBe(205);
+    expect(
+      callDurationSeconds({
+        callAnsweredAt: "2026-11-16T10:00:00.000Z",
+        callEndedAt: "2026-11-16T10:00:07.000Z",
+      })
+    ).toBe(7);
+  });
+
+  it("is null for a call that was never answered or hasn't ended", () => {
+    expect(callDurationSeconds({ callEndedAt: new Date() })).toBeNull();
+    expect(callDurationSeconds({ callAnsweredAt: new Date(), callEndedAt: null })).toBeNull();
+  });
+
+  it("formats like a phone's call log", () => {
+    expect(formatCallDuration(0)).toBe("0:00");
+    expect(formatCallDuration(7)).toBe("0:07");
+    expect(formatCallDuration(205)).toBe("3:25");
+    expect(formatCallDuration(3729)).toBe("1:02:09");
   });
 });

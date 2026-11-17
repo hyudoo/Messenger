@@ -3,7 +3,9 @@
 import { SafeUser } from "@/app/types";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import axios from "axios";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { MdOutlineGroupAdd } from "react-icons/md";
 import clsx from "clsx";
 import { find } from "lodash";
@@ -11,9 +13,12 @@ import { find } from "lodash";
 import useConversation from "@/app/hooks/useConversation";
 import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
+import SearchInput from "@/app/components/inputs/SearchInput";
+import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
-import { FullConversationType, FullCallType } from "@/app/types";
-import IncomingCallModal from "@/app/components/modals/IncomingCallModal";
+import { ConversationUpdate, FullConversationType } from "@/app/types";
+import { matchesSearch } from "@/app/libs/search";
+import { formatUnread } from "@/app/libs/unread";
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
@@ -26,14 +31,43 @@ const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isCallOpen, setIsCallOpen] = useState(false);
-  const [otherUser, setOtherUser] = useState<SafeUser>();
-  const [roomId, setRoomId] = useState<String>();
+  const [query, setQuery] = useState("");
 
   const t = useTranslations("conversations");
   const router = useRouter();
+  const myEmail = useSession().data?.user?.email;
 
   const { conversationId, isOpen } = useConversation();
+
+  // the socket handlers below are registered per conversation, not per session change
+  const myEmailRef = useRef(myEmail);
+  useLayoutEffect(() => {
+    myEmailRef.current = myEmail;
+  });
+
+  // Tab title badge: "(3) Messenger" while there are unread messages. Re-applied after
+  // navigations, which reset the title from the page metadata.
+  const totalUnread = items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0);
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\) /, "");
+    const apply = () => {
+      document.title = totalUnread > 0 ? `(${formatUnread(totalUnread)}) ${base}` : base;
+    };
+    apply();
+    const frame = requestAnimationFrame(apply);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.title = base;
+    };
+  }, [totalUnread, conversationId]);
+
+  const visibleItems = items.filter((item) =>
+    matchesSearch(
+      query,
+      item.name,
+      ...item.users.filter((user) => user.email !== myEmail).map((user) => user.name)
+    )
+  );
 
   // The server puts every socket in its user's room on connect, so these
   // per-user events need no explicit subscription.
@@ -50,12 +84,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
 
     // A new message also carries lastMessageAt: that conversation moves to the top.
-    // "Seen" updates don't, so the order stays put.
-    const updateHandler = (
-      conversation: Pick<FullConversationType, "id" | "messages"> & {
-        lastMessageAt?: string;
+    // "Seen" updates don't, so the order stays put. A member leaving a group sends the
+    // new member list instead of messages.
+    const updateHandler = (conversation: ConversationUpdate) => {
+      if (conversation.users && conversation.id === conversationId) {
+        // the open chat's header and drawer come from the server component
+        router.refresh();
       }
-    ) => {
       setItems((current) => {
         const target = current.find((item) => item.id === conversation.id);
         if (!target) {
@@ -63,7 +98,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
         }
         const updated = {
           ...target,
-          messages: conversation.messages,
+          ...(conversation.messages && {
+            messages: conversation.messages,
+            unreadCount: nextUnread(target, conversation),
+          }),
+          ...(conversation.users && {
+            users: conversation.users,
+            userIds: conversation.userIds ?? target.userIds,
+            ownerId: conversation.ownerId ?? null,
+          }),
           ...(conversation.lastMessageAt && {
             lastMessageAt: new Date(conversation.lastMessageAt),
           }),
@@ -75,7 +118,31 @@ const ConversationList: React.FC<ConversationListProps> = ({
       });
     };
 
-    const removeHandler = (conversation: FullConversationType) => {
+    // A message the user has seen (or sent) clears the count; a new one from someone else adds
+    // one, unless it arrived in the chat the user is looking at (Body marks it seen right away).
+    const nextUnread = (target: FullConversationType, update: ConversationUpdate) => {
+      const last = update.messages?.[update.messages.length - 1];
+      const me = myEmailRef.current;
+      if (!last || last.sender?.email === me || last.seen?.some((user) => user.email === me)) {
+        return 0;
+      }
+      const watching =
+        update.id === conversationId && document.visibilityState === "visible";
+      return update.lastMessageAt && !watching
+        ? (target.unreadCount ?? 0) + 1
+        : target.unreadCount ?? 0;
+    };
+
+    // Events sent while the socket was down are lost (sleep, network change), so every
+    // (re)connection reloads the list. Also covers the gap between server render and connect.
+    const resyncHandler = () => {
+      axios
+        .get<FullConversationType[]>("/api/conversations")
+        .then(({ data }) => setItems(data))
+        .catch(() => {}); // keep what is shown; the next reconnect tries again
+    };
+
+    const removeHandler = (conversation: Pick<FullConversationType, "id">) => {
       setItems((current) => {
         return [...current.filter((convo) => convo.id !== conversation.id)];
       });
@@ -84,33 +151,21 @@ const ConversationList: React.FC<ConversationListProps> = ({
       }
     };
 
-    const incomingCallHandler = (call: FullCallType) => {
-      setOtherUser(call.user);
-      setRoomId(call.id);
-      setIsCallOpen(true);
-    };
-
     socket.on("conversation:new", newHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
-    socket.on("call:incoming", incomingCallHandler);
+    socket.on("connect", resyncHandler);
 
     return () => {
+      socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
-      socket.off("call:incoming", incomingCallHandler);
     };
   }, [router, conversationId]);
 
   return (
     <>
-      <IncomingCallModal
-        user={otherUser!}
-        roomId={roomId!}
-        isOpen={isCallOpen}
-        onClose={() => setIsCallOpen(false)}
-      />
       <GroupChatModal
         users={users}
         isOpen={isModalOpen}
@@ -152,13 +207,20 @@ const ConversationList: React.FC<ConversationListProps> = ({
               <MdOutlineGroupAdd size={20} />
             </button>
           </div>
-          {items.map((item) => (
+          <NotificationPrompt />
+          {items.length > 0 && (
+            <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
+          )}
+          {visibleItems.map((item) => (
             <ConversationBox
               key={item.id}
               data={item}
               selected={conversationId === item.id}
             />
           ))}
+          {query && visibleItems.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t("no_results")}</p>
+          )}
         </div>
       </aside>
     </>

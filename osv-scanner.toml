@@ -1,0 +1,12 @@
+# Advisories accepted for now by the CI audit job (passed with --config). Each entry expires on ignoreUntil, after
+# which the job flags it again: re-check whether the upstream packages have moved to a fixed version, then bump or extend.
+
+[[IgnoredVulns]]
+id = "GHSA-ggr8-5vv4-36mx"
+ignoreUntil = 2027-02-16
+reason = "deepmerge-ts <8.0.0 stack exhaustion on recursive object graphs. Only pulled in by the prisma CLI (@prisma/config), which merges our own config; the fix is Prisma 7, which has no MongoDB support yet."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-02-16
+reason = "minimatch 10.x globparts DoS. Pulled in by typescript-eslint (via eslint-config-next), matching only patterns we write; dev only, waits on an upstream bump."

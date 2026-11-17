@@ -32,7 +32,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
     <div className="lg:pl-80 h-full">
       <div className="h-full flex flex-col">
         <Header conversation={conversation} />
-        <Body initialMessages={messages} initialHasMore={hasMore} />
+        <Body initialMessages={messages} initialHasMore={hasMore} members={conversation.users} />
         <Form />
       </div>
     </div>

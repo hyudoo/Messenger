@@ -1,12 +1,11 @@
-import path from "path";
 import { defineConfig } from "vitest/config";
 
-// Stay on Vitest 3: Vitest 5 fails every test file ("Cannot read properties of
-// undefined (reading 'config')") when the shell reports the drive in lower case
-// (e:\ instead of E:\), as VS Code does here.
+// Run from E:\gitlab\Messenger, not e:\: Vitest 5 fails every test file
+// ("Cannot read properties of undefined (reading 'config')") when the shell
+// reports the drive in lower case.
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname) },
+    alias: { "@": import.meta.dirname },
   },
   test: {
     environment: "node",
@@ -20,6 +19,7 @@ export default defineConfig({
       NEXT_PUBLIC_S3_PUBLIC_URL: "",
       NEXTAUTH_SECRET: "test-nextauth-secret",
       REDIS_URL: "",
+      REDIS_HOST: "",
     },
     // socket tests open real servers and connections
     testTimeout: 15_000,

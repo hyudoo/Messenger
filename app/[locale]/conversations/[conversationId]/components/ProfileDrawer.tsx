@@ -2,7 +2,8 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { Dialog, DialogPanel, Transition, TransitionChild } from "@headlessui/react";
-import { IoClose, IoTrash } from "react-icons/io5";
+import { IoClose, IoExitOutline, IoTrash } from "react-icons/io5";
+import { useSession } from "next-auth/react";
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
 import { format } from "date-fns";
@@ -11,6 +12,10 @@ import { useTranslations } from "next-intl";
 import useDateLocale from "@/app/hooks/useDateLocale";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
+import {
+  canDeleteConversation,
+  canLeaveConversation,
+} from "@/app/libs/conversation-permissions";
 import { useIsActive } from "@/app/hooks/useActiveList";
 
 import Avatar from "@/app/components/Avatar";
@@ -33,7 +38,18 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
   const t = useTranslations();
   const dateLocale = useDateLocale();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // kept after closing, so the modal's text doesn't change while it fades out
+  const [confirmAction, setConfirmAction] = useState<"delete" | "leave">("delete");
+  const openConfirm = (action: "delete" | "leave") => {
+    setConfirmAction(action);
+    setConfirmOpen(true);
+  };
   const otherUser = useOtherUser(data);
+  const myEmail = useSession().data?.user?.email;
+  const myId = data.users.find((user) => user.email === myEmail)?.id;
+  // the same rules as the API (a group: leave; delete only by its owner)
+  const canDelete = !!myId && canDeleteConversation(data, myId);
+  const canLeave = canLeaveConversation(data);
 
   const joinedDate = useMemo(() => {
     return format(new Date(otherUser.createdAt), "PP", { locale: dateLocale });
@@ -55,6 +71,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     <>
       <ConfirmModal
         isOpen={confirmOpen}
+        action={confirmAction}
         onClose={() => setConfirmOpen(false)}
       />
       <Transition show={isOpen} as={Fragment}>
@@ -109,16 +126,32 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                             {statusText}
                           </div>
                           <div className="flex gap-10 my-8">
-                            <div
-                              onClick={() => setConfirmOpen(true)}
-                              className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75">
-                              <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-                                <IoTrash size={20} />
-                              </div>
-                              <div className="text-sm font-light text-muted-foreground">
-                                {t("profile.delete")}
-                              </div>
-                            </div>
+                            {canLeave && (
+                              <button
+                                type="button"
+                                onClick={() => openConfirm("leave")}
+                                className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75">
+                                <span className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                                  <IoExitOutline size={20} aria-hidden />
+                                </span>
+                                <span className="text-sm font-light text-muted-foreground">
+                                  {t("profile.leave")}
+                                </span>
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => openConfirm("delete")}
+                                className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75">
+                                <span className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                                  <IoTrash size={20} aria-hidden />
+                                </span>
+                                <span className="text-sm font-light text-muted-foreground">
+                                  {t("profile.delete")}
+                                </span>
+                              </button>
+                            )}
                           </div>
                           <div className="w-full pb-5 pt-5 sm:px-0 sm:pt-0">
                             <dl className="space-y-8 px-4 sm:space-y-6 sm:px-6">

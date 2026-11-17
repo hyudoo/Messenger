@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import {
   HiVideoCamera,
   HiVideoCameraSlash,
@@ -16,6 +17,14 @@ interface FooterProps {
   leaveRoom: () => void;
 }
 
+const toggleClass = (active: boolean) =>
+  clsx(
+    "flex h-14 w-14 items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+    active
+      ? "bg-white/15 text-white backdrop-blur hover:bg-white/25"
+      : "bg-white text-neutral-900 hover:bg-neutral-200"
+  );
+
 const Footer: React.FC<FooterProps> = ({
   micActive,
   cameraActive,
@@ -25,49 +34,45 @@ const Footer: React.FC<FooterProps> = ({
 }) => {
   const t = useTranslations("call");
 
+  const cameraLabel = cameraActive ? t("camera_off") : t("camera_on");
+  const micLabel = micActive ? t("mic_off") : t("mic_on");
+
   return (
-    <div className="backdrop-opacity-10 fixed bottom-5 inset-x-2/4">
-      <div className="flex justify-evenly gap-12">
-        {cameraActive ? (
-          <button
-            type="button"
-            className="bg-purple-500 p-3 cursor-pointer rounded-full"
-            aria-label={t("camera_off")}
-            onClick={() => toggleCamera()}>
-            <HiVideoCamera size={24} className="text-white" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="bg-purple-500 p-3 cursor-pointer rounded-full"
-            aria-label={t("camera_on")}
-            onClick={() => toggleCamera()}>
-            <HiVideoCameraSlash size={24} className="text-white" />
-          </button>
-        )}
-        {micActive ? (
-          <button
-            type="button"
-            className="bg-purple-500 p-3 cursor-pointer rounded-full"
-            aria-label={t("mic_off")}
-            onClick={() => toggleMic()}>
-            <FaMicrophone size={24} className="text-white" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="bg-purple-500 p-3 cursor-pointer rounded-full"
-            aria-label={t("mic_on")}
-            onClick={() => toggleMic()}>
-            <FaMicrophoneSlash size={24} className="text-white" />
-          </button>
-        )}
+    <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-black/70 to-transparent px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
+      <div className="flex items-center gap-4 sm:gap-6">
         <button
           type="button"
-          className="bg-red-500 p-3 cursor-pointer rounded-full"
+          className={toggleClass(micActive)}
+          aria-label={micLabel}
+          aria-pressed={!micActive}
+          title={micLabel}
+          onClick={toggleMic}>
+          {micActive ? (
+            <FaMicrophone size={22} />
+          ) : (
+            <FaMicrophoneSlash size={22} />
+          )}
+        </button>
+        <button
+          type="button"
+          className={toggleClass(cameraActive)}
+          aria-label={cameraLabel}
+          aria-pressed={!cameraActive}
+          title={cameraLabel}
+          onClick={toggleCamera}>
+          {cameraActive ? (
+            <HiVideoCamera size={24} />
+          ) : (
+            <HiVideoCameraSlash size={24} />
+          )}
+        </button>
+        <button
+          type="button"
+          className="flex h-14 w-20 items-center justify-center rounded-full bg-red-600 text-white transition hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           aria-label={t("leave")}
-            onClick={() => leaveRoom()}>
-          <HiPhoneXMark size={24} className="text-white" />
+          title={t("leave")}
+          onClick={leaveRoom}>
+          <HiPhoneXMark size={26} />
         </button>
       </div>
     </div>

@@ -34,3 +34,23 @@ body,
 body {
   @apply bg-background text-foreground;
 }
+
+/* a message reached from a reply's quote (MessageReply.tsx): a short highlight */
+@keyframes message-flash {
+  0%,
+  60% {
+    background-color: rgb(14 165 233 / 0.18); /* sky-500 */
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.message-flash {
+  animation: message-flash 1.6s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-flash {
+    animation: none;
+    background-color: rgb(14 165 233 / 0.18);
+  }
+}

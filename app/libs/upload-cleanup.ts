@@ -1,5 +1,6 @@
 import prisma from "@/app/libs/prismadb";
 import { deleteUploadedObjects } from "@/app/libs/s3";
+import { logError } from "./log";
 
 // Removes uploaded files that nothing points at any more (no user avatar, no
 // message image). Call it after the rows that used them are updated or deleted.
@@ -25,5 +26,5 @@ export const cleanUpUploads = (urls: (string | null | undefined)[]) => {
       [...usedByMessages, ...usedByUsers].map((row) => row.image)
     );
     await deleteUploadedObjects(candidates.filter((url) => !stillUsed.has(url)));
-  })().catch((error) => console.log(error, "ERROR_UPLOAD_CLEANUP"));
+  })().catch((error) => logError("upload_cleanup", error));
 };
