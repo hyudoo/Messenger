@@ -121,7 +121,7 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
         selected ? "bg-muted" : "bg-background"
       )}>
       {data.isGroup ? (
-        <AvatarGroup users={data.users} />
+        <AvatarGroup users={data.users} image={data.image} />
       ) : (
         <Avatar user={otherUser} />
       )}

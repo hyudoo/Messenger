@@ -47,11 +47,22 @@ export type FullConversationType = Conversation & {
 export type ConversationSettings = { id: string; muted: boolean; pinned: boolean };
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
-// notifications), a seen update (messages only) or a group change (users with name / ownerId:
-// renamed, members added or removed, someone left).
+// notifications), a seen update (messages only) or a group change (users with name / ownerId /
+// adminIds / image / inviteCode: renamed, new photo, members or admins changed, someone left).
 export type ConversationUpdate = Pick<FullConversationType, "id"> &
   Partial<
-    Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId" | "name" | "isGroup">
+    Pick<
+      FullConversationType,
+      | "messages"
+      | "users"
+      | "userIds"
+      | "ownerId"
+      | "adminIds"
+      | "image"
+      | "inviteCode"
+      | "name"
+      | "isGroup"
+    >
   > & {
     lastMessageAt?: string;
     // the recipient muted this conversation: no notification

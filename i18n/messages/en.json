@@ -17,7 +17,8 @@
     "members": "{count, plural, one {# member} other {# members}}",
     "select_placeholder": "Select...",
     "no_options": "No options",
-    "clear": "Clear search"
+    "clear": "Clear search",
+    "group_photo": "Group photo"
   },
   "theme": {
     "toggle": "Toggle light / dark theme",
@@ -205,7 +206,20 @@
     "remove_confirm": "Click again to remove {name} from the group",
     "remove_short": "Remove?",
     "update_failed": "Couldn't update the group!",
-    "too_fast": "Too many changes, wait a moment and try again!"
+    "too_fast": "Too many changes, wait a moment and try again!",
+    "admin": "Admin",
+    "make_admin": "Make {name} an admin",
+    "unmake_admin": "Remove {name} as admin",
+    "change_photo": "Change photo",
+    "remove_photo": "Remove photo",
+    "invite_title": "Invite link",
+    "invite_hint": "Anyone with the link can join the group.",
+    "invite_on": "Create link",
+    "invite_reset": "Reset link",
+    "invite_off": "Turn off",
+    "invite_copy": "Copy",
+    "invite_copied": "Invite link copied!",
+    "invite_copy_failed": "Couldn't copy the link!"
   },
   "users": {
     "title": "People",
@@ -282,7 +296,11 @@
     "you_subject": "You",
     "you_object": "you",
     "someone": "Someone",
-    "pinned": "{actor} pinned a message"
+    "pinned": "{actor} pinned a message",
+    "photo": "{actor} changed the group photo",
+    "promoted": "{actor} made {users} an admin",
+    "demoted": "{actor} removed {users} as admin",
+    "joined": "{actor} joined the group via the invite link"
   },
   "presence": {
     "just_now": "Active just now",
@@ -358,5 +376,15 @@
     "all": "All ({count})",
     "unpin": "Unpin",
     "failed": "Couldn't unpin!"
+  },
+  "join": {
+    "invited": "You're invited to join",
+    "members": "{count, plural, one {# member} other {# members}}",
+    "join": "Join group",
+    "back": "Back to chats",
+    "invalid_title": "This invite link no longer works",
+    "invalid": "It was turned off or reset. Ask a member of the group for a new one.",
+    "failed": "Couldn't join the group!",
+    "too_fast": "You're going too fast, wait a moment and try again!"
   }
 }

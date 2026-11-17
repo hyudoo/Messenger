@@ -6,10 +6,19 @@ import { useTranslations } from "next-intl";
 
 interface AvatarGroupProps {
   users?: SafeUser[];
+  // the group's photo: shown instead of its members' faces
+  image?: string | null;
 }
 
-const AvatarGroup: React.FC<AvatarGroupProps> = ({ users = [] }) => {
+const AvatarGroup: React.FC<AvatarGroupProps> = ({ users = [], image }) => {
   const t = useTranslations("common");
+  if (image) {
+    return (
+      <div className="relative h-11 w-11 overflow-hidden rounded-full">
+        <Image fill src={image} alt={t("group_photo")} className="object-cover" />
+      </div>
+    );
+  }
   const slicedUser = users.slice(0, 3);
   const positionMap = {
     0: "top-0 left-[12px]",

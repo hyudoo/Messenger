@@ -1,12 +1,19 @@
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
 import LanguageToggle from "@/app/components/toggles/LanguageToggle";
 import ThemeToggle from "@/app/components/toggles/ThemeToggle";
+import { safeNextPath } from "@/app/libs/invite-code";
 import AuthForm from "./components/AuthForm";
 
-export default function Home() {
-  const t = useTranslations("auth");
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const t = await getTranslations("auth");
+  // where to go after signing in: an invite link the visitor opened signed out (proxy.ts)
+  const next = safeNextPath((await searchParams).next);
 
   return (
     <div
@@ -38,7 +45,7 @@ export default function Home() {
         </h2>
       </div>
 
-      <AuthForm />
+      <AuthForm next={next} />
     </div>
   );
 }

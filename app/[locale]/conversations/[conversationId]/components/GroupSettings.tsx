@@ -2,18 +2,32 @@
 
 import axios from "axios";
 import clsx from "clsx";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "react-hot-toast";
-import { useTranslations } from "next-intl";
-import { HiCheck, HiPencil, HiUserPlus, HiXMark } from "react-icons/hi2";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  HiCamera,
+  HiCheck,
+  HiLink,
+  HiOutlineShieldCheck,
+  HiPencil,
+  HiShieldCheck,
+  HiUserPlus,
+  HiXMark,
+} from "react-icons/hi2";
 
 import Avatar from "@/app/components/Avatar";
+import AvatarGroup from "@/app/components/AvatarGroup";
+import ImageUploadButton from "@/app/components/ImageUploadButton";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import {
   MAX_GROUP_NAME_LENGTH,
   canEditGroup,
+  canManageAdmins,
+  canManageInvite,
   canRemoveMember,
 } from "@/app/libs/conversation-permissions";
+import { invitePath } from "@/app/libs/invite-code";
 import { matchesSearch } from "@/app/libs/search";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
 import { useRouter } from "@/i18n/navigation";
@@ -48,6 +62,133 @@ const useGroupRequest = () => {
 interface GroupNameProps {
   conversation: ConversationWithUsers;
 }
+
+// The group's photo (or its members' faces), with buttons to change or remove it (any member).
+export const GroupPhoto: React.FC<GroupNameProps> = ({ conversation }) => {
+  const t = useTranslations("group");
+  const { busy, run } = useGroupRequest();
+  const setImage = (image: string | null) =>
+    run(() => axios.patch(`/api/conversations/${conversation.id}`, { image }));
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <AvatarGroup users={conversation.users} image={conversation.image} />
+      {canEditGroup(conversation) && (
+        <div className="flex items-center gap-1 text-xs">
+          <ImageUploadButton onUpload={setImage} disabled={busy}>
+            <span className="flex items-center gap-1 rounded-full px-2 py-1 font-medium text-sky-500 transition hover:bg-muted">
+              <HiCamera size={14} aria-hidden />
+              {t("change_photo")}
+            </span>
+          </ImageUploadButton>
+          {conversation.image && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setImage(null)}
+              className="rounded-full px-2 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+              {t("remove_photo")}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// this page's origin, for the full invite link (none while rendering on the server)
+const noSubscription = () => () => {};
+const currentOrigin = () => window.location.origin;
+const noOrigin = () => "";
+
+interface GroupInviteProps {
+  conversation: ConversationWithUsers;
+  myId?: string;
+}
+
+// The invite link: every member sees and copies it while it is on; admins turn it on, reset it
+// (the old link stops working) or turn it off.
+export const GroupInvite: React.FC<GroupInviteProps> = ({ conversation, myId }) => {
+  const t = useTranslations("group");
+  const locale = useLocale();
+  const origin = useSyncExternalStore(noSubscription, currentOrigin, noOrigin);
+  const { busy, run } = useGroupRequest();
+  const isAdmin = !!myId && canManageInvite(conversation, myId);
+  const code = conversation.inviteCode;
+
+  if (!conversation.isGroup || (!code && !isAdmin)) {
+    return null;
+  }
+  const link = code ? `${origin}/${locale}${invitePath(code)}` : "";
+  const setEnabled = (enabled: boolean) =>
+    run(() => axios.post(`/api/conversations/${conversation.id}/invite`, { enabled }));
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success(t("invite_copied"));
+    } catch {
+      toast.error(t("invite_copy_failed"));
+    }
+  };
+
+  return (
+    <section className="mb-4 w-full rounded-xl border p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <HiLink size={16} aria-hidden />
+        {t("invite_title")}
+      </h3>
+      {code ? (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={link}
+              aria-label={t("invite_title")}
+              onFocus={(event) => event.target.select()}
+              className="min-w-0 flex-1 rounded-md border bg-muted px-2 py-1 text-xs text-foreground"
+            />
+            <button
+              type="button"
+              onClick={copy}
+              className="shrink-0 rounded-md bg-sky-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-sky-600">
+              {t("invite_copy")}
+            </button>
+          </div>
+          {isAdmin && (
+            <div className="mt-2 flex justify-end gap-2 text-xs">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setEnabled(true)}
+                className="rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+                {t("invite_reset")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setEnabled(false)}
+                className="rounded-md px-2 py-1 text-rose-500 transition hover:bg-muted disabled:opacity-50">
+                {t("invite_off")}
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">{t("invite_hint")}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setEnabled(true)}
+            className="shrink-0 rounded-md bg-sky-500 px-3 py-1 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50">
+            {t("invite_on")}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+};
 
 // The group's name, with a pencil to rename it (any member).
 export const GroupName: React.FC<GroupNameProps> = ({ conversation }) => {
@@ -139,17 +280,18 @@ interface GroupMembersProps {
   users: SafeUser[];
 }
 
-// The members (owner first, then the user, then by name) with their online dot, the owner's
-// badge and, for the owner, a remove button (two clicks: the second confirms). Below, any member
-// can add people.
+// The members (owner first, then admins, then the user, then by name) with their online dot, the
+// owner's / admins' badge, for the owner a button making or unmaking admins, and for admins a remove
+// button (two clicks: the second confirms). Any member can add people.
 export const GroupMembers: React.FC<GroupMembersProps> = ({ conversation, myId, users }) => {
   const t = useTranslations("group");
   const [adding, setAdding] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const { busy, run } = useGroupRequest();
 
+  const isAdmin = (user: SafeUser) => !!conversation.adminIds?.includes(user.id);
   const rank = (user: SafeUser) =>
-    user.id === conversation.ownerId ? 0 : user.id === myId ? 1 : 2;
+    user.id === conversation.ownerId ? 0 : isAdmin(user) ? 1 : user.id === myId ? 2 : 3;
   const members = [...conversation.users].sort(
     (a, b) => rank(a) - rank(b) || (a.name ?? "").localeCompare(b.name ?? "")
   );
@@ -205,14 +347,53 @@ export const GroupMembers: React.FC<GroupMembersProps> = ({ conversation, myId, 
                   {member.name}
                   {member.id === myId && ` (${t("you")})`}
                 </span>
-                {member.id === conversation.ownerId && (
+                {member.id === conversation.ownerId ? (
                   <span className="shrink-0 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
                     {t("owner")}
                   </span>
+                ) : (
+                  isAdmin(member) && (
+                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {t("admin")}
+                    </span>
+                  )
                 )}
               </div>
               <div className="truncate text-xs text-muted-foreground">{member.email}</div>
             </div>
+            {myId && canManageAdmins(conversation, myId, member.id) && (
+              <button
+                type="button"
+                disabled={busy}
+                aria-pressed={isAdmin(member)}
+                onClick={() =>
+                  run(() =>
+                    axios.patch(`/api/conversations/${conversation.id}/members/${member.id}`, {
+                      admin: !isAdmin(member),
+                    })
+                  )
+                }
+                aria-label={
+                  isAdmin(member)
+                    ? t("unmake_admin", { name: member.name ?? "" })
+                    : t("make_admin", { name: member.name ?? "" })
+                }
+                title={
+                  isAdmin(member)
+                    ? t("unmake_admin", { name: member.name ?? "" })
+                    : t("make_admin", { name: member.name ?? "" })
+                }
+                className={clsx(
+                  "shrink-0 rounded-full p-1.5 transition hover:bg-muted disabled:opacity-50",
+                  isAdmin(member) ? "text-sky-500" : "text-muted-foreground hover:text-foreground"
+                )}>
+                {isAdmin(member) ? (
+                  <HiShieldCheck size={16} aria-hidden />
+                ) : (
+                  <HiOutlineShieldCheck size={16} aria-hidden />
+                )}
+              </button>
+            )}
             {myId && canRemoveMember(conversation, myId, member.id) && (
               <button
                 type="button"

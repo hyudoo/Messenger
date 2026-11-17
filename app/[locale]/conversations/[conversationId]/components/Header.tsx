@@ -107,7 +107,7 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedB
             <HiChevronLeft size={32} />
           </Link>
           {conversation.isGroup ? (
-            <AvatarGroup users={conversation.users} />
+            <AvatarGroup users={conversation.users} image={conversation.image} />
           ) : (
             <Avatar user={otherUser} />
           )}

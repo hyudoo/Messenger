@@ -35,7 +35,7 @@ import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "@/i18n/navigation";
 import { HiNoSymbol } from "react-icons/hi2";
 import { ConversationSettings } from "@/app/types";
-import { GroupMembers, GroupName } from "./GroupSettings";
+import { GroupInvite, GroupMembers, GroupName, GroupPhoto } from "./GroupSettings";
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -200,7 +200,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                         <div className="flex flex-col items-center">
                           <div className="mb-2">
                             {data.isGroup ? (
-                              <AvatarGroup users={data.users} />
+                              <GroupPhoto conversation={data} />
                             ) : (
                               <Avatar user={otherUser} />
                             )}
@@ -298,7 +298,10 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                             )}
                           </div>
                           {data.isGroup ? (
-                            <GroupMembers conversation={data} myId={myId} users={users} />
+                            <div className="w-full">
+                              <GroupInvite conversation={data} myId={myId} />
+                              <GroupMembers conversation={data} myId={myId} users={users} />
+                            </div>
                           ) : (
                             <dl className="w-full space-y-6 px-4 sm:px-6">
                               <div>

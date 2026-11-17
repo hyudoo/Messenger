@@ -17,7 +17,8 @@
     "members": "{count} thành viên",
     "select_placeholder": "Chọn...",
     "no_options": "Không có lựa chọn",
-    "clear": "Xoá tìm kiếm"
+    "clear": "Xoá tìm kiếm",
+    "group_photo": "Ảnh nhóm"
   },
   "theme": {
     "toggle": "Đổi giao diện sáng / tối",
@@ -205,7 +206,20 @@
     "remove_confirm": "Bấm lần nữa để xoá {name} khỏi nhóm",
     "remove_short": "Xoá?",
     "update_failed": "Không cập nhật được nhóm!",
-    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!",
+    "admin": "Quản trị viên",
+    "make_admin": "Cho {name} làm quản trị viên",
+    "unmake_admin": "Bỏ quyền quản trị viên của {name}",
+    "change_photo": "Đổi ảnh",
+    "remove_photo": "Xoá ảnh",
+    "invite_title": "Link mời vào nhóm",
+    "invite_hint": "Ai có link đều có thể tham gia nhóm.",
+    "invite_on": "Tạo link",
+    "invite_reset": "Đặt lại link",
+    "invite_off": "Tắt link",
+    "invite_copy": "Sao chép",
+    "invite_copied": "Đã sao chép link mời!",
+    "invite_copy_failed": "Không sao chép được link!"
   },
   "users": {
     "title": "Mọi người",
@@ -282,7 +296,11 @@
     "you_subject": "Bạn",
     "you_object": "bạn",
     "someone": "Ai đó",
-    "pinned": "{actor} đã ghim một tin nhắn"
+    "pinned": "{actor} đã ghim một tin nhắn",
+    "photo": "{actor} đã đổi ảnh nhóm",
+    "promoted": "{actor} đã cho {users} làm quản trị viên",
+    "demoted": "{actor} đã bỏ quyền quản trị viên của {users}",
+    "joined": "{actor} đã tham gia nhóm qua link mời"
   },
   "presence": {
     "just_now": "Vừa mới hoạt động",
@@ -358,5 +376,15 @@
     "all": "Tất cả ({count})",
     "unpin": "Bỏ ghim",
     "failed": "Không bỏ ghim được!"
+  },
+  "join": {
+    "invited": "Bạn được mời tham gia nhóm",
+    "members": "{count} thành viên",
+    "join": "Tham gia nhóm",
+    "back": "Về hộp thư",
+    "invalid_title": "Link mời không còn hiệu lực",
+    "invalid": "Link này đã bị tắt hoặc đặt lại. Hãy xin link mới từ thành viên của nhóm.",
+    "failed": "Không tham gia được nhóm!",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
   }
 }

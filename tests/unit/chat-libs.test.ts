@@ -12,9 +12,13 @@ import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
 import { findMentions, mentionQueryAt, splitMentions } from "@/app/libs/mentions";
 import {
   canEditGroup,
+  canManageAdmins,
+  canManageInvite,
   canRemoveMember,
+  isGroupAdmin,
   normalizeGroupName,
 } from "@/app/libs/conversation-permissions";
+import { isInviteCode, safeNextPath } from "@/app/libs/invite-code";
 import {
   canEditMessage,
   canRecallMessage,
@@ -217,6 +221,32 @@ describe("group permissions", () => {
     expect(canRemoveMember({ isGroup: false, ownerId: null }, "me", "other")).toBe(false);
   });
 
+  it("knows admins: the owner, the picked ones, anyone in an ownerless group", () => {
+    const withAdmins = { isGroup: true, ownerId: "owner", adminIds: ["admin"] };
+    expect(isGroupAdmin(withAdmins, "owner")).toBe(true);
+    expect(isGroupAdmin(withAdmins, "admin")).toBe(true);
+    expect(isGroupAdmin(withAdmins, "member")).toBe(false);
+    expect(isGroupAdmin(group(null), "member")).toBe(true);
+    expect(isGroupAdmin({ isGroup: false, ownerId: null }, "member")).toBe(false);
+    expect(canManageInvite(withAdmins, "admin")).toBe(true);
+  });
+
+  it("lets admins remove members, only the owner remove admins, nobody the owner", () => {
+    const withAdmins = { isGroup: true, ownerId: "owner", adminIds: ["admin", "admin2"] };
+    expect(canRemoveMember(withAdmins, "admin", "member")).toBe(true);
+    expect(canRemoveMember(withAdmins, "admin", "admin2")).toBe(false);
+    expect(canRemoveMember(withAdmins, "admin", "owner")).toBe(false);
+    expect(canRemoveMember(withAdmins, "owner", "admin")).toBe(true);
+    expect(canRemoveMember(withAdmins, "member", "other")).toBe(false);
+  });
+
+  it("lets only the owner change admins, never their own role", () => {
+    expect(canManageAdmins(group("owner"), "owner", "member")).toBe(true);
+    expect(canManageAdmins(group("owner"), "owner", "owner")).toBe(false);
+    expect(canManageAdmins({ ...group("owner"), adminIds: ["admin"] }, "admin", "member")).toBe(false);
+    expect(canManageAdmins(group(null), "member", "other")).toBe(false);
+  });
+
   it("normalizes a group name", () => {
     expect(normalizeGroupName("  Team ")).toBe("Team");
     expect(normalizeGroupName("   ")).toBeNull();
@@ -281,5 +311,22 @@ describe("mentions", () => {
     expect(mentionQueryAt("@", 1)).toEqual({ start: 0, query: "" });
     expect(mentionQueryAt("mail@x", 6)).toBeNull();
     expect(mentionQueryAt("@huy do", 7)).toBeNull();
+  });
+});
+
+describe("invite codes", () => {
+  it("accepts only 16 base64url characters", () => {
+    expect(isInviteCode("AbCdEfGhIjKlMn_-")).toBe(true);
+    expect(isInviteCode("short")).toBe(false);
+    expect(isInviteCode("AbCdEfGhIjKlMn_/")).toBe(false);
+    expect(isInviteCode(42)).toBe(false);
+  });
+
+  it("only lets the login page go back to a join page", () => {
+    expect(safeNextPath("/join/AbCdEfGhIjKlMn_-")).toBe("/join/AbCdEfGhIjKlMn_-");
+    expect(safeNextPath("//evil.example/join/AbCdEfGhIjKlMn_-")).toBeNull();
+    expect(safeNextPath("https://evil.example")).toBeNull();
+    expect(safeNextPath("/conversations")).toBeNull();
+    expect(safeNextPath(["/join/AbCdEfGhIjKlMn_-"])).toBeNull();
   });
 });

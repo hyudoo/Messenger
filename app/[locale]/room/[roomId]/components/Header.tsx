@@ -30,7 +30,7 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <div className="absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent px-4 pb-10 pt-[max(1rem,env(safe-area-inset-top))] lg:px-6">
       {conversation.isGroup ? (
-        <AvatarGroup users={conversation.users} />
+        <AvatarGroup users={conversation.users} image={conversation.image} />
       ) : (
         <Avatar user={otherUser} />
       )}

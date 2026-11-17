@@ -54,7 +54,10 @@ export const deleteConversation = async (conversation: ConversationWithUsers) =>
     }),
   ]);
 
-  cleanUpUploads(messages.flatMap((message) => [message.image, message.attachment?.url]));
+  cleanUpUploads([
+    conversation.image,
+    ...messages.flatMap((message) => [message.image, message.attachment?.url]),
+  ]);
   pullSeenMessageIds(
     conversation.userIds,
     messages.map((message) => message.id)

@@ -85,6 +85,14 @@ model Conversation {
   // Groups only: the member who may delete the group for everyone (the creator; passed on to another
   // member when they leave). Missing on groups from before it existed: any member may delete those.
   ownerId       String?  @db.ObjectId
+  // Groups only: members the owner made admins (besides the owner): they may remove members and
+  // manage the invite link (app/libs/conversation-permissions.ts)
+  adminIds      String[] @db.ObjectId
+  // Groups only: the group photo (an upload by the member who set it); AvatarGroup without it
+  image         String?
+  // Groups only: the code of the invite link /join/<code>, while one is on (admins create / reset /
+  // turn it off). Random, so no unique index (Mongo would also count every missing one as a duplicate)
+  inviteCode    String?
   // messages pinned to the top of the chat, latest first (POST /api/messages/[id]/pin)
   pinnedMessageIds String[] @db.ObjectId
 
@@ -94,6 +102,7 @@ model Conversation {
   users   User[]   @relation(fields: [userIds], references: [id])
 
   @@index([userIds, lastMessageAt])
+  @@index([inviteCode])
 }
 
 model Message {
@@ -181,6 +190,10 @@ enum SystemType {
   removed
   left
   pinned
+  photo
+  promoted
+  demoted
+  joined
 }
 
 enum AttachmentKind {

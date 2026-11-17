@@ -120,6 +120,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
             users: conversation.users,
             userIds: conversation.userIds ?? target.userIds,
             ownerId: conversation.ownerId ?? null,
+            adminIds: conversation.adminIds ?? target.adminIds,
+            image: conversation.image === undefined ? target.image : conversation.image,
+            inviteCode:
+              conversation.inviteCode === undefined ? target.inviteCode : conversation.inviteCode,
             name: conversation.name ?? target.name,
           }),
           ...(conversation.lastMessageAt && {

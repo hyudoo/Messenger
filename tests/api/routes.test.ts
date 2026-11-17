@@ -60,7 +60,12 @@ import {
   DELETE as deleteConversation,
   PATCH as updateGroup,
 } from "@/app/api/conversations/[conversationId]/route";
-import { DELETE as removeMember } from "@/app/api/conversations/[conversationId]/members/[userId]/route";
+import {
+  DELETE as removeMember,
+  PATCH as setAdmin,
+} from "@/app/api/conversations/[conversationId]/members/[userId]/route";
+import { POST as setInvite } from "@/app/api/conversations/[conversationId]/invite/route";
+import { POST as joinByLink } from "@/app/api/join/[code]/route";
 import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
@@ -1801,5 +1806,220 @@ describe("rate limits on settings and new chats", () => {
     }
     expect(statuses[19]).toBe(200);
     expect(statuses[20]).toBe(429);
+  });
+});
+
+describe("group photo, admins, invite links", () => {
+  const withAdmins = (ownerId: string | null, adminIds: string[], users = [me, other, third]) => ({
+    ...group(ownerId, users),
+    adminIds,
+  });
+  const patch = (body: Record<string, unknown>) =>
+    updateGroup(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("sets the group photo from the caller's own upload and posts the event", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    expect((await patch({ image: uploadUrl(OTHER) })).status).toBe(400);
+    expect((await patch({ image: "https://evil.example/x.png" })).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), image: uploadUrl(ME) });
+    prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+    expect((await patch({ image: uploadUrl(ME) })).status).toBe(200);
+    expect(mocks.markUploadsUsed).toHaveBeenCalledWith([uploadUrl(ME)]);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { image: uploadUrl(ME) },
+      include: { users: true },
+    });
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ systemType: "photo" }) })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      other.email,
+      "conversation:update",
+      expect.objectContaining({ image: uploadUrl(ME) })
+    );
+  });
+
+  it("removes the photo without an event", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), image: uploadUrl(OTHER) });
+    prisma.conversation.update.mockResolvedValue(group(OTHER));
+    expect((await patch({ image: null })).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { image: null } })
+    );
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  describe("admins", () => {
+    const admin = (userId: string, value: unknown) =>
+      setAdmin(
+        jsonRequest(`/api/conversations/${CONVERSATION}/members/${userId}`, { admin: value }, {
+          method: "PATCH",
+        }),
+        params({ conversationId: CONVERSATION, userId })
+      );
+
+    it("lets only the owner change admins", async () => {
+      expect((await admin(OTHER, "yes")).status).toBe(400);
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME]));
+      expect((await admin(THIRD, true)).status).toBe(403);
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(ME, []));
+      expect((await admin(ME, true)).status).toBe(403);
+      expect((await admin("eeeeeeeeeeeeeeeeeeeeeeee", true)).status).toBe(404);
+      expect(prisma.conversation.update).not.toHaveBeenCalled();
+    });
+
+    it("makes and unmakes an admin, telling everyone", async () => {
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(ME, []));
+      prisma.conversation.update.mockResolvedValue(withAdmins(ME, [OTHER]));
+      prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+      expect(await (await admin(OTHER, true)).json()).toEqual({ adminIds: [OTHER] });
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: CONVERSATION },
+        data: { adminIds: { set: [OTHER] } },
+        include: { users: true },
+      });
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        third.email,
+        "conversation:update",
+        expect.objectContaining({ adminIds: [OTHER] })
+      );
+      expect(prisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ systemType: "promoted" }) })
+      );
+
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(ME, [OTHER]));
+      expect(await (await admin(OTHER, false)).json()).toEqual({ adminIds: [] });
+      expect(prisma.message.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ systemType: "demoted" }) })
+      );
+    });
+
+    it("lets an admin remove a member but not another admin or the owner", async () => {
+      const kick = (userId: string) =>
+        removeMember(
+          jsonRequest(`/api/conversations/${CONVERSATION}/members/${userId}`, null, {
+            method: "DELETE",
+          }),
+          params({ conversationId: CONVERSATION, userId })
+        );
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME, THIRD]));
+      expect((await kick(OTHER)).status).toBe(403);
+      expect((await kick(THIRD)).status).toBe(403);
+
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME]));
+      prisma.conversation.update.mockResolvedValue(withAdmins(OTHER, [ME], [me, other]));
+      expect((await kick(THIRD)).status).toBe(200);
+    });
+
+    it("hands the group on to an admin when the owner leaves, and drops leavers from admins", async () => {
+      const leave = () =>
+        leaveConversation(
+          jsonRequest(`/api/conversations/${CONVERSATION}/leave`, null),
+          params({ conversationId: CONVERSATION })
+        );
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(ME, [THIRD]));
+      prisma.conversation.update.mockResolvedValue(withAdmins(THIRD, [], [other, third]));
+      await leave();
+      expect(prisma.conversation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { users: { disconnect: { id: ME } }, ownerId: THIRD, adminIds: { set: [] } },
+        })
+      );
+
+      prisma.conversation.update.mockClear();
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME, THIRD]));
+      prisma.conversation.update.mockResolvedValue(withAdmins(OTHER, [THIRD], [other, third]));
+      await leave();
+      expect(prisma.conversation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { users: { disconnect: { id: ME } }, adminIds: { set: [THIRD] } },
+        })
+      );
+    });
+  });
+
+  describe("invite links", () => {
+    const CODE = "AbCdEfGhIjKlMn_-";
+    const invite = (enabled: unknown) =>
+      setInvite(
+        jsonRequest(`/api/conversations/${CONVERSATION}/invite`, { enabled }),
+        params({ conversationId: CONVERSATION })
+      );
+    const join = (code: string) =>
+      joinByLink(jsonRequest(`/api/join/${code}`, null), params({ code }));
+
+    it("lets only admins turn the link on (a new code each time) or off", async () => {
+      expect((await invite("on")).status).toBe(400);
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, []));
+      expect((await invite(true)).status).toBe(403);
+
+      prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME]));
+      prisma.conversation.update.mockImplementation(async ({ data }: any) => ({
+        ...withAdmins(OTHER, [ME]),
+        ...data,
+      }));
+      const { inviteCode } = await (await invite(true)).json();
+      expect(inviteCode).toMatch(/^[A-Za-z0-9_-]{16}$/);
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        third.email,
+        "conversation:update",
+        expect.objectContaining({ inviteCode })
+      );
+      const second = await (await invite(true)).json();
+      expect(second.inviteCode).not.toBe(inviteCode);
+      expect(await (await invite(false)).json()).toEqual({ inviteCode: null });
+    });
+
+    it("refuses malformed and unknown codes without a lookup for the malformed", async () => {
+      expect((await join("bad")).status).toBe(404);
+      expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
+      prisma.conversation.findFirst.mockResolvedValue(null);
+      expect((await join(CODE)).status).toBe(404);
+      expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+        where: { inviteCode: CODE, isGroup: true },
+        include: { users: true },
+      });
+    });
+
+    it("joins: the members get the new list and the event, the joiner the conversation", async () => {
+      prisma.conversation.findFirst.mockResolvedValue(group(OTHER, [other, third]));
+      prisma.conversation.update.mockResolvedValue(group(OTHER, [other, third, me]));
+      prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+      expect(await (await join(CODE)).json()).toEqual({ conversationId: CONVERSATION });
+      expect(prisma.conversation.update).toHaveBeenCalledWith({
+        where: { id: CONVERSATION },
+        data: { users: { connect: { id: ME } } },
+        include: { users: true },
+      });
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        other.email,
+        "conversation:update",
+        expect.objectContaining({ userIds: [OTHER, THIRD, ME] })
+      );
+      expect(prisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ systemType: "joined", senderId: ME }),
+        })
+      );
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        me.email,
+        "conversation:new",
+        expect.objectContaining({ id: CONVERSATION, unreadCount: 0 })
+      );
+    });
+
+    it("does nothing for a member", async () => {
+      prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+      expect((await join(CODE)).status).toBe(200);
+      expect(prisma.conversation.update).not.toHaveBeenCalled();
+    });
   });
 });
