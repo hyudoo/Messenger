@@ -6,6 +6,7 @@ import prisma from "@/app/libs/prismadb";
 import { canForwardMessage } from "@/app/libs/message-actions";
 import { deliverMessage } from "@/app/libs/message-delivery";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
+import { searchTextOf } from "@/app/libs/search";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 
@@ -51,6 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
       include: MESSAGE_INCLUDE,
       data: {
         body: original.body ?? undefined,
+        searchText: searchTextOf(original.body),
         image: original.image ?? undefined,
         attachment: original.attachment ?? undefined,
         forwarded: true,

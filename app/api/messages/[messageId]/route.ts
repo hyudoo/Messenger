@@ -4,6 +4,7 @@ import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { logError } from "@/app/libs/log";
 import { canEditMessage, canRecallMessage } from "@/app/libs/message-actions";
+import { searchTextOf } from "@/app/libs/search";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -80,7 +81,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<IPar
 
     const updated = await prisma.message.update({
       where: { id: found.message.id },
-      data: { body, editedAt: new Date() },
+      data: { body, searchText: searchTextOf(body), editedAt: new Date() },
       include: MESSAGE_INCLUDE,
     });
     await broadcast(found.conversation, updated);
@@ -118,6 +119,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
         where: { id: found.message.id },
         data: {
           body: null,
+          searchText: null,
           image: null,
           attachment: { unset: true },
           editedAt: null,

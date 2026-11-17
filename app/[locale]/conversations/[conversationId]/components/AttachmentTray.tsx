@@ -25,6 +25,8 @@ export interface TrayItem {
   // images: a local preview (object URL) until sent
   preview?: string;
   status: "uploading" | "ready" | "failed";
+  // while uploading: the share sent (0..1)
+  progress?: number;
   // the uploaded file's public URL once ready
   url?: string;
 }
@@ -48,7 +50,9 @@ export const useAttachmentTray = () => {
 
   const upload = async (item: TrayItem) => {
     try {
-      const url = await uploadFile(item.file, item.kind);
+      const url = await uploadFile(item.file, item.kind, (progress) =>
+        patch(item.id, { progress })
+      );
       patch(item.id, { status: "ready", url });
     } catch (error) {
       patch(item.id, { status: "failed" });
@@ -100,7 +104,7 @@ export const useAttachmentTray = () => {
   const retry = (id: string) => {
     const item = itemsRef.current.find((entry) => entry.id === id);
     if (item?.status === "failed") {
-      patch(id, { status: "uploading" });
+      patch(id, { status: "uploading", progress: 0 });
       upload(item);
     }
   };
@@ -172,10 +176,16 @@ const AttachmentTray: React.FC<AttachmentTrayProps> = ({ items, onRemove, onRetr
           )}
           {item.status === "uploading" && (
             <div
-              className="absolute inset-0 flex items-center justify-center"
-              role="status"
-              aria-label={t("attachment_uploading")}>
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
+              className="absolute inset-x-1.5 bottom-1.5 h-1.5 overflow-hidden rounded-full bg-background/80"
+              role="progressbar"
+              aria-label={t("attachment_uploading")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round((item.progress ?? 0) * 100)}>
+              <div
+                className="h-full rounded-full bg-sky-500 transition-[width]"
+                style={{ width: `${Math.max((item.progress ?? 0) * 100, 4)}%` }}
+              />
             </div>
           )}
           {item.status === "failed" && (

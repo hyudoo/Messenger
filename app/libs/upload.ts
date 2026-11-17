@@ -69,8 +69,12 @@ export class UploadError extends Error {
 }
 
 // Uploads a file straight from the browser to S3 with a presigned PUT URL and returns its
-// public URL. Throws UploadError.
-export const uploadFile = async (file: Blob, kind: UploadKind) => {
+// public URL. `onProgress` gets the share sent so far (0..1). Throws UploadError.
+export const uploadFile = async (
+  file: Blob,
+  kind: UploadKind,
+  onProgress?: (share: number) => void
+) => {
   const contentType = baseContentType(file.type);
   const rules = UPLOAD_RULES[kind];
   if (!rules.types[contentType]) {
@@ -86,14 +90,21 @@ export const uploadFile = async (file: Blob, kind: UploadKind) => {
       throw new UploadError(error?.response?.status === 429 ? "too_many" : "failed");
     });
 
-  const response = await fetch(data.uploadUrl, {
-    method: "PUT",
-    headers: data.headers,
-    body: file,
-  });
-  if (!response.ok) {
-    throw new UploadError("failed");
-  }
+  // axios (XMLHttpRequest in the browser) reports upload progress, which fetch can't
+  await axios
+    .put(data.uploadUrl, file, {
+      headers: data.headers,
+      // the body as it is (no JSON transform)
+      transformRequest: [(body) => body],
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.min(event.loaded / event.total, 1));
+        }
+      },
+    })
+    .catch(() => {
+      throw new UploadError("failed");
+    });
 
   return data.fileUrl;
 };

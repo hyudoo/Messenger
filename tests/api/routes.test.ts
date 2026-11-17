@@ -62,6 +62,7 @@ import { DELETE as removeMember } from "@/app/api/conversations/[conversationId]
 import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
+import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
 import {
@@ -194,12 +195,17 @@ describe("POST /api/messages", () => {
 
   it("saves the message and notifies the conversation and every member", async () => {
     asMember();
-    const response = await send({ message: "  hello  " });
+    const response = await send({ message: "  Xin Chào  " });
 
     expect(response.status).toBe(200);
     expect(prisma.message.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ body: "hello", senderId: ME, seenIds: [ME] }),
+        data: expect.objectContaining({
+          body: "Xin Chào",
+          searchText: "xin chao",
+          senderId: ME,
+          seenIds: [ME],
+        }),
       })
     );
     expect(mocks.emitToConversation).toHaveBeenCalledWith(
@@ -1065,19 +1071,63 @@ describe("GET /api/conversations/[id]/search", () => {
     expect((await search("x".repeat(101))).status).toBe(400);
   });
 
-  it("searches the conversation's text, case-insensitive, newest first", async () => {
+  it("searches the folded text (no case or diacritics), newest first", async () => {
     asMember();
-    prisma.message.findMany.mockResolvedValue([{ id: MESSAGE, body: "Hello" }]);
-    expect(await (await search(" hello ")).json()).toEqual([{ id: MESSAGE, body: "Hello" }]);
-    expect(prisma.message.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          conversationId: CONVERSATION,
-          body: { contains: "hello", mode: "insensitive" },
-        }),
-        take: 30,
-      })
+    prisma.message.findMany.mockResolvedValue([{ id: MESSAGE, body: "Chào" }]);
+    expect(await (await search(" CHÀO ")).json()).toEqual([{ id: MESSAGE, body: "Chào" }]);
+    const { where, take } = prisma.message.findMany.mock.calls[0][0];
+    expect(take).toBe(30);
+    expect(where.conversationId).toBe(CONVERSATION);
+    expect(where.AND[2]).toEqual({
+      OR: [
+        { searchText: { contains: "chao" } },
+        // messages from before searchText: the body, case-insensitive
+        { searchText: { isSet: false }, body: { contains: "CHÀO", mode: "insensitive" } },
+      ],
+    });
+  });
+});
+
+describe("GET /api/messages/[id]/download", () => {
+  const download = () =>
+    downloadFile(
+      jsonRequest(`/api/messages/${MESSAGE}/download`, null, { method: "GET" }),
+      params({ messageId: MESSAGE })
     );
+  const file = {
+    kind: "file",
+    url: uploadUrl(ME, "pdf"),
+    name: "Báo cáo \"Q4\".pdf",
+    size: 3,
+    type: "application/pdf",
+  };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("returns 404 to non-members and for messages without a file", async () => {
+    prisma.message.findUnique.mockResolvedValue({ conversationId: CONVERSATION, attachment: file });
+    asNonMember();
+    expect((await download()).status).toBe(404);
+    prisma.message.findUnique.mockResolvedValue({ conversationId: CONVERSATION, attachment: null });
+    asMember();
+    expect((await download()).status).toBe(404);
+  });
+
+  it("streams the stored file under its original name", async () => {
+    prisma.message.findUnique.mockResolvedValue({ conversationId: CONVERSATION, attachment: file });
+    asMember();
+    const fetchMock = vi.fn().mockResolvedValue(new Response("pdf", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await download();
+    expect(response.status).toBe(200);
+    // the URL comes from the message, never from the request
+    expect(fetchMock).toHaveBeenCalledWith(file.url);
+    expect(response.headers.get("content-type")).toBe("application/pdf");
+    expect(response.headers.get("content-disposition")).toBe(
+      `attachment; filename="B_o c_o _Q4_.pdf"; filename*=UTF-8''${encodeURIComponent(file.name)}`
+    );
+    expect(await response.text()).toBe("pdf");
   });
 });
 
@@ -1342,7 +1392,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: MESSAGE },
-        data: { body: "hello", editedAt: expect.any(Date) },
+        data: { body: "hello", searchText: "hello", editedAt: expect.any(Date) },
       })
     );
     expect(mocks.emitToConversation).toHaveBeenCalledWith(
@@ -1382,6 +1432,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
       expect.objectContaining({
         data: {
           body: null,
+          searchText: null,
           image: null,
           attachment: { unset: true },
           editedAt: null,

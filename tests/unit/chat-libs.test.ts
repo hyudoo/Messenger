@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { splitLinks } from "@/app/libs/linkify";
-import { matchesSearch, normalizeSearch } from "@/app/libs/search";
+import {
+  findFoldedMatch,
+  matchesSearch,
+  normalizeSearch,
+  searchTextOf,
+} from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
 import {
@@ -216,5 +221,27 @@ describe("group permissions", () => {
     expect(normalizeGroupName("   ")).toBeNull();
     expect(normalizeGroupName(42)).toBeNull();
     expect(normalizeGroupName("x".repeat(101))).toBeNull();
+  });
+});
+
+describe("message search folding", () => {
+  it("folds a body like the inbox search", () => {
+    expect(searchTextOf("Xin Chào ĐỨC")).toBe("xin chao duc");
+    expect(searchTextOf("   ")).toBeUndefined();
+    expect(searchTextOf(null)).toBeUndefined();
+  });
+
+  it("finds the match in the original text, ignoring case and diacritics", () => {
+    const text = "Hẹn gặp Đức lúc 5h nhé";
+    const match = findFoldedMatch(text, "duc luc")!;
+    expect(text.slice(...match)).toBe("Đức lúc");
+    expect(findFoldedMatch(text, "HEN")).toEqual([0, 3]);
+    expect(findFoldedMatch(text, "xyz")).toBeNull();
+    expect(findFoldedMatch(text, "  ")).toBeNull();
+  });
+
+  it("keeps whole characters around emoji", () => {
+    const text = "😀 chào";
+    expect(text.slice(...findFoldedMatch(text, "chao")!)).toBe("chào");
   });
 });

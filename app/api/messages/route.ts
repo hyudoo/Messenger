@@ -9,6 +9,7 @@ import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 import { deliverMessage } from "@/app/libs/message-delivery";
 import { parseAttachment } from "@/app/libs/attachment";
+import { searchTextOf } from "@/app/libs/search";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
       include: MESSAGE_INCLUDE,
       data: {
         body: body || undefined,
+        searchText: searchTextOf(body),
         image,
         attachment: file ?? undefined,
         isCall: isCall === true ? true : undefined,

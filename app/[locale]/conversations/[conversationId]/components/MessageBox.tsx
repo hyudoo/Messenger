@@ -369,7 +369,14 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
                 />
               </button>
             )}
-            {data.attachment?.kind === "file" && <FileCard attachment={data.attachment} isOwn={isOwn} />}
+            {data.attachment?.kind === "file" && (
+              <FileCard
+                attachment={data.attachment}
+                isOwn={isOwn}
+                // an outbox copy has no server id yet
+                messageId={pending ? undefined : data.id}
+              />
+            )}
             {data.attachment?.kind === "voice" && (
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />
             )}

@@ -17,16 +17,17 @@ interface Props {
   isOwn: boolean;
 }
 
-// A file message: its name, type and size; opens (or downloads) the file in a new tab.
-export const FileCard: React.FC<Props> = ({ attachment, isOwn }) => {
+// A file message: its name, type and size. A click saves it under its original name
+// (GET /api/messages/[id]/download); a message still in the outbox links the file itself.
+export const FileCard: React.FC<Props & { messageId?: string }> = ({ attachment, isOwn, messageId }) => {
   const t = useTranslations("chat");
   const extension = attachment.name.split(".").pop()?.toUpperCase();
   return (
     <a
-      href={attachment.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      download={attachment.name}
+      href={messageId ? `/api/messages/${messageId}/download` : attachment.url}
+      {...(messageId
+        ? { download: attachment.name }
+        : { target: "_blank", rel: "noopener noreferrer" })}
       aria-label={t("open_file", { name: attachment.name })}
       className="flex min-w-0 max-w-full items-center gap-3 sm:w-64">
       <span

@@ -108,6 +108,9 @@ model Message {
   attachment MessageAttachment?
   // a copy of another message (POST /api/messages/[messageId]/forward), shown "Forwarded"
   forwarded Boolean?
+  // the body without case or Vietnamese diacritics (searchTextOf), what search matches against;
+  // older messages get it from scripts/backfill-search-text.ts
+  searchText String?
   createdAt DateTime @default(now())
   // set when the sender edits the body (PATCH /api/messages/[messageId])
   editedAt  DateTime?

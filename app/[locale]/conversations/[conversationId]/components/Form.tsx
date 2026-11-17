@@ -14,6 +14,7 @@ import EmojiPicker from "@/app/components/EmojiPicker";
 import useComposer from "@/app/hooks/useComposer";
 import useConversation from "@/app/hooks/useConversation";
 import useOutbox, { OutboxPayload } from "@/app/hooks/useOutbox";
+import useDrafts from "@/app/hooks/useDrafts";
 import { QUICK_EMOJI } from "@/app/libs/emoji";
 import { getSocket } from "@/app/libs/socket-client";
 import {
@@ -58,7 +59,11 @@ const Form = () => {
   // only for this conversation (a reply started elsewhere doesn't follow the user here)
   const replyTo = composer.conversationId === conversationId ? composer.replyTo : null;
   const editing = composer.conversationId === conversationId ? composer.editing : null;
-  const [message, setMessage] = useState("");
+  // the text left here before switching chats (useDrafts), kept up to date in changeMessage
+  const [message, setMessage] = useState(
+    () => useDrafts.getState().drafts[conversationId] ?? ""
+  );
+  const saveDraft = (text: string) => useDrafts.getState().setDraft(conversationId, text);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +83,8 @@ const Form = () => {
         if (state.editing && state.editing !== previous.editing) {
           setMessage(state.editing.body ?? "");
         } else if (!state.editing && previous.editing) {
-          setMessage("");
+          // back to what was being written before the edit
+          setMessage(useDrafts.getState().drafts[previous.editing.conversationId] ?? "");
         }
         if (state.editing !== previous.editing || state.replyTo !== previous.replyTo) {
           inputRef.current?.focus();
@@ -108,8 +114,9 @@ const Form = () => {
   const changeMessage = (value: string) => {
     setMessage(value);
     if (editing) {
-      return; // editing isn't "typing a new message"
+      return; // editing isn't "typing a new message" (nor a draft)
     }
+    saveDraft(value);
     if (!value.trim()) {
       stopTyping();
     } else if (Date.now() - typing.current.sentAt > TYPING_REFRESH_MS) {
@@ -175,6 +182,7 @@ const Form = () => {
     );
     sendAll([...attachments, ...(isEmpty ? [] : [{ message }])]);
     setMessage("");
+    saveDraft("");
     inputRef.current?.focus();
   };
 
