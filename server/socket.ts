@@ -17,6 +17,7 @@ import {
   userRoom,
 } from "../app/libs/socket-rooms";
 import { logError } from "../app/libs/log";
+import { createPresence, type Presence } from "./presence";
 
 interface SocketData {
   email: string;
@@ -208,6 +209,8 @@ const resendRingingCalls = async (io: AppServer, socket: AppSocket) => {
 
 // the Redis adapter's connections, closed by closeSocketServer
 let adapterClients: RedisClient[] = [];
+// each server's presence, stopped by closeSocketServer (tests run several servers in one process)
+const presences = new WeakMap<AppServer, Presence>();
 
 // With Redis configured (REDIS_URL or REDIS_HOST), sockets on every instance
 // share rooms through Redis, so emits (including emitToUser/emitToConversation
@@ -240,11 +243,14 @@ const attachRedisAdapter = async (io: AppServer): Promise<RedisClient | null> =>
   return pubClient;
 };
 
-// Presence and call rooms are read with fetchSockets(), which asks every
-// instance when the Redis adapter is on, instead of counters held in memory.
+// Call rooms are read with fetchSockets(), which asks every instance when the Redis adapter is on,
+// instead of counters held in memory. Presence is kept by server/presence.ts (per-instance counts
+// shared between instances), since it would otherwise ask the whole cluster on every connection.
 export const initSocketServer = async (httpServer: HttpServer) => {
   const io: AppServer = new Server(httpServer);
   const redis = await attachRedisAdapter(io);
+  const presence = createPresence(io, { clustered: !!redis });
+  presences.set(io, presence);
 
   io.use(async (socket, next) => {
     const user = await authenticate(socket.request).catch(() => null);
@@ -464,32 +470,11 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       });
     });
 
-    // Offline only once no socket of this user is left anywhere. The socket has
-    // already left its rooms here, so of two tabs closing together the later
-    // check sees none.
-    socket.on("disconnect", async () => {
-      try {
-        const remaining = await io.in(userRoom(email)).fetchSockets();
-        if (remaining.length === 0) {
-          io.emit("presence:offline", email);
-        }
-      } catch (error) {
-        logError("presence_offline", error);
-      }
-    });
-
-    // Announced on every connection (clients add idempotently), so tabs that
-    // connect at the same time can't race each other out of the announcement.
-    try {
-      socket.broadcast.emit("presence:online", email);
-      const sockets = await io.fetchSockets();
-      socket.emit(
-        "presence:list",
-        Array.from(new Set(sockets.map((peer) => peer.data.email)))
-      );
-    } catch (error) {
-      logError("presence_list", error);
-    }
+    // Presence (server/presence.ts): "online" / "offline" go out when the user's first socket
+    // appears / last one leaves anywhere; the new socket gets the whole list from memory.
+    socket.on("disconnect", () => presence.remove(email));
+    presence.add(email);
+    socket.emit("presence:list", presence.list());
   });
 
   setIO(io);
@@ -504,6 +489,8 @@ export const closeSocketServer = async (io: AppServer, settleMs = 1000) => {
   await new Promise<void>((resolve) => io.close(() => resolve()));
   // the call-log moves started by the disconnects are fire-and-forget; give them a moment
   await new Promise((resolve) => setTimeout(resolve, settleMs));
+  // after the disconnects, which sent their "offline" changes; Redis is still open here
+  presences.get(io)?.stop();
   await Promise.all(
     adapterClients.map((client) => client.close().catch(() => client.destroy()))
   );

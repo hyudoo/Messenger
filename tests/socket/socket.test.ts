@@ -563,6 +563,38 @@ describe.skipIf(!process.env.TEST_REDIS_URL)("socket server on two instances (Re
     expect(await wentOffline).toBe(emailOf(OTHER));
   });
 
+  it("gives an instance started later the users online on the others", async () => {
+    vi.stubEnv("REDIS_URL", process.env.TEST_REDIS_URL!);
+    const one = await startServer();
+    await connected(one.url, ME);
+
+    const two = await startServer();
+    const b = await connected(two.url, OTHER);
+    // in its first list, or announced once the older instance answered the new one's hello
+    const online = new Set(b.online);
+    b.socket.on("presence:online", (email: string) => online.add(email));
+    await vi.waitFor(() => expect(online.has(emailOf(ME))).toBe(true));
+  });
+
+  it("keeps a user online while a tab on either instance is left", async () => {
+    const [one, two] = await twoInstances();
+    const watcher = (await connected(one.url, OTHER)).socket;
+    const tabOne = (await connected(one.url, ME)).socket;
+    const tabTwo = (await connected(two.url, ME)).socket;
+    const offline = vi.fn();
+    watcher.on("presence:offline", offline);
+    // instance one hears about the tab on instance two through Redis (a few ms); before that a
+    // close here would flicker offline -> online
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    tabOne.close();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(offline).not.toHaveBeenCalled();
+
+    tabTwo.close();
+    await vi.waitFor(() => expect(offline).toHaveBeenCalledWith(emailOf(ME)));
+  });
+
   it("runs a call whose peers are on different instances", async () => {
     const [one, two] = await twoInstances();
     const host = (await connected(one.url, ME)).socket;
