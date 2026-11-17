@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { countEmojiOnly } from "@/app/libs/emoji";
+import { canReactToMessage } from "@/app/libs/message-actions";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -49,16 +50,16 @@ export async function POST(
     // "missing" and "not a member" look the same
     const message = await prisma.message.findUnique({
       where: { id: messageId },
-      select: { conversationId: true, deletedAt: true },
+      select: { conversationId: true, deletedAt: true, isCall: true, systemType: true },
     });
     const conversation =
       message && (await getConversationForUser(message.conversationId, currentUser.id));
     if (!conversation) {
       return new NextResponse("Not found", { status: 404 });
     }
-    // a recalled message has nothing left to react to
-    if (message.deletedAt) {
-      return new NextResponse("Message recalled", { status: 400 });
+    // a recalled message has nothing left to react to; calls and group events aren't for reacting
+    if (!canReactToMessage(message)) {
+      return new NextResponse("Cannot react to this message", { status: 400 });
     }
 
     const key = { messageId_userId: { messageId, userId: currentUser.id } };

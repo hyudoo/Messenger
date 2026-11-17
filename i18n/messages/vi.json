@@ -77,9 +77,15 @@
     "search": "Tìm cuộc trò chuyện",
     "no_results": "Không tìm thấy cuộc trò chuyện nào.",
     "last_from": "{name}: {text}",
+    "typing": "Đang soạn tin…",
+    "typing_group": "{count, plural, other {{names} đang soạn tin…}}",
     "you": "Bạn",
     "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
-    "last_recalled": "Tin nhắn đã được thu hồi."
+    "last_recalled": "Tin nhắn đã được thu hồi.",
+    "last_voice": "Đã gửi một tin nhắn thoại.",
+    "last_file": "Đã gửi tệp {name}.",
+    "muted": "Đã tắt thông báo",
+    "pinned": "Đã ghim"
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -108,12 +114,17 @@
     "sending": "Đang gửi...",
     "retry": "Thử lại",
     "discard": "Bỏ",
-    "image_uploading": "Đang tải ảnh lên...",
     "reply": "Trả lời",
     "edit": "Sửa",
     "recall": "Thu hồi",
     "recall_confirm": "Thu hồi?",
     "recall_failed": "Không thu hồi được tin nhắn!",
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "copy_failed": "Không sao chép được!",
+    "more_actions": "Tuỳ chọn tin nhắn",
+    "recall_tap_again": "Chạm lần nữa để thu hồi",
+    "unread_divider": "Tin nhắn mới",
     "recalled": "Tin nhắn đã được thu hồi",
     "edited": "Đã chỉnh sửa",
     "editing": "Đang sửa tin nhắn",
@@ -125,15 +136,42 @@
     "reply_image": "Hình ảnh",
     "reply_call": "Cuộc gọi",
     "reply_jump": "Xem tin nhắn gốc",
-    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}"
+    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}",
+    "reply_voice": "Tin nhắn thoại",
+    "reply_file": "Tệp {name}",
+    "attach_file": "Gửi tệp",
+    "drop_files": "Thả ảnh hoặc tệp vào đây để gửi",
+    "remove_attachment": "Bỏ {name}",
+    "attachment_uploading": "Đang tải lên…",
+    "attachment_failed": "Tải lên thất bại, bấm để thử lại",
+    "attachments_too_many": "Mỗi lần gửi tối đa {max} ảnh hoặc tệp",
+    "record_voice": "Ghi âm tin nhắn thoại",
+    "recording": "Đang ghi âm",
+    "send_voice": "Gửi tin nhắn thoại",
+    "cancel_voice": "Huỷ ghi âm",
+    "mic_denied": "Không dùng được micro. Hãy cho phép trang truy cập micro.",
+    "voice_unsupported": "Trình duyệt này không ghi âm được.",
+    "voice_uploading": "Đang gửi tin nhắn thoại...",
+    "play": "Phát",
+    "pause": "Tạm dừng",
+    "seek": "Tua tin nhắn thoại",
+    "open_file": "Mở {name}",
+    "forward": "Chuyển tiếp",
+    "forwarded": "Đã chuyển tiếp",
+    "jump_not_found": "Không tìm thấy tin nhắn này (có thể đã quá cũ)."
   },
   "profile": {
     "close": "Đóng bảng thông tin",
     "delete": "Xoá",
     "email": "Email",
-    "emails": "Email",
     "joined": "Tham gia",
-    "leave": "Rời nhóm"
+    "leave": "Rời nhóm",
+    "search": "Tìm kiếm",
+    "mute": "Tắt thông báo",
+    "unmute": "Bật thông báo",
+    "pin": "Ghim",
+    "unpin": "Bỏ ghim",
+    "pin_limit": "Chỉ ghim được tối đa 5 cuộc trò chuyện."
   },
   "confirm_delete": {
     "title": "Xoá cuộc trò chuyện",
@@ -143,7 +181,23 @@
     "title": "Tạo nhóm chat mới",
     "description": "Tạo cuộc trò chuyện với nhiều hơn hai người",
     "name": "Tên nhóm",
-    "members": "Thành viên"
+    "members": "Thành viên",
+    "rename": "Đổi tên nhóm",
+    "save_name": "Lưu tên nhóm",
+    "cancel_rename": "Huỷ đổi tên",
+    "members_title": "Thành viên ({count})",
+    "owner": "Trưởng nhóm",
+    "you": "Bạn",
+    "add_members": "Thêm",
+    "add_selected": "{count, plural, other {Thêm # người}}",
+    "cancel_add": "Huỷ",
+    "search_people": "Tìm theo tên hoặc email",
+    "no_one_to_add": "Mọi người đều đã ở trong nhóm.",
+    "remove": "Xoá {name} khỏi nhóm",
+    "remove_confirm": "Bấm lần nữa để xoá {name} khỏi nhóm",
+    "remove_short": "Xoá?",
+    "update_failed": "Không cập nhật được nhóm!",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
   },
   "users": {
     "title": "Mọi người",
@@ -170,7 +224,11 @@
     "unsupported_type": "Chỉ hỗ trợ ảnh JPG, PNG, GIF hoặc WEBP",
     "too_large": "Ảnh tối đa 10MB",
     "too_many": "Bạn tải ảnh lên quá nhiều, thử lại sau ít phút",
-    "failed": "Tải ảnh lên thất bại"
+    "failed": "Tải ảnh lên thất bại",
+    "file_unsupported_type": "Không hỗ trợ loại tệp này (PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP)",
+    "file_too_large": "Tệp tối đa 25MB",
+    "voice_unsupported_type": "Định dạng ghi âm không được hỗ trợ",
+    "voice_too_large": "Tin nhắn thoại quá dài"
   },
   "call": {
     "incoming": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
@@ -202,11 +260,28 @@
     "no_results": "Không tìm thấy biểu tượng nào",
     "loading": "Đang tải…"
   },
+  "system": {
+    "created": "{actor} đã tạo nhóm “{name}”",
+    "renamed": "{actor} đã đổi tên nhóm thành “{name}”",
+    "added": "{actor} đã thêm {users} vào nhóm",
+    "removed": "{actor} đã xoá {users} khỏi nhóm",
+    "left": "{actor} đã rời nhóm",
+    "you_subject": "Bạn",
+    "you_object": "bạn",
+    "someone": "Ai đó"
+  },
+  "presence": {
+    "just_now": "Vừa mới hoạt động",
+    "active_ago": "Hoạt động {time} trước"
+  },
   "reactions": {
     "add": "Thả cảm xúc",
     "more": "Biểu tượng khác",
     "react_with": "Thả {emoji}",
     "reacted_by": "{emoji} {names}",
+    "title": "Cảm xúc về tin nhắn",
+    "all": "Tất cả {count}",
+    "tap_to_remove": "Chạm để gỡ",
     "you": "Bạn",
     "failed": "Không thả được cảm xúc!"
   },
@@ -223,6 +298,36 @@
     "prompt_later": "Để sau",
     "prompt_denied": "Trình duyệt đã chặn thông báo. Bạn có thể cho phép lại trong phần cài đặt trang của trình duyệt.",
     "incoming_call": "{kind, select, audio {Cuộc gọi thoại đến} other {Cuộc gọi video đến}}",
-    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}"
+    "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
+    "voice": "Đã gửi một tin nhắn thoại.",
+    "file": "Đã gửi tệp {name}."
+  },
+  "viewer": {
+    "close": "Đóng",
+    "previous": "Ảnh trước",
+    "next": "Ảnh sau",
+    "download": "Tải ảnh xuống",
+    "zoom_in": "Phóng to",
+    "zoom_out": "Thu nhỏ",
+    "counter": "{current} / {total}"
+  },
+  "search": {
+    "title": "Tìm trong cuộc trò chuyện",
+    "placeholder": "Tìm tin nhắn",
+    "back": "Quay lại",
+    "searching": "Đang tìm…",
+    "no_results": "Không có tin nhắn nào khớp.",
+    "failed": "Tìm kiếm thất bại, thử lại sau."
+  },
+  "forward": {
+    "title": "Chuyển tiếp tin nhắn",
+    "search": "Tìm cuộc trò chuyện",
+    "loading": "Đang tải…",
+    "load_failed": "Không tải được danh sách cuộc trò chuyện.",
+    "no_results": "Không tìm thấy cuộc trò chuyện nào.",
+    "send": "Gửi",
+    "sending": "Đang gửi…",
+    "sent": "Đã gửi",
+    "retry": "Thử lại"
   }
 }

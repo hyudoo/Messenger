@@ -19,6 +19,11 @@ const unreadIn = async (conversationId: string, userId: string) =>
 // number of messages the user hasn't seen. Throws on a database error (GET /api/conversations
 // answers 500 then, so the client keeps the list it has).
 export const findConversationsForUser = async (userId: string) => {
+  // the user's own muted / pinned lists (omitted from user rows by default)
+  const settings = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { mutedConversationIds: true, pinnedConversationIds: true },
+  });
   const conversations = await prisma.conversation.findMany({
     orderBy: {
       lastMessageAt: "desc",
@@ -52,7 +57,12 @@ export const findConversationsForUser = async (userId: string) => {
         last && last.senderId !== userId && !last.seenIds.includes(userId)
           ? await unreadIn(conversation.id, userId)
           : 0;
-      return { ...conversation, unreadCount: unread };
+      return {
+        ...conversation,
+        unreadCount: unread,
+        muted: !!settings?.mutedConversationIds.includes(conversation.id),
+        pinned: !!settings?.pinnedConversationIds.includes(conversation.id),
+      };
     })
   );
 };

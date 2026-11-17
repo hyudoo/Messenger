@@ -36,6 +36,14 @@ describe("isUploadedFileUrl", () => {
     expect(isUploadedFileUrl(uploadUrl(ME), ME)).toBe(true);
   });
 
+  it("matches the kind by the key's extension", () => {
+    expect(isUploadedFileUrl(uploadUrl(ME, "pdf"), ME, "file")).toBe(true);
+    expect(isUploadedFileUrl(uploadUrl(ME, "m4a"), ME, "voice")).toBe(true);
+    expect(isUploadedFileUrl(uploadUrl(ME, "pdf"), ME)).toBe(false); // not an image
+    expect(isUploadedFileUrl(uploadUrl(ME, "png"), ME, "file")).toBe(false);
+    expect(isUploadedFileUrl(uploadUrl(ME, "exe"), ME, "file")).toBe(false);
+  });
+
   it.each([
     ["someone else's upload", uploadUrl(OTHER)],
     ["a path traversal", `${S3_BASE}/uploads/${ME}/../${OTHER}/123e4567-e89b-12d3-a456-426614174000.png`],

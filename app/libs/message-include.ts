@@ -6,11 +6,17 @@ export const NOT_RECALLED = {
   OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
 } satisfies Prisma.MessageWhereInput;
 
+// a person's message, not a group event (documents from before group events have no field)
+export const NOT_SYSTEM = {
+  OR: [{ systemType: null }, { systemType: { isSet: false } }],
+} satisfies Prisma.MessageWhereInput;
+
 // The preview of a replied-to message shown above a reply (MessageBox's ReplyQuote).
 export const REPLY_PREVIEW_SELECT = {
   id: true,
   body: true,
   image: true,
+  attachment: true,
   isCall: true,
   deletedAt: true,
   sender: { select: { name: true, email: true } },

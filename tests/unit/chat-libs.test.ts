@@ -3,10 +3,17 @@ import { describe, expect, it } from "vitest";
 import { splitLinks } from "@/app/libs/linkify";
 import { matchesSearch, normalizeSearch } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
-import { countUnread, formatUnread } from "@/app/libs/unread";
+import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
+import {
+  canEditGroup,
+  canRemoveMember,
+  normalizeGroupName,
+} from "@/app/libs/conversation-permissions";
 import {
   canEditMessage,
   canRecallMessage,
+  canForwardMessage,
+  canReactToMessage,
   canReplyToMessage,
 } from "@/app/libs/message-actions";
 
@@ -89,6 +96,13 @@ describe("message groups", () => {
     );
   });
 
+  it("never groups group events", () => {
+    const first = at("2026-11-17T10:00:00");
+    const event = { ...at("2026-11-17T10:00:30"), systemType: "renamed" };
+    expect(startsGroup(first, event)).toBe(true);
+    expect(startsGroup(event, at("2026-11-17T10:00:40"))).toBe(true);
+  });
+
   it("puts a divider where the local day changes", () => {
     expect(startsNewDay(undefined, at("2026-11-17T10:00:00"))).toBe(true);
     expect(startsNewDay(at("2026-11-17T10:00:00"), at("2026-11-17T23:00:00"))).toBe(false);
@@ -114,6 +128,17 @@ describe("countUnread", () => {
   it("is 0 when the newest message was seen", () => {
     expect(countUnread([from("a", ["a", ME]), from("a")], ME)).toBe(0);
     expect(countUnread([], ME)).toBe(0);
+  });
+
+  it("finds where the new messages start (oldest first)", () => {
+    const page = [
+      { id: "1", ...from("a", ["a", ME]) },
+      { id: "2", ...from("b") },
+      { id: "3", ...from("a") },
+    ];
+    expect(findFirstUnread(page, ME)).toBe("2");
+    expect(findFirstUnread([...page, { id: "4", ...from(ME) }], ME)).toBeNull();
+    expect(findFirstUnread([], ME)).toBeNull();
   });
 
   it("caps the label at 99+", () => {
@@ -151,5 +176,45 @@ describe("message actions", () => {
   it("replies to anything still there", () => {
     expect(canReplyToMessage(message({ senderId: "other" }))).toBe(true);
     expect(canReplyToMessage(message({ deletedAt: new Date() }))).toBe(false);
+  });
+
+  it("forwards a person's message with content", () => {
+    expect(canForwardMessage(message({ senderId: "other" }))).toBe(true);
+    expect(canForwardMessage({ ...message(), body: null, image: "x" })).toBe(true);
+    expect(canForwardMessage({ ...message(), body: null })).toBe(false);
+    expect(canForwardMessage(message({ isCall: true }))).toBe(false);
+    expect(canForwardMessage(message({ systemType: "left" }))).toBe(false);
+  });
+
+  it("reacts to anything still there except a call", () => {
+    expect(canReactToMessage(message({ senderId: "other" }))).toBe(true);
+    expect(canReactToMessage(message({ deletedAt: new Date() }))).toBe(false);
+    expect(canReactToMessage(message({ isCall: true }))).toBe(false);
+    expect(canReactToMessage(message({ systemType: "added" }))).toBe(false);
+    expect(canReplyToMessage(message({ systemType: "added" }))).toBe(false);
+  });
+});
+
+describe("group permissions", () => {
+  const group = (ownerId: string | null) => ({ isGroup: true, ownerId });
+
+  it("lets any group member edit, never a 1:1 chat", () => {
+    expect(canEditGroup(group("other"))).toBe(true);
+    expect(canEditGroup({ isGroup: null })).toBe(false);
+  });
+
+  it("lets the owner (or anyone in an ownerless group) remove someone else", () => {
+    expect(canRemoveMember(group("me"), "me", "other")).toBe(true);
+    expect(canRemoveMember(group("other"), "me", "third")).toBe(false);
+    expect(canRemoveMember(group(null), "me", "other")).toBe(true);
+    expect(canRemoveMember(group("me"), "me", "me")).toBe(false);
+    expect(canRemoveMember({ isGroup: false, ownerId: null }, "me", "other")).toBe(false);
+  });
+
+  it("normalizes a group name", () => {
+    expect(normalizeGroupName("  Team ")).toBe("Team");
+    expect(normalizeGroupName("   ")).toBeNull();
+    expect(normalizeGroupName(42)).toBeNull();
+    expect(normalizeGroupName("x".repeat(101))).toBeNull();
   });
 });

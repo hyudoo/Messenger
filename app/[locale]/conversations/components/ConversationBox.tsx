@@ -12,22 +12,28 @@ import useOtherUser from "@/app/hooks/useOtherUser";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { FullConversationType } from "@/app/types";
 import useDateLocale from "@/app/hooks/useDateLocale";
+import useSystemText from "@/app/hooks/useSystemText";
 import { callDurationSeconds, formatCallDuration } from "@/app/libs/call";
 import { formatUnread } from "@/app/libs/unread";
+import { HiBellSlash, HiMapPin } from "react-icons/hi2";
 
 interface ConversationBoxProps {
   data: FullConversationType;
   selected?: boolean;
+  // who is typing in it right now (replaces the last message's preview)
+  typingNames?: string[];
 }
 
 const ConversationBox: React.FC<ConversationBoxProps> = ({
   data,
   selected,
+  typingNames = [],
 }) => {
   const t = useTranslations("conversations");
   const dateLocale = useDateLocale();
   const otherUser = useOtherUser(data);
   const session = useSession();
+  const systemText = useSystemText();
 
   const lastMessage = useMemo(() => {
     const messages = data.messages || [];
@@ -47,6 +53,10 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
   const unread = data.unreadCount ?? (hasSeen || !lastMessage ? 0 : 1);
 
   const lastMessageText = useMemo(() => {
+    // a group event is a whole sentence already ("You added …")
+    if (lastMessage?.systemType) {
+      return systemText(lastMessage);
+    }
     if (lastMessage?.isCall) {
       // older calls have no callType: video
       const kind = lastMessage.callType ?? "video";
@@ -67,7 +77,11 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
       ? t("last_recalled")
       : lastMessage?.image
         ? t("last_image")
-        : lastMessage?.body;
+        : lastMessage?.attachment?.kind === "voice"
+          ? t("last_voice")
+          : lastMessage?.attachment
+            ? t("last_file", { name: lastMessage.attachment.name })
+            : lastMessage?.body;
     if (!text) {
       return t("no_messages");
     }
@@ -80,7 +94,7 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
       return t("last_from", { name: lastMessage.sender.name, text });
     }
     return text;
-  }, [lastMessage, t, userEmail, data.isGroup]);
+  }, [lastMessage, t, userEmail, data.isGroup, systemText]);
 
   const title = data.name || otherUser.name;
 
@@ -120,6 +134,13 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
             )}>
             {title}
           </p>
+          {(data.muted || data.pinned) && (
+            <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+              {data.pinned && <HiMapPin size={14} aria-label={t("pinned")} />}
+              {data.muted && <HiBellSlash size={14} aria-label={t("muted")} />}
+            </span>
+          )}
+          <span className="flex-1" />
           {lastMessage?.createdAt && (
             <p
               className={clsx(
@@ -139,11 +160,22 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
               "min-w-0 flex-1 truncate text-sm",
               unread > 0 ? "text-foreground font-medium" : "text-muted-foreground"
             )}>
-            {lastMessageText}
+            {typingNames.length > 0 ? (
+              <span className="font-medium text-sky-500">
+                {data.isGroup
+                  ? t("typing_group", { names: typingNames.join(", "), count: typingNames.length })
+                  : t("typing")}
+              </span>
+            ) : (
+              lastMessageText
+            )}
           </p>
           {unread > 0 && (
             <span
-              className="shrink-0 rounded-full bg-sky-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white"
+              className={clsx(
+                "shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none text-white",
+                data.muted ? "bg-muted-foreground" : "bg-sky-500"
+              )}
               aria-label={t("unread", { count: unread })}>
               {formatUnread(unread)}
             </span>

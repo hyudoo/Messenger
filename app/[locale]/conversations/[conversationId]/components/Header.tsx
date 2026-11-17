@@ -10,7 +10,7 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
-import { useIsActive } from "@/app/hooks/useActiveList";
+import usePresenceText from "@/app/hooks/usePresenceText";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
@@ -21,22 +21,23 @@ interface HeaderProps {
   conversation: Conversation & {
     users: SafeUser[];
   };
+  // everyone but the user (groups: who can be added)
+  users: SafeUser[];
+  // the user's own settings of this conversation
+  settings: { muted: boolean; pinned: boolean };
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation }) => {
+const Header: React.FC<HeaderProps> = ({ conversation, users, settings }) => {
   const t = useTranslations();
   const router = useRouter();
   const otherUser = useOtherUser(conversation);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const isActive = useIsActive(otherUser?.email);
-  const statusText = useMemo(() => {
-    if (conversation.isGroup) {
-      return t("common.members", { count: conversation.userIds.length });
-    }
-
-    return isActive ? t("common.online") : t("common.offline");
-  }, [conversation, isActive, t]);
+  // 1:1: "Active now", "Active 5 minutes ago" or "Offline"
+  const presenceText = usePresenceText(otherUser);
+  const statusText = conversation.isGroup
+    ? t("common.members", { count: conversation.userIds.length })
+    : presenceText;
 
   // const handleCall = useCallback(() => {
   //   axios.post("/api/messages", {
@@ -69,6 +70,8 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
     <>
       <ProfileDrawer
         data={conversation}
+        users={users}
+        settings={settings}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
@@ -132,16 +135,15 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
               </button>
             </>
           )}
-          <HiEllipsisHorizontal
-            size={32}
-            role="button"
+          <button
+            type="button"
             aria-label={t("chat.details")}
+            title={t("chat.details")}
+            aria-haspopup="dialog"
             onClick={() => setDrawerOpen(true)}
-            className="text-sky-500
-            cursor-pointer
-            hover:text-sky-600
-            transition"
-          />
+            className="rounded-full text-sky-500 transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+            <HiEllipsisHorizontal size={32} aria-hidden />
+          </button>
         </div>
       </div>
     </>

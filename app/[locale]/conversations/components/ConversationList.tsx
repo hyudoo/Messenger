@@ -16,9 +16,13 @@ import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
-import { ConversationUpdate, FullConversationType } from "@/app/types";
+import { ConversationSettings, ConversationUpdate, FullConversationType } from "@/app/types";
 import { matchesSearch } from "@/app/libs/search";
 import { formatUnread } from "@/app/libs/unread";
+
+// "typing" events refresh every few seconds while someone types; without one for this long the
+// inbox stops showing it (same as the chat's indicator)
+const TYPING_TIMEOUT_MS = 5000;
 
 interface ConversationListProps {
   initialItems: FullConversationType[];
@@ -32,6 +36,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // conversation id -> email -> when their last "typing" arrived (conversation:typing)
+  const [typing, setTyping] = useState<Record<string, Record<string, number>>>({});
 
   const t = useTranslations("conversations");
   const router = useRouter();
@@ -47,7 +53,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
   // Tab title badge: "(3) Messenger" while there are unread messages. Re-applied after
   // navigations, which reset the title from the page metadata.
-  const totalUnread = items.reduce((sum, item) => sum + (item.unreadCount ?? 0), 0);
+  // muted conversations don't count (their own badges still show, greyed)
+  const totalUnread = items.reduce(
+    (sum, item) => sum + (item.muted ? 0 : (item.unreadCount ?? 0)),
+    0
+  );
   useEffect(() => {
     const base = document.title.replace(/^\(\d+\+?\) /, "");
     const apply = () => {
@@ -61,7 +71,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
   }, [totalUnread, conversationId]);
 
-  const visibleItems = items.filter((item) =>
+  // pinned conversations first (each part keeps its order: latest activity first)
+  const visibleItems = [
+    ...items.filter((item) => item.pinned),
+    ...items.filter((item) => !item.pinned),
+  ].filter((item) =>
     matchesSearch(
       query,
       item.name,
@@ -84,8 +98,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
 
     // A new message also carries lastMessageAt: that conversation moves to the top.
-    // "Seen" updates don't, so the order stays put. A member leaving a group sends the
-    // new member list instead of messages.
+    // "Seen" updates don't, so the order stays put. A group change (rename, members added,
+    // removed or leaving) sends the name and member list instead of messages.
     const updateHandler = (conversation: ConversationUpdate) => {
       if (conversation.users && conversation.id === conversationId) {
         // the open chat's header and drawer come from the server component
@@ -106,6 +120,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             users: conversation.users,
             userIds: conversation.userIds ?? target.userIds,
             ownerId: conversation.ownerId ?? null,
+            name: conversation.name ?? target.name,
           }),
           ...(conversation.lastMessageAt && {
             lastMessageAt: new Date(conversation.lastMessageAt),
@@ -151,7 +166,35 @@ const ConversationList: React.FC<ConversationListProps> = ({
       }
     };
 
+    const typingHandler = (event: { conversationId: string; email: string; typing: boolean }) => {
+      if (event.email === myEmailRef.current) {
+        return;
+      }
+      setTyping((current) => {
+        const people = { ...current[event.conversationId] };
+        if (event.typing) {
+          people[event.email] = Date.now();
+        } else if (people[event.email]) {
+          delete people[event.email];
+        } else {
+          return current;
+        }
+        return { ...current, [event.conversationId]: people };
+      });
+    };
+
     socket.on("conversation:new", newHandler);
+    // the user's own settings, changed in another tab or the chat's drawer
+    const settingsHandler = (settings: ConversationSettings) => {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === settings.id ? { ...item, muted: settings.muted, pinned: settings.pinned } : item
+        )
+      );
+    };
+
+    socket.on("conversation:typing", typingHandler);
+    socket.on("conversation:settings", settingsHandler);
     socket.on("conversation:update", updateHandler);
     socket.on("conversation:remove", removeHandler);
     socket.on("connect", resyncHandler);
@@ -159,10 +202,42 @@ const ConversationList: React.FC<ConversationListProps> = ({
     return () => {
       socket.off("connect", resyncHandler);
       socket.off("conversation:new", newHandler);
+      socket.off("conversation:typing", typingHandler);
+      socket.off("conversation:settings", settingsHandler);
       socket.off("conversation:update", updateHandler);
       socket.off("conversation:remove", removeHandler);
     };
   }, [router, conversationId]);
+
+  // drops typing entries that weren't refreshed in time
+  const typingActive = Object.values(typing).some((people) => Object.keys(people).length > 0);
+  useEffect(() => {
+    if (!typingActive) {
+      return;
+    }
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setTyping((current) => {
+        let changed = false;
+        const next: typeof current = {};
+        Object.entries(current).forEach(([id, people]) => {
+          const fresh = Object.entries(people).filter(([, at]) => now - at < TYPING_TIMEOUT_MS);
+          changed ||= fresh.length !== Object.keys(people).length;
+          if (fresh.length > 0) {
+            next[id] = Object.fromEntries(fresh);
+          }
+        });
+        return changed ? next : current;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [typingActive]);
+
+  // the names of who is typing in a conversation (the open chat shows its own indicator too)
+  const typingNames = (item: FullConversationType) =>
+    Object.keys(typing[item.id] ?? {})
+      .map((email) => item.users.find((user) => user.email === email)?.name)
+      .filter((name): name is string => !!name);
 
   return (
     <>
@@ -216,6 +291,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
               key={item.id}
               data={item}
               selected={conversationId === item.id}
+              typingNames={typingNames(item)}
             />
           ))}
           {query && visibleItems.length === 0 && (

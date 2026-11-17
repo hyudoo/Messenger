@@ -44,9 +44,13 @@ const reportOnlyCsp = [
   "style-src 'self' 'unsafe-inline'",
   `img-src ${imageSources.join(" ")}`,
   "font-src 'self' data:",
-  // socket.io (same origin, ws in dev / wss behind TLS) and the S3 upload PUT
-  `connect-src 'self' ws: wss:${s3UploadHost ? ` https://${s3UploadHost}` : ""}`,
-  "media-src 'self' blob:",
+  // socket.io (same origin, ws in dev / wss behind TLS), the S3 upload PUT and the image
+  // viewer's download (a fetch of the public file)
+  `connect-src 'self' ws: wss:${s3UploadHost ? ` https://${s3UploadHost}` : ""}${
+    s3PublicHost && s3PublicHost !== s3UploadHost ? ` https://${s3PublicHost}` : ""
+  }`,
+  // voice messages play from the upload host
+  `media-src 'self' blob:${s3PublicHost ? ` https://${s3PublicHost}` : ""}`,
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",

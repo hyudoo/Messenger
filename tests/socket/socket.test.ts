@@ -38,6 +38,7 @@ type CallRow = {
 const CALLS: Record<string, CallRow> = {};
 
 const pushMissedCall = vi.hoisted(() => vi.fn());
+const lastSeenUpdate = vi.hoisted(() => vi.fn(async () => ({})));
 vi.mock("@/app/libs/message-push", () => ({ pushMissedCall }));
 const callById = (id: string) => Object.values(CALLS).find((call) => call.id === id);
 
@@ -105,6 +106,8 @@ vi.mock("@/app/libs/prismadb", () => ({
     },
     // resendRingingCalls: the user's conversations
     user: {
+      // "active N minutes ago" (touchLastSeen)
+      update: lastSeenUpdate,
       findUnique: vi.fn(async ({ where }: any) => ({
         conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
       })),
@@ -706,6 +709,46 @@ describe("typing and session expiry", () => {
       { conversationId: CONVERSATION, email: emailOf(ME), typing: false },
     ]);
     expect(strangerGot).not.toHaveBeenCalled();
+  });
+
+  it("also tells the other members' inboxes, not the typist's own", async () => {
+    const { io, url } = await startServer();
+    const a = (await connected(url, ME)).socket;
+    const inboxB = (await connected(url, OTHER)).socket; // not in the chat
+    const inboxA = (await connected(url, ME)).socket; // the typist's other tab
+    const stranger = (await connected(url, STRANGER)).socket;
+    a.emit("conversation:join", CONVERSATION);
+    await vi.waitFor(async () =>
+      expect(await io.in(conversationRoom(CONVERSATION)).fetchSockets()).toHaveLength(1)
+    );
+
+    const got = vi.fn();
+    inboxB.on("conversation:typing", got);
+    const own = vi.fn();
+    inboxA.on("conversation:typing", own);
+    const strangerGot = vi.fn();
+    stranger.on("conversation:typing", strangerGot);
+
+    a.emit("typing", CONVERSATION, true);
+    await vi.waitFor(() =>
+      expect(got).toHaveBeenCalledWith({ conversationId: CONVERSATION, email: emailOf(ME), typing: true })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(own).not.toHaveBeenCalled();
+    expect(strangerGot).not.toHaveBeenCalled();
+  });
+
+  it("stamps lastSeenAt when a socket disconnects", async () => {
+    const { url } = await startServer();
+    const { socket } = await connected(url, ME);
+    lastSeenUpdate.mockClear();
+    socket.disconnect();
+    await vi.waitFor(() =>
+      expect(lastSeenUpdate).toHaveBeenCalledWith({
+        where: { id: ME },
+        data: { lastSeenAt: expect.any(Date) },
+      })
+    );
   });
 
   it("drops the socket's transport when its session expires", async () => {

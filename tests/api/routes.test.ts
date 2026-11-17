@@ -54,7 +54,14 @@ import {
   DELETE as recallMessage,
   PATCH as editMessage,
 } from "@/app/api/messages/[messageId]/route";
-import { DELETE as deleteConversation } from "@/app/api/conversations/[conversationId]/route";
+import {
+  DELETE as deleteConversation,
+  PATCH as updateGroup,
+} from "@/app/api/conversations/[conversationId]/route";
+import { DELETE as removeMember } from "@/app/api/conversations/[conversationId]/members/[userId]/route";
+import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
+import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
+import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
 import {
@@ -148,6 +155,23 @@ describe("POST /api/messages", () => {
     );
   });
 
+  it("skips the push (and marks the update) for members who muted the conversation", async () => {
+    asMember();
+    prisma.user.findMany.mockResolvedValue([{ id: OTHER }]);
+    await send({ message: "hi" });
+    expect(mocks.pushNewMessage).toHaveBeenCalledWith(expect.objectContaining({ recipientIds: [] }));
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      other.email,
+      "conversation:update",
+      expect.objectContaining({ muted: true })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.not.objectContaining({ muted: true })
+    );
+  });
+
   it("rejects empty and too long messages", async () => {
     asMember();
     expect((await send({ message: "   " })).status).toBe(400);
@@ -188,6 +212,45 @@ describe("POST /api/messages", () => {
       "conversation:update",
       expect.objectContaining({ id: CONVERSATION, lastMessageAt: expect.any(Date) })
     );
+  });
+
+  describe("attachments", () => {
+    const pdf = { kind: "file", url: uploadUrl(ME, "pdf"), name: "report.pdf", size: 1000, type: "application/pdf" };
+    const voice = { kind: "voice", url: uploadUrl(ME, "webm"), name: "voice.webm", size: 1000, type: "audio/webm", duration: 4200 };
+
+    it("saves a file or voice message after marking the upload used", async () => {
+      asMember();
+      expect((await send({ attachment: pdf })).status).toBe(200);
+      expect(mocks.markUploadsUsed).toHaveBeenCalledWith([pdf.url]);
+      expect(prisma.message.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attachment: pdf }) })
+      );
+      expect((await send({ attachment: voice })).status).toBe(200);
+      expect(prisma.message.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attachment: voice }) })
+      );
+    });
+
+    it.each([
+      ["someone else's upload", { ...pdf, url: uploadUrl(OTHER, "pdf") }],
+      ["an image URL as a file", { ...pdf, url: uploadUrl(ME, "png") }],
+      ["a PDF as a voice message", { ...voice, url: uploadUrl(ME, "pdf") }],
+      ["a disallowed type", { ...pdf, type: "text/html" }],
+      ["a file too large", { ...pdf, size: 26 * 1024 * 1024 }],
+      ["a file without a name", { ...pdf, name: "  " }],
+      ["a voice message without a length", { ...voice, duration: undefined }],
+      ["a voice message too long", { ...voice, duration: 10 * 60 * 1000 }],
+      ["an unknown kind", { ...pdf, kind: "video" }],
+    ])("rejects %s", async (_, attachment) => {
+      asMember();
+      expect((await send({ attachment })).status).toBe(400);
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects an attachment together with an image", async () => {
+      asMember();
+      expect((await send({ attachment: pdf, image: uploadUrl(ME) })).status).toBe(400);
+    });
   });
 
   it("marks an image as used before saving it", async () => {
@@ -538,6 +601,18 @@ describe("POST /api/settings", () => {
 describe("POST /api/uploads", () => {
   const ask = (body: Record<string, unknown>) => requestUpload(jsonRequest("/api/uploads", body));
 
+  it("signs files and voice messages by kind, with their own types and limits", async () => {
+    const file = await (await ask({ contentType: "application/pdf", size: 20 * 1024 * 1024, kind: "file" })).json();
+    expect(file.fileUrl).toMatch(/\.pdf$/);
+    const voice = await (await ask({ contentType: "audio/webm", size: 100, kind: "voice" })).json();
+    expect(voice.fileUrl).toMatch(/\.webm$/);
+    // a PDF is not an image, an image is not a voice message, and no unknown kinds
+    expect((await ask({ contentType: "application/pdf", size: 10 })).status).toBe(400);
+    expect((await ask({ contentType: "image/png", size: 10, kind: "voice" })).status).toBe(400);
+    expect((await ask({ contentType: "image/png", size: 10, kind: "html" })).status).toBe(400);
+    expect((await ask({ contentType: "application/pdf", size: 26 * 1024 * 1024, kind: "file" })).status).toBe(400);
+  });
+
   it("rejects unsupported types and sizes", async () => {
     expect((await ask({ contentType: "text/html", size: 10 })).status).toBe(400);
     expect((await ask({ contentType: "image/png", size: 11 * 1024 * 1024 })).status).toBe(400);
@@ -660,6 +735,231 @@ describe("POST /api/conversations/[id]/leave", () => {
   });
 });
 
+describe("PATCH /api/conversations/[id] (rename, add members)", () => {
+  const FOURTH = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const fourth = user(FOURTH);
+  const patch = (body: Record<string, unknown>) =>
+    updateGroup(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns 404 to non-members and 400 for a 1:1 chat", async () => {
+    asNonMember();
+    expect((await patch({ name: "x" })).status).toBe(404);
+    asMember();
+    expect((await patch({ name: "x" })).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it.each([[{ name: "   " }], [{ name: "x".repeat(101) }], [{}], [{ addUserIds: [OTHER] }]])(
+    "refuses %j",
+    async (body) => {
+      prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+      expect((await patch(body)).status).toBe(400);
+      expect(prisma.conversation.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it("refuses unknown users", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.user.count.mockResolvedValue(0);
+    expect((await patch({ addUserIds: [FOURTH] })).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("renames the group for any member and tells everyone", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "New" });
+
+    expect((await patch({ name: "  New " })).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { name: "New" },
+      include: { users: true },
+    });
+    [me, other, third].forEach((member) =>
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        member.email,
+        "conversation:update",
+        expect.objectContaining({ id: CONVERSATION, name: "New" })
+      )
+    );
+  });
+
+  it("adds people: the members get the new list, the new ones the conversation", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.user.count.mockResolvedValue(1);
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [me, other, third, fourth]));
+
+    expect((await patch({ addUserIds: [FOURTH, FOURTH, ME, "nope"] })).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { users: { connect: [{ id: FOURTH }] } },
+      include: { users: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:new",
+      expect.objectContaining({ id: CONVERSATION, messages: [], unreadCount: 0 })
+    );
+    expect(mocks.emitToUser).not.toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:update",
+      expect.anything()
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.objectContaining({ userIds: [ME, OTHER, THIRD, FOURTH] })
+    );
+  });
+});
+
+describe("DELETE /api/conversations/[id]/members/[userId]", () => {
+  const kick = (userId: string) =>
+    removeMember(
+      jsonRequest(`/api/conversations/${CONVERSATION}/members/${userId}`, null, {
+        method: "DELETE",
+      }),
+      params({ conversationId: CONVERSATION, userId })
+    );
+
+  it("lets only the owner remove someone else", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    expect((await kick(THIRD)).status).toBe(403);
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    expect((await kick(ME)).status).toBe(403); // leaving is its own route
+    expect((await kick("eeeeeeeeeeeeeeeeeeeeeeee")).status).toBe(404);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("removes the member and tells both sides", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.conversation.update.mockResolvedValue(group(ME, [me, other]));
+
+    expect((await kick(THIRD)).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { users: { disconnect: { id: THIRD } } },
+      include: { users: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(third.email, "conversation:remove", {
+      id: CONVERSATION,
+    });
+    expect(mocks.removeUserFromConversationRoom).toHaveBeenCalledWith(third.email, CONVERSATION);
+    [me, other].forEach((member) =>
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        member.email,
+        "conversation:update",
+        expect.objectContaining({ userIds: [ME, OTHER] })
+      )
+    );
+  });
+});
+
+describe("group events (system messages)", () => {
+  const FOURTH = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const fourth = user(FOURTH);
+  const event = (data: Record<string, unknown>) => ({ id: MESSAGE, createdAt: new Date(), ...data });
+  const systemCreate = () =>
+    prisma.message.create.mock.calls.map(([args]) => (args as { data: Record<string, unknown> }).data);
+  const patch = (body: Record<string, unknown>) =>
+    updateGroup(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  beforeEach(() => {
+    prisma.message.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => event(data));
+  });
+
+  it("posts one when a group is created", async () => {
+    prisma.user.count.mockResolvedValue(2);
+    prisma.conversation.create.mockResolvedValue({ ...group(ME), name: "Team" });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    const response = await createConversation(
+      jsonRequest("/api/conversations", {
+        isGroup: true,
+        name: "Team",
+        members: [{ value: OTHER }, { value: THIRD }],
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({ systemType: "created", systemName: "Team", senderId: ME, seenIds: [ME] }),
+    ]);
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:new",
+      expect.objectContaining({ systemType: "created" })
+    );
+  });
+
+  it("posts renamed and added; the people added have it as read and as their preview", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Old" });
+    prisma.user.count.mockResolvedValue(1);
+    prisma.conversation.update.mockResolvedValue({
+      ...group(OTHER, [me, other, third, fourth]),
+      name: "New",
+      lastMessageAt: new Date(),
+    });
+
+    expect((await patch({ name: "New", addUserIds: [FOURTH] })).status).toBe(200);
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({ systemType: "renamed", systemName: "New", seenIds: [ME] }),
+      expect.objectContaining({
+        systemType: "added",
+        systemUsers: [{ id: FOURTH, name: fourth.name, email: fourth.email }],
+        seenIds: [ME, FOURTH],
+      }),
+    ]);
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:new",
+      expect.objectContaining({ messages: [expect.objectContaining({ systemType: "added" })] })
+    );
+  });
+
+  it("posts nothing for a rename to the same name", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Same" });
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "Same" });
+    expect((await patch({ name: "Same" })).status).toBe(200);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("posts removed (by the owner) and left", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.conversation.update.mockResolvedValue(group(ME, [me, other]));
+    await removeMember(
+      jsonRequest(`/api/conversations/${CONVERSATION}/members/${THIRD}`, null, { method: "DELETE" }),
+      params({ conversationId: CONVERSATION, userId: THIRD })
+    );
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [other, third]));
+    await leaveConversation(
+      jsonRequest(`/api/conversations/${CONVERSATION}/leave`, null),
+      params({ conversationId: CONVERSATION })
+    );
+
+    expect(systemCreate()).toEqual([
+      expect.objectContaining({
+        systemType: "removed",
+        senderId: ME,
+        systemUsers: [{ id: THIRD, name: third.name, email: third.email }],
+      }),
+      expect.objectContaining({ systemType: "left", senderId: ME }),
+    ]);
+  });
+
+  it("keeps the change when the event can't be posted", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), name: "Old" });
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "New" });
+    prisma.message.create.mockRejectedValue(new Error("db down"));
+    expect((await patch({ name: "New" })).status).toBe(200);
+  });
+});
+
 describe("GET /api/conversations/[id]/messages (after / latest)", () => {
   const get = (query: string) =>
     olderMessages(
@@ -701,11 +1001,161 @@ describe("GET /api/conversations/[id]/messages (after / latest)", () => {
   });
 });
 
+describe("PATCH /api/conversations/[id]/settings (mute, pin)", () => {
+  const change = (body: Record<string, unknown>) =>
+    updateSettingsOf(
+      jsonRequest(`/api/conversations/${CONVERSATION}/settings`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+  const own = (muted: string[] = [], pinned: string[] = []) =>
+    prisma.user.findUniqueOrThrow.mockResolvedValue({
+      mutedConversationIds: muted,
+      pinnedConversationIds: pinned,
+    });
+
+  it("returns 404 to non-members and 400 for nothing to change", async () => {
+    asNonMember();
+    expect((await change({ muted: true })).status).toBe(404);
+    asMember();
+    expect((await change({})).status).toBe(400);
+    expect((await change({ muted: "yes" })).status).toBe(400);
+  });
+
+  it("mutes and pins for the caller only, and tells their other tabs", async () => {
+    asMember();
+    own(["eeeeeeeeeeeeeeeeeeeeeeee"]);
+    const body = await (await change({ muted: true, pinned: true })).json();
+    expect(body).toEqual({ id: CONVERSATION, muted: true, pinned: true });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: ME },
+      data: {
+        mutedConversationIds: ["eeeeeeeeeeeeeeeeeeeeeeee", CONVERSATION],
+        pinnedConversationIds: [CONVERSATION],
+      },
+      select: { id: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(me.email, "conversation:settings", body);
+  });
+
+  it("unmutes, and refuses a sixth pin", async () => {
+    asMember();
+    own([CONVERSATION]);
+    expect(await (await change({ muted: false })).json()).toEqual(
+      expect.objectContaining({ muted: false })
+    );
+    own([], ["1", "2", "3", "4", "5"].map((n) => n.repeat(24)));
+    expect((await change({ pinned: true })).status).toBe(409);
+  });
+});
+
+describe("GET /api/conversations/[id]/search", () => {
+  const search = (q: string) =>
+    searchMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/search?q=${encodeURIComponent(q)}`, null, {
+        method: "GET",
+      }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns 404 to non-members and 400 for an empty or long query", async () => {
+    asNonMember();
+    expect((await search("hi")).status).toBe(404);
+    asMember();
+    expect((await search("  ")).status).toBe(400);
+    expect((await search("x".repeat(101))).status).toBe(400);
+  });
+
+  it("searches the conversation's text, case-insensitive, newest first", async () => {
+    asMember();
+    prisma.message.findMany.mockResolvedValue([{ id: MESSAGE, body: "Hello" }]);
+    expect(await (await search(" hello ")).json()).toEqual([{ id: MESSAGE, body: "Hello" }]);
+    expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          conversationId: CONVERSATION,
+          body: { contains: "hello", mode: "insensitive" },
+        }),
+        take: 30,
+      })
+    );
+  });
+});
+
+describe("POST /api/messages/[id]/forward", () => {
+  const TARGET = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const forward = (conversationId: string = TARGET) =>
+    forwardMessage(
+      jsonRequest(`/api/messages/${MESSAGE}/forward`, { conversationId }),
+      params({ messageId: MESSAGE })
+    );
+  const original = (extra: Record<string, unknown> = {}) =>
+    prisma.message.findUnique.mockResolvedValue({
+      id: MESSAGE,
+      conversationId: CONVERSATION,
+      senderId: OTHER,
+      body: "hi",
+      image: null,
+      attachment: null,
+      createdAt: new Date(),
+      ...extra,
+    });
+  // the caller is in both conversations
+  const inBoth = () =>
+    prisma.conversation.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      ...conversation,
+      id: where.id,
+    }));
+
+  it("returns 404 unless the caller is in both conversations", async () => {
+    original();
+    prisma.conversation.findFirst.mockImplementation(async ({ where }: { where: { id: string } }) =>
+      where.id === CONVERSATION ? conversation : null
+    );
+    expect((await forward()).status).toBe(404);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a call", { isCall: true, body: null }],
+    ["a recalled message", { deletedAt: new Date(), body: null }],
+    ["a group event", { systemType: "added", body: null }],
+  ])("refuses %s", async (_, extra) => {
+    original(extra);
+    inBoth();
+    expect((await forward()).status).toBe(400);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("copies the content as the caller's forwarded message and delivers it", async () => {
+    original({ image: uploadUrl(OTHER) });
+    inBoth();
+    prisma.message.create.mockResolvedValue({ id: "new", createdAt: new Date() });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    expect((await forward()).status).toBe(200);
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          body: "hi",
+          image: uploadUrl(OTHER),
+          forwarded: true,
+          conversationId: TARGET,
+          senderId: ME,
+          seenIds: [ME],
+        }),
+      })
+    );
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(TARGET, "messages:new", expect.anything());
+  });
+});
+
 describe("GET /api/conversations", () => {
   it("returns the caller's conversations", async () => {
     prisma.conversation.findMany.mockResolvedValue([{ id: CONVERSATION, messages: [] }]);
     const response = await listConversations();
-    expect(await response.json()).toEqual([{ id: CONVERSATION, messages: [], unreadCount: 0 }]);
+    expect(await response.json()).toEqual([
+      { id: CONVERSATION, messages: [], unreadCount: 0, muted: false, pinned: false },
+    ]);
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userIds: { has: ME } } })
     );
@@ -922,7 +1372,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.message.update).not.toHaveBeenCalled();
   });
 
-  it("recalls: clears text, image and reactions, and removes the image from S3", async () => {
+  it("recalls: clears text, image, attachment and reactions, and removes the image from S3", async () => {
     prisma.message.findUnique.mockResolvedValue(own({ body: null, image: uploadUrl(ME) }));
 
     expect((await recall()).status).toBe(200);
@@ -930,7 +1380,13 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
     expect(prisma.reaction.deleteMany).toHaveBeenCalledWith({ where: { messageId: MESSAGE } });
     expect(prisma.message.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { body: null, image: null, editedAt: null, deletedAt: expect.any(Date) },
+        data: {
+          body: null,
+          image: null,
+          attachment: { unset: true },
+          editedAt: null,
+          deletedAt: expect.any(Date),
+        },
       })
     );
     expect(mocks.emitToConversation).toHaveBeenCalledWith(
@@ -989,6 +1445,23 @@ describe("reactions on a recalled message", () => {
     prisma.message.findUnique.mockResolvedValue({
       conversationId: CONVERSATION,
       deletedAt: new Date(),
+    });
+    asMember();
+    const response = await toggleReaction(
+      jsonRequest(`/api/messages/${MESSAGE}/reactions`, { emoji: "👍" }),
+      params({ messageId: MESSAGE })
+    );
+    expect(response.status).toBe(400);
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("reactions on a call", () => {
+  it("are refused", async () => {
+    prisma.message.findUnique.mockResolvedValue({
+      conversationId: CONVERSATION,
+      deletedAt: null,
+      isCall: true,
     });
     asMember();
     const response = await toggleReaction(

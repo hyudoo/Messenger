@@ -14,6 +14,10 @@ import { FullMessageType, SafeUser } from "@/app/types";
 import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
+import { ImageViewerProvider } from "./ImageViewer";
+import ForwardDialog from "./ForwardDialog";
+import { flashMessage } from "./MessageReply";
+import { onMessageJump } from "@/app/hooks/useMessageJump";
 import { format, isToday, isYesterday } from "date-fns";
 
 interface BodyProps {
@@ -21,6 +25,9 @@ interface BodyProps {
   initialHasMore: boolean;
   // the conversation's members, for the names in "X is typing"
   members: SafeUser[];
+  // the first message the user hadn't read when opening the chat: a "new messages" divider goes
+  // before it, and the chat opens there instead of at the bottom
+  firstUnreadId?: string | null;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -31,6 +38,9 @@ interface MessagePage {
   messages: FullMessageType[];
   hasMore: boolean;
 }
+
+// how many older pages a jump to a message (search, reply quote) may load to find it
+const MAX_JUMP_PAGES = 10;
 
 // how close to the top (px) scrolling has to get before older messages load
 const LOAD_OLDER_THRESHOLD = 120;
@@ -51,6 +61,7 @@ const outboxMessage = (item: OutboxItem, me: Partial<SafeUser>): FullMessageType
     id: item.clientId,
     body: item.payload.message ?? null,
     image: item.payload.image ?? null,
+    attachment: item.payload.attachment ? { duration: null, ...item.payload.attachment } : null,
     createdAt: item.createdAt,
     conversationId: item.conversationId,
     sender: me,
@@ -81,12 +92,14 @@ const DayDivider: React.FC<{ date: Date | string }> = ({ date }) => {
 const Body: React.FC<BodyProps> = ({
   initialMessages = [],
   initialHasMore,
+  firstUnreadId,
   members,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState(initialMessages);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -100,6 +113,10 @@ const Body: React.FC<BodyProps> = ({
   // set before a render that should end scrolled to the bottom (read in the layout effect)
   const scrollToBottomRef = useRef(true);
   const nearBottomRef = useRef(true);
+  const isFirstLayoutRef = useRef(true);
+  // a message to show once the older pages loaded for it are rendered
+  const pendingJumpRef = useRef<string | null>(null);
+  const hasMoreRef = useRef(initialHasMore);
   // the latest messages for the socket handlers, which are registered once per conversation
   const messagesRef = useRef(messages);
 
@@ -112,8 +129,50 @@ const Body: React.FC<BodyProps> = ({
 
   useLayoutEffect(() => {
     messagesRef.current = messages;
+    hasMoreRef.current = hasMore;
     myEmailRef.current = myEmail;
   });
+
+  // Showing a message (search result, reply quote): at once when it is loaded, else after
+  // loading older pages until it turns up (at most MAX_JUMP_PAGES).
+  useEffect(
+    () =>
+      onMessageJump(async (messageId) => {
+        if (flashMessage(messageId)) {
+          return;
+        }
+        const pages: FullMessageType[][] = [];
+        let cursor = messagesRef.current[0]?.id;
+        let more = hasMoreRef.current;
+        let found = false;
+        try {
+          for (let page = 0; page < MAX_JUMP_PAGES && more && cursor && !found; page++) {
+            const { data } = await axios.get<MessagePage>(
+              `/api/conversations/${conversationId}/messages`,
+              { params: { before: cursor } }
+            );
+            pages.unshift(data.messages);
+            found = data.messages.some((message) => message.id === messageId);
+            cursor = data.messages[0]?.id;
+            more = data.hasMore;
+          }
+        } catch {
+          // shown below as "not found"
+        }
+        if (pages.length > 0) {
+          pendingJumpRef.current = found ? messageId : null;
+          setMessages((current) => {
+            const known = new Set(current.map((message) => message.id));
+            return [...pages.flat().filter((message) => !known.has(message.id)), ...current];
+          });
+          setHasMore(more);
+        }
+        if (!found) {
+          toast.error(t("jump_not_found"));
+        }
+      }),
+    [conversationId, t]
+  );
 
   useEffect(() => {
     // "seen" only while the user can actually see the chat: not from a hidden tab, and again
@@ -268,13 +327,26 @@ const Body: React.FC<BodyProps> = ({
   useLayoutEffect(() => {
     const container = containerRef.current;
     const previousHeight = heightBeforePrependRef.current;
-    if (container && previousHeight !== null) {
+    if (pendingJumpRef.current) {
+      // older pages loaded for a jump: go to that message instead of keeping the place
+      flashMessage(pendingJumpRef.current);
+      pendingJumpRef.current = null;
+      heightBeforePrependRef.current = null;
+    } else if (container && previousHeight !== null) {
       container.scrollTop += container.scrollHeight - previousHeight;
       heightBeforePrependRef.current = null;
     } else if (scrollToBottomRef.current) {
-      bottomRef.current?.scrollIntoView();
+      // opening the chat with unread messages: start at the first of them (the browser stops at
+      // the bottom when they fit on the screen)
+      const divider = isFirstLayoutRef.current ? unreadDividerRef.current : null;
+      if (divider) {
+        divider.scrollIntoView({ block: "start" });
+      } else {
+        bottomRef.current?.scrollIntoView();
+      }
     }
     scrollToBottomRef.current = false;
+    isFirstLayoutRef.current = false;
   }, [messages]);
 
   // This conversation's outbox entries not in the list yet. A sent one is dropped as soon as its
@@ -365,85 +437,104 @@ const Body: React.FC<BodyProps> = ({
     setUnseenCount(0);
   };
 
+  // the images the viewer can move between (the loaded pages, oldest first)
+  const images = messages
+    .filter((message) => message.image && !message.deletedAt)
+    .map((message) => message.image!);
+
   return (
-    <div className="relative flex-1 min-h-0">
-      <div
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="h-full overflow-y-auto">
-        {hasMore && (
-          <div className="flex justify-center pt-4">
-            {/* fallback for when the first page doesn't fill the screen (no scroll) */}
-            <button
-              type="button"
-              onClick={loadOlder}
-              disabled={isLoadingOlder}
-              className="text-xs text-muted-foreground hover:underline disabled:opacity-50">
-              {isLoadingOlder ? tCommon("loading") : t("load_older")}
-            </button>
-          </div>
-        )}
-        {shown.map(({ message, item }, i) => {
-          const previous = shown[i - 1]?.message;
-          return (
-            <div key={item?.clientId ?? message.id}>
-              {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
-              <MessageBox
-                isLast={i === shown.length - 1}
-                showHeader={startsGroup(previous, message)}
-                data={message}
-                pending={
-                  item && item.status !== "sent"
-                    ? {
-                        status: item.status,
-                        tooFast: item.tooFast,
-                        onRetry: () => retry(item.clientId),
-                        onDiscard: () => discard(item.clientId),
-                      }
-                    : undefined
-                }
-              />
+    <ImageViewerProvider images={images}>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto">
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              {/* fallback for when the first page doesn't fill the screen (no scroll) */}
+              <button
+                type="button"
+                onClick={loadOlder}
+                disabled={isLoadingOlder}
+                className="text-xs text-muted-foreground hover:underline disabled:opacity-50">
+                {isLoadingOlder ? tCommon("loading") : t("load_older")}
+              </button>
             </div>
-          );
-        })}
-        {typingNames.length > 0 && (
-          <div className="flex items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" aria-live="polite">
-            <span className="flex gap-0.5" aria-hidden>
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
-            </span>
-            {t("typing", { names: typingNames.join(", "), count: typingNames.length })}
-          </div>
+          )}
+          {shown.map(({ message, item }, i) => {
+            const previous = shown[i - 1]?.message;
+            return (
+              <div key={item?.clientId ?? message.id}>
+                {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
+                {message.id === firstUnreadId && (
+                  <div
+                    ref={unreadDividerRef}
+                    className="flex scroll-mt-4 items-center gap-3 px-4 pt-4 pb-1"
+                    role="separator"
+                    aria-label={t("unread_divider")}>
+                    <div className="h-px flex-1 bg-rose-500/60" />
+                    <span className="text-xs font-medium text-rose-500">{t("unread_divider")}</span>
+                    <div className="h-px flex-1 bg-rose-500/60" />
+                  </div>
+                )}
+                <MessageBox
+                  isLast={i === shown.length - 1}
+                  showHeader={startsGroup(previous, message)}
+                  data={message}
+                  pending={
+                    item && item.status !== "sent"
+                      ? {
+                          status: item.status,
+                          tooFast: item.tooFast,
+                          onRetry: () => retry(item.clientId),
+                          onDiscard: () => discard(item.clientId),
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            );
+          })}
+          {typingNames.length > 0 && (
+            <div className="flex items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" aria-live="polite">
+              <span className="flex gap-0.5" aria-hidden>
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+              </span>
+              {t("typing", { names: typingNames.join(", "), count: typingNames.length })}
+            </div>
+          )}
+          <div className="pt-24" ref={bottomRef} />
+        </div>
+        {unseenCount > 0 && (
+          <button
+            type="button"
+            onClick={jumpToBottom}
+            className="
+              absolute
+              bottom-4
+              left-1/2
+              -translate-x-1/2
+              flex
+              items-center
+              gap-1
+              rounded-full
+              bg-sky-500
+              px-4
+              py-2
+              text-sm
+              text-white
+              shadow-lg
+              transition
+              hover:bg-sky-600">
+            <HiArrowDown size={16} aria-hidden />
+            {t("new_messages", { count: unseenCount })}
+          </button>
         )}
-        <div className="pt-24" ref={bottomRef} />
       </div>
-      {unseenCount > 0 && (
-        <button
-          type="button"
-          onClick={jumpToBottom}
-          className="
-            absolute
-            bottom-4
-            left-1/2
-            -translate-x-1/2
-            flex
-            items-center
-            gap-1
-            rounded-full
-            bg-sky-500
-            px-4
-            py-2
-            text-sm
-            text-white
-            shadow-lg
-            transition
-            hover:bg-sky-600">
-          <HiArrowDown size={16} aria-hidden />
-          {t("new_messages", { count: unseenCount })}
-        </button>
-      )}
-    </div>
+      <ForwardDialog />
+    </ImageViewerProvider>
   );
 };
 

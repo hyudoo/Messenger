@@ -7,8 +7,9 @@ import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import prisma from "@/app/libs/prismadb";
 import { ConversationWithUsers } from "@/app/types";
 import { logError } from "@/app/libs/log";
+import { normalizeGroupName } from "@/app/libs/conversation-permissions";
+import { postSystemMessage } from "@/app/libs/system-message";
 
-const MAX_GROUP_NAME_LENGTH = 100;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 const isObjectId = (value: unknown): value is string =>
@@ -61,13 +62,9 @@ export async function POST(request: Request) {
             .filter((id: string) => id !== currentUser.id)
         )
       );
-      const groupName = typeof name === "string" ? name.trim() : "";
+      const groupName = normalizeGroupName(name);
 
-      if (
-        memberIds.length < 2 ||
-        !groupName ||
-        groupName.length > MAX_GROUP_NAME_LENGTH
-      ) {
+      if (memberIds.length < 2 || !groupName) {
         return new NextResponse("Invalid data", { status: 400 });
       }
       const existingMembers = await prisma.user.count({
@@ -92,6 +89,13 @@ export async function POST(request: Request) {
       });
 
       notifyMembers(newConversation);
+      // the first message: "X created the group" (also moves it to the top of the inboxes)
+      await postSystemMessage({
+        conversation: newConversation,
+        actorId: currentUser.id,
+        type: "created",
+        name: groupName,
+      });
       return NextResponse.json(newConversation);
     }
 

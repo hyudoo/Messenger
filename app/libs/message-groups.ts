@@ -4,6 +4,7 @@ type Groupable = {
   createdAt: Date | string;
   sender?: { email?: string | null } | null;
   isCall?: boolean | null;
+  systemType?: string | null;
 };
 
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -18,11 +19,13 @@ export const startsNewDay = (previous: Groupable | undefined, message: Groupable
   !previous || !isSameDay(previous.createdAt, message.createdAt);
 
 // Whether a message shows its own header (avatar, name, time) instead of continuing the previous
-// one. Calls always stand alone: they read as events, not as part of a run of text.
+// one. Calls and group events always stand alone: they read as events, not as part of a run of text.
 export const startsGroup = (previous: Groupable | undefined, message: Groupable) =>
   !previous ||
   startsNewDay(previous, message) ||
   !!previous.isCall ||
   !!message.isCall ||
+  !!previous.systemType ||
+  !!message.systemType ||
   previous.sender?.email !== message.sender?.email ||
   time(message.createdAt) - time(previous.createdAt) > GROUP_WINDOW_MS;

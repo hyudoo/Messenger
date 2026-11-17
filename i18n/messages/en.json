@@ -77,9 +77,15 @@
     "search": "Search conversations",
     "no_results": "No conversations found.",
     "last_from": "{name}: {text}",
+    "typing": "Typing…",
+    "typing_group": "{count, plural, one {{names} is typing…} other {{names} are typing…}}",
     "you": "You",
     "unread": "{count, plural, one {# unread message} other {# unread messages}}",
-    "last_recalled": "Message unsent."
+    "last_recalled": "Message unsent.",
+    "last_voice": "Sent a voice message.",
+    "last_file": "Sent the file {name}.",
+    "muted": "Muted",
+    "pinned": "Pinned"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -108,12 +114,17 @@
     "sending": "Sending...",
     "retry": "Retry",
     "discard": "Discard",
-    "image_uploading": "Uploading image...",
     "reply": "Reply",
     "edit": "Edit",
     "recall": "Unsend",
     "recall_confirm": "Unsend?",
     "recall_failed": "Couldn't unsend the message!",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copy_failed": "Couldn't copy!",
+    "more_actions": "Message options",
+    "recall_tap_again": "Tap again to unsend",
+    "unread_divider": "New messages",
     "recalled": "Message unsent",
     "edited": "Edited",
     "editing": "Editing message",
@@ -125,15 +136,42 @@
     "reply_image": "Photo",
     "reply_call": "Call",
     "reply_jump": "Go to the original message",
-    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}"
+    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}",
+    "reply_voice": "Voice message",
+    "reply_file": "File {name}",
+    "attach_file": "Send a file",
+    "drop_files": "Drop images or files here to send them",
+    "remove_attachment": "Remove {name}",
+    "attachment_uploading": "Uploading…",
+    "attachment_failed": "Upload failed, click to retry",
+    "attachments_too_many": "At most {max} images or files at a time",
+    "record_voice": "Record a voice message",
+    "recording": "Recording",
+    "send_voice": "Send voice message",
+    "cancel_voice": "Cancel recording",
+    "mic_denied": "Can't use the microphone. Allow this site to use it.",
+    "voice_unsupported": "This browser can't record audio.",
+    "voice_uploading": "Sending voice message...",
+    "play": "Play",
+    "pause": "Pause",
+    "seek": "Seek voice message",
+    "open_file": "Open {name}",
+    "forward": "Forward",
+    "forwarded": "Forwarded",
+    "jump_not_found": "Couldn't find this message (it may be too old)."
   },
   "profile": {
     "close": "Close panel",
     "delete": "Delete",
     "email": "Email",
-    "emails": "Emails",
     "joined": "Joined",
-    "leave": "Leave group"
+    "leave": "Leave group",
+    "search": "Search",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "pin_limit": "You can pin at most 5 conversations."
   },
   "confirm_delete": {
     "title": "Delete conversation",
@@ -143,7 +181,23 @@
     "title": "Create a group chat",
     "description": "Create a chat with more than two people",
     "name": "Group name",
-    "members": "Members"
+    "members": "Members",
+    "rename": "Rename group",
+    "save_name": "Save group name",
+    "cancel_rename": "Cancel renaming",
+    "members_title": "Members ({count})",
+    "owner": "Owner",
+    "you": "you",
+    "add_members": "Add",
+    "add_selected": "{count, plural, one {Add # person} other {Add # people}}",
+    "cancel_add": "Cancel",
+    "search_people": "Search by name or email",
+    "no_one_to_add": "Everyone is already in the group.",
+    "remove": "Remove {name} from the group",
+    "remove_confirm": "Click again to remove {name} from the group",
+    "remove_short": "Remove?",
+    "update_failed": "Couldn't update the group!",
+    "too_fast": "Too many changes, wait a moment and try again!"
   },
   "users": {
     "title": "People",
@@ -170,7 +224,11 @@
     "unsupported_type": "Only JPG, PNG, GIF or WEBP images are supported",
     "too_large": "Images can be at most 10MB",
     "too_many": "Too many uploads, try again in a few minutes",
-    "failed": "Upload failed"
+    "failed": "Upload failed",
+    "file_unsupported_type": "This file type isn't supported (PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP)",
+    "file_too_large": "Files can be up to 25MB",
+    "voice_unsupported_type": "This recording format isn't supported",
+    "voice_too_large": "The voice message is too long"
   },
   "call": {
     "incoming": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
@@ -202,11 +260,28 @@
     "no_results": "No emoji found",
     "loading": "Loading…"
   },
+  "system": {
+    "created": "{actor} created the group “{name}”",
+    "renamed": "{actor} named the group “{name}”",
+    "added": "{actor} added {users} to the group",
+    "removed": "{actor} removed {users} from the group",
+    "left": "{actor} left the group",
+    "you_subject": "You",
+    "you_object": "you",
+    "someone": "Someone"
+  },
+  "presence": {
+    "just_now": "Active just now",
+    "active_ago": "Active {time} ago"
+  },
   "reactions": {
     "add": "React",
     "more": "More emoji",
     "react_with": "React with {emoji}",
     "reacted_by": "{emoji} {names}",
+    "title": "Message reactions",
+    "all": "All {count}",
+    "tap_to_remove": "Tap to remove",
     "you": "You",
     "failed": "Couldn't add the reaction!"
   },
@@ -223,6 +298,36 @@
     "prompt_later": "Not now",
     "prompt_denied": "Notifications are blocked. You can allow them again in the browser's site settings.",
     "incoming_call": "{kind, select, audio {Incoming audio call} other {Incoming video call}}",
-    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}"
+    "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
+    "voice": "Sent a voice message.",
+    "file": "Sent the file {name}."
+  },
+  "viewer": {
+    "close": "Close",
+    "previous": "Previous image",
+    "next": "Next image",
+    "download": "Download image",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "counter": "{current} / {total}"
+  },
+  "search": {
+    "title": "Search in conversation",
+    "placeholder": "Search messages",
+    "back": "Back",
+    "searching": "Searching…",
+    "no_results": "No matching messages.",
+    "failed": "Search failed, try again later."
+  },
+  "forward": {
+    "title": "Forward message",
+    "search": "Search conversations",
+    "loading": "Loading…",
+    "load_failed": "Couldn't load your conversations.",
+    "no_results": "No conversations found.",
+    "send": "Send",
+    "sending": "Sending…",
+    "sent": "Sent",
+    "retry": "Retry"
   }
 }
