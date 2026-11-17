@@ -84,8 +84,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
     };
 
     // A new message also carries lastMessageAt: that conversation moves to the top.
-    // "Seen" updates don't, so the order stays put. A member leaving a group sends the
-    // new member list instead of messages.
+    // "Seen" updates don't, so the order stays put. A group change (rename, members added,
+    // removed or leaving) sends the name and member list instead of messages.
     const updateHandler = (conversation: ConversationUpdate) => {
       if (conversation.users && conversation.id === conversationId) {
         // the open chat's header and drawer come from the server component
@@ -106,6 +106,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             users: conversation.users,
             userIds: conversation.userIds ?? target.userIds,
             ownerId: conversation.ownerId ?? null,
+            name: conversation.name ?? target.name,
           }),
           ...(conversation.lastMessageAt && {
             lastMessageAt: new Date(conversation.lastMessageAt),

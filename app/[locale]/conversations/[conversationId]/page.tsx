@@ -1,5 +1,6 @@
 import getConversationById from "@/app/actions/getConversationById";
 import getMessages from "@/app/actions/getMessages";
+import getUsers from "@/app/actions/getUsers";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
@@ -26,12 +27,16 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   }
 
   // only loaded once membership is confirmed; older pages load on scroll
-  const { messages, hasMore } = await getMessages(conversation.id);
+  // the users: people a group member may add (the drawer's picker)
+  const [{ messages, hasMore }, users] = await Promise.all([
+    getMessages(conversation.id),
+    conversation.isGroup ? getUsers() : Promise.resolve([]),
+  ]);
 
   return (
     <div className="lg:pl-80 h-full">
       <div className="h-full flex flex-col">
-        <Header conversation={conversation} />
+        <Header conversation={conversation} users={users} />
         <Body initialMessages={messages} initialHasMore={hasMore} members={conversation.users} />
         <Form />
       </div>

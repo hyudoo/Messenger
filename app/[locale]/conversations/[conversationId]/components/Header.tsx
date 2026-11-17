@@ -21,9 +21,11 @@ interface HeaderProps {
   conversation: Conversation & {
     users: SafeUser[];
   };
+  // everyone but the user (groups: who can be added)
+  users: SafeUser[];
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation }) => {
+const Header: React.FC<HeaderProps> = ({ conversation, users }) => {
   const t = useTranslations();
   const router = useRouter();
   const otherUser = useOtherUser(conversation);
@@ -69,6 +71,7 @@ const Header: React.FC<HeaderProps> = ({ conversation }) => {
     <>
       <ProfileDrawer
         data={conversation}
+        users={users}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />

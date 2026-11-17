@@ -136,7 +136,6 @@
     "close": "Đóng bảng thông tin",
     "delete": "Xoá",
     "email": "Email",
-    "emails": "Email",
     "joined": "Tham gia",
     "leave": "Rời nhóm"
   },
@@ -148,7 +147,23 @@
     "title": "Tạo nhóm chat mới",
     "description": "Tạo cuộc trò chuyện với nhiều hơn hai người",
     "name": "Tên nhóm",
-    "members": "Thành viên"
+    "members": "Thành viên",
+    "rename": "Đổi tên nhóm",
+    "save_name": "Lưu tên nhóm",
+    "cancel_rename": "Huỷ đổi tên",
+    "members_title": "Thành viên ({count})",
+    "owner": "Trưởng nhóm",
+    "you": "Bạn",
+    "add_members": "Thêm",
+    "add_selected": "{count, plural, other {Thêm # người}}",
+    "cancel_add": "Huỷ",
+    "search_people": "Tìm theo tên hoặc email",
+    "no_one_to_add": "Mọi người đều đã ở trong nhóm.",
+    "remove": "Xoá {name} khỏi nhóm",
+    "remove_confirm": "Bấm lần nữa để xoá {name} khỏi nhóm",
+    "remove_short": "Xoá?",
+    "update_failed": "Không cập nhật được nhóm!",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
   },
   "users": {
     "title": "Mọi người",

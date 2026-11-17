@@ -21,6 +21,7 @@ import { useIsActive } from "@/app/hooks/useActiveList";
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import ConfirmModal from "./ConfirmModal";
+import { GroupMembers, GroupName } from "./GroupSettings";
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -28,12 +29,15 @@ interface ProfileDrawerProps {
   data: Conversation & {
     users: SafeUser[];
   };
+  // everyone but the user (groups: who can be added)
+  users: SafeUser[];
 }
 
 const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
   isOpen,
   onClose,
   data,
+  users,
 }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -121,7 +125,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                               <Avatar user={otherUser} />
                             )}
                           </div>
-                          <div>{title}</div>
+                          {data.isGroup ? <GroupName conversation={data} /> : <div>{title}</div>}
                           <div className="text-sm text-muted-foreground">
                             {statusText}
                           </div>
@@ -153,71 +157,29 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                               </button>
                             )}
                           </div>
-                          <div className="w-full pb-5 pt-5 sm:px-0 sm:pt-0">
-                            <dl className="space-y-8 px-4 sm:space-y-6 sm:px-6">
-                              {data.isGroup && (
-                                <div>
-                                  <dt
-                                    className="text-sm
-                                     font-medium
-                                     text-muted-foreground
-                                     sm:w-40
-                                     sm:flex-shrink-0">
-                                    {t("profile.emails")}
-                                  </dt>
-                                  <dd
-                                    className="
-                                   mt-1
-                                   text-sm
-                                   text-foreground
-                                   sm:col-span-2">
-                                    {data.users
-                                      .map((user) => user.email)
-                                      .join(", ")}
-                                  </dd>
-                                </div>
-                              )}
-                              {!data.isGroup && (
-                                <div>
-                                  <dt
-                                    className="text-sm
-                                   font-medium
-                                   text-muted-foreground
-                                   sm:w-40
-                                   sm:flex-shrink-0">
-                                    {t("profile.email")}
-                                  </dt>
-                                  <dd
-                                    className="mt-1
-                                    text-sm
-                                    text-foreground
-                                    sm:col-span-2">
-                                    {otherUser.email}
-                                  </dd>
-                                </div>
-                              )}
-                              {!data.isGroup && (
-                                <>
-                                  <hr />
-                                  <div>
-                                    <dt className="text-sm font-medium text-muted-foreground sm:w-40 sm:flex-shrink-0">
-                                      {t("profile.joined")}
-                                    </dt>
-                                    <dd
-                                      className="
-                                     mt-1
-                                     text-sm
-                                     text-foreground
-                                     sm:col-span-2">
-                                      <time dateTime={joinedDate}>
-                                        {joinedDate}
-                                      </time>
-                                    </dd>
-                                  </div>
-                                </>
-                              )}
+                          {data.isGroup ? (
+                            <GroupMembers conversation={data} myId={myId} users={users} />
+                          ) : (
+                            <dl className="w-full space-y-6 px-4 sm:px-6">
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">
+                                  {t("profile.email")}
+                                </dt>
+                                <dd className="mt-1 text-sm text-foreground">{otherUser.email}</dd>
+                              </div>
+                              <hr />
+                              <div>
+                                <dt className="text-sm font-medium text-muted-foreground">
+                                  {t("profile.joined")}
+                                </dt>
+                                <dd className="mt-1 text-sm text-foreground">
+                                  <time dateTime={new Date(otherUser.createdAt).toISOString()}>
+                                    {joinedDate}
+                                  </time>
+                                </dd>
+                              </div>
                             </dl>
-                          </div>
+                          )}
                         </div>
                       </div>
                     </div>

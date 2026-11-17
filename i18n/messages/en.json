@@ -136,7 +136,6 @@
     "close": "Close panel",
     "delete": "Delete",
     "email": "Email",
-    "emails": "Emails",
     "joined": "Joined",
     "leave": "Leave group"
   },
@@ -148,7 +147,23 @@
     "title": "Create a group chat",
     "description": "Create a chat with more than two people",
     "name": "Group name",
-    "members": "Members"
+    "members": "Members",
+    "rename": "Rename group",
+    "save_name": "Save group name",
+    "cancel_rename": "Cancel renaming",
+    "members_title": "Members ({count})",
+    "owner": "Owner",
+    "you": "you",
+    "add_members": "Add",
+    "add_selected": "{count, plural, one {Add # person} other {Add # people}}",
+    "cancel_add": "Cancel",
+    "search_people": "Search by name or email",
+    "no_one_to_add": "Everyone is already in the group.",
+    "remove": "Remove {name} from the group",
+    "remove_confirm": "Click again to remove {name} from the group",
+    "remove_short": "Remove?",
+    "update_failed": "Couldn't update the group!",
+    "too_fast": "Too many changes, wait a moment and try again!"
   },
   "users": {
     "title": "People",

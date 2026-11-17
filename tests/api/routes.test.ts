@@ -54,7 +54,11 @@ import {
   DELETE as recallMessage,
   PATCH as editMessage,
 } from "@/app/api/messages/[messageId]/route";
-import { DELETE as deleteConversation } from "@/app/api/conversations/[conversationId]/route";
+import {
+  DELETE as deleteConversation,
+  PATCH as updateGroup,
+} from "@/app/api/conversations/[conversationId]/route";
+import { DELETE as removeMember } from "@/app/api/conversations/[conversationId]/members/[userId]/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
 import {
@@ -657,6 +661,129 @@ describe("POST /api/conversations/[id]/leave", () => {
 
     expect((await leave()).status).toBe(200);
     expect(prisma.conversation.delete).toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/conversations/[id] (rename, add members)", () => {
+  const FOURTH = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const fourth = user(FOURTH);
+  const patch = (body: Record<string, unknown>) =>
+    updateGroup(
+      jsonRequest(`/api/conversations/${CONVERSATION}`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns 404 to non-members and 400 for a 1:1 chat", async () => {
+    asNonMember();
+    expect((await patch({ name: "x" })).status).toBe(404);
+    asMember();
+    expect((await patch({ name: "x" })).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it.each([[{ name: "   " }], [{ name: "x".repeat(101) }], [{}], [{ addUserIds: [OTHER] }]])(
+    "refuses %j",
+    async (body) => {
+      prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+      expect((await patch(body)).status).toBe(400);
+      expect(prisma.conversation.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it("refuses unknown users", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.user.count.mockResolvedValue(0);
+    expect((await patch({ addUserIds: [FOURTH] })).status).toBe(400);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("renames the group for any member and tells everyone", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.conversation.update.mockResolvedValue({ ...group(OTHER), name: "New" });
+
+    expect((await patch({ name: "  New " })).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { name: "New" },
+      include: { users: true },
+    });
+    [me, other, third].forEach((member) =>
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        member.email,
+        "conversation:update",
+        expect.objectContaining({ id: CONVERSATION, name: "New" })
+      )
+    );
+  });
+
+  it("adds people: the members get the new list, the new ones the conversation", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.user.count.mockResolvedValue(1);
+    prisma.conversation.update.mockResolvedValue(group(OTHER, [me, other, third, fourth]));
+
+    expect((await patch({ addUserIds: [FOURTH, FOURTH, ME, "nope"] })).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { users: { connect: [{ id: FOURTH }] } },
+      include: { users: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:new",
+      expect.objectContaining({ id: CONVERSATION, messages: [], unreadCount: 0 })
+    );
+    expect(mocks.emitToUser).not.toHaveBeenCalledWith(
+      fourth.email,
+      "conversation:update",
+      expect.anything()
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.objectContaining({ userIds: [ME, OTHER, THIRD, FOURTH] })
+    );
+  });
+});
+
+describe("DELETE /api/conversations/[id]/members/[userId]", () => {
+  const kick = (userId: string) =>
+    removeMember(
+      jsonRequest(`/api/conversations/${CONVERSATION}/members/${userId}`, null, {
+        method: "DELETE",
+      }),
+      params({ conversationId: CONVERSATION, userId })
+    );
+
+  it("lets only the owner remove someone else", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    expect((await kick(THIRD)).status).toBe(403);
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    expect((await kick(ME)).status).toBe(403); // leaving is its own route
+    expect((await kick("eeeeeeeeeeeeeeeeeeeeeeee")).status).toBe(404);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it("removes the member and tells both sides", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(ME));
+    prisma.conversation.update.mockResolvedValue(group(ME, [me, other]));
+
+    expect((await kick(THIRD)).status).toBe(200);
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: CONVERSATION },
+      data: { users: { disconnect: { id: THIRD } } },
+      include: { users: true },
+    });
+    expect(mocks.emitToUser).toHaveBeenCalledWith(third.email, "conversation:remove", {
+      id: CONVERSATION,
+    });
+    expect(mocks.removeUserFromConversationRoom).toHaveBeenCalledWith(third.email, CONVERSATION);
+    [me, other].forEach((member) =>
+      expect(mocks.emitToUser).toHaveBeenCalledWith(
+        member.email,
+        "conversation:update",
+        expect.objectContaining({ userIds: [ME, OTHER] })
+      )
+    );
   });
 });
 

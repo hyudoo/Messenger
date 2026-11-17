@@ -5,6 +5,11 @@ import { matchesSearch, normalizeSearch } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { countUnread, formatUnread } from "@/app/libs/unread";
 import {
+  canEditGroup,
+  canRemoveMember,
+  normalizeGroupName,
+} from "@/app/libs/conversation-permissions";
+import {
   canEditMessage,
   canRecallMessage,
   canReactToMessage,
@@ -158,5 +163,29 @@ describe("message actions", () => {
     expect(canReactToMessage(message({ senderId: "other" }))).toBe(true);
     expect(canReactToMessage(message({ deletedAt: new Date() }))).toBe(false);
     expect(canReactToMessage(message({ isCall: true }))).toBe(false);
+  });
+});
+
+describe("group permissions", () => {
+  const group = (ownerId: string | null) => ({ isGroup: true, ownerId });
+
+  it("lets any group member edit, never a 1:1 chat", () => {
+    expect(canEditGroup(group("other"))).toBe(true);
+    expect(canEditGroup({ isGroup: null })).toBe(false);
+  });
+
+  it("lets the owner (or anyone in an ownerless group) remove someone else", () => {
+    expect(canRemoveMember(group("me"), "me", "other")).toBe(true);
+    expect(canRemoveMember(group("other"), "me", "third")).toBe(false);
+    expect(canRemoveMember(group(null), "me", "other")).toBe(true);
+    expect(canRemoveMember(group("me"), "me", "me")).toBe(false);
+    expect(canRemoveMember({ isGroup: false, ownerId: null }, "me", "other")).toBe(false);
+  });
+
+  it("normalizes a group name", () => {
+    expect(normalizeGroupName("  Team ")).toBe("Team");
+    expect(normalizeGroupName("   ")).toBeNull();
+    expect(normalizeGroupName(42)).toBeNull();
+    expect(normalizeGroupName("x".repeat(101))).toBeNull();
   });
 });

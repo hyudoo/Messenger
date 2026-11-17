@@ -34,7 +34,8 @@ export type FullConversationType = Conversation & {
 };
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
-// notifications), a seen update (messages only) or a new member list (users, after a leave).
+// notifications), a seen update (messages only) or a group change (users with name / ownerId:
+// renamed, members added or removed, someone left).
 export type ConversationUpdate = Pick<FullConversationType, "id"> &
   Partial<
     Pick<FullConversationType, "messages" | "users" | "userIds" | "ownerId" | "name" | "isGroup">
