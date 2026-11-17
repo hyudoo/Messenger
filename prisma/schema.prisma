@@ -81,6 +81,18 @@ model Message {
   callEndedAt    DateTime?
   image     String?
   createdAt DateTime @default(now())
+  // set when the sender edits the body (PATCH /api/messages/[messageId])
+  editedAt  DateTime?
+  // set when the sender recalls the message (DELETE /api/messages/[messageId]): body, image and
+  // reactions are removed, the row stays so the chat shows "message recalled" in its place
+  deletedAt DateTime?
+
+  // the message this one replies to (same conversation). NoAction: required by MongoDB for a
+  // self-relation; the original is never hard-deleted on its own (recall keeps the row, and a
+  // conversation delete removes both)
+  replyToId String?   @db.ObjectId
+  replyTo   Message?  @relation("Replies", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Message[] @relation("Replies")
 
   seenIds String[] @db.ObjectId
   seen    User[]   @relation("Seen", fields: [seenIds], references: [id])

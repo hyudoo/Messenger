@@ -63,7 +63,11 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
         : t("last_call", { kind });
     }
 
-    const text = lastMessage?.image ? t("last_image") : lastMessage?.body;
+    const text = lastMessage?.deletedAt
+      ? t("last_recalled")
+      : lastMessage?.image
+        ? t("last_image")
+        : lastMessage?.body;
     if (!text) {
       return t("no_messages");
     }

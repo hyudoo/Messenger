@@ -6,6 +6,7 @@ import { canLeaveConversation } from "@/app/libs/conversation-permissions";
 import { deleteConversation } from "@/app/libs/conversation-delete";
 import { emitToUser, removeUserFromConversationRoom } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
+import { logError } from "@/app/libs/log";
 
 interface IParams {
   conversationId?: string;
@@ -66,7 +67,7 @@ export async function POST(
 
     return new NextResponse("Success");
   } catch (error) {
-    console.log(error, "ERROR_CONVERSATION_LEAVE");
+    logError("conversation_leave", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

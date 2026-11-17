@@ -1,7 +1,7 @@
 import axios from "axios";
 import { create } from "zustand";
 
-import { FullMessageType } from "@/app/types";
+import { FullMessageType, ReplyPreview } from "@/app/types";
 
 // Messages the user sent from this tab, shown at once instead of after the server's round trip.
 // `Form` adds them, `Body` renders them after the conversation's messages:
@@ -12,6 +12,7 @@ import { FullMessageType } from "@/app/types";
 export interface OutboxPayload {
   message?: string;
   image?: string;
+  replyToId?: string;
 }
 
 export interface OutboxItem {
@@ -23,11 +24,13 @@ export interface OutboxItem {
   // why it failed: 429 (too fast) or anything else
   tooFast?: boolean;
   message?: FullMessageType;
+  // the quoted message while it is pending (the server's message carries its own)
+  replyTo?: ReplyPreview;
 }
 
 interface OutboxStore {
   items: OutboxItem[];
-  send: (conversationId: string, payload: OutboxPayload) => Promise<void>;
+  send: (conversationId: string, payload: OutboxPayload, replyTo?: ReplyPreview) => Promise<void>;
   retry: (clientId: string) => Promise<void>;
   discard: (clientId: string) => void;
 }
@@ -56,11 +59,12 @@ const useOutbox = create<OutboxStore>((set, get) => {
 
   return {
     items: [],
-    send: (conversationId, payload) => {
+    send: (conversationId, payload, replyTo) => {
       const item: OutboxItem = {
         clientId: newClientId(),
         conversationId,
         payload,
+        replyTo,
         createdAt: new Date().toISOString(),
         status: "sending",
       };

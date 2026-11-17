@@ -78,7 +78,8 @@
     "no_results": "Không tìm thấy cuộc trò chuyện nào.",
     "last_from": "{name}: {text}",
     "you": "Bạn",
-    "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}"
+    "unread": "{count, plural, one {# tin nhắn chưa đọc} other {# tin nhắn chưa đọc}}",
+    "last_recalled": "Tin nhắn đã được thu hồi."
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -107,7 +108,24 @@
     "sending": "Đang gửi...",
     "retry": "Thử lại",
     "discard": "Bỏ",
-    "image_uploading": "Đang tải ảnh lên..."
+    "image_uploading": "Đang tải ảnh lên...",
+    "reply": "Trả lời",
+    "edit": "Sửa",
+    "recall": "Thu hồi",
+    "recall_confirm": "Thu hồi?",
+    "recall_failed": "Không thu hồi được tin nhắn!",
+    "recalled": "Tin nhắn đã được thu hồi",
+    "edited": "Đã chỉnh sửa",
+    "editing": "Đang sửa tin nhắn",
+    "replying_to": "Đang trả lời {name}",
+    "cancel_compose": "Huỷ",
+    "save_edit": "Lưu thay đổi",
+    "edit_failed": "Không sửa được tin nhắn!",
+    "edit_expired": "Đã quá thời gian sửa tin nhắn này.",
+    "reply_image": "Hình ảnh",
+    "reply_call": "Cuộc gọi",
+    "reply_jump": "Xem tin nhắn gốc",
+    "typing": "{count, plural, one {{names} đang soạn tin...} other {{names} đang soạn tin...}}"
   },
   "profile": {
     "close": "Đóng bảng thông tin",

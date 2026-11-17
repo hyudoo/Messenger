@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import getMessages, { getMessagesAfter } from "@/app/actions/getMessages";
+import { logError } from "@/app/libs/log";
 
 interface IParams {
   conversationId?: string;
@@ -44,7 +45,7 @@ export async function GET(
     }
     return NextResponse.json(await getMessages(conversation.id, before ?? undefined));
   } catch (error) {
-    console.log(error, "ERROR_MESSAGES_PAGE");
+    logError("messages_page", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

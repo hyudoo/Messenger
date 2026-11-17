@@ -44,6 +44,10 @@ vi.mock("bcrypt", () => ({ default: { hash: vi.fn().mockResolvedValue("hashed") 
 
 import { POST as sendMessage } from "@/app/api/messages/route";
 import { POST as toggleReaction } from "@/app/api/messages/[messageId]/reactions/route";
+import {
+  DELETE as recallMessage,
+  PATCH as editMessage,
+} from "@/app/api/messages/[messageId]/route";
 import { DELETE as deleteConversation } from "@/app/api/conversations/[conversationId]/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
 import { GET as olderMessages } from "@/app/api/conversations/[conversationId]/messages/route";
@@ -790,5 +794,202 @@ describe("POST /api/messages clientId", () => {
       "conversation:update",
       expect.objectContaining({ id: CONVERSATION, isGroup: null })
     );
+  });
+});
+
+// ---- edit / recall / reply ----
+describe("PATCH / DELETE /api/messages/[id]", () => {
+  const own = (extra: Record<string, unknown> = {}) => ({
+    id: MESSAGE,
+    conversationId: CONVERSATION,
+    senderId: ME,
+    body: "helo",
+    image: null as string | null,
+    isCall: null,
+    deletedAt: null,
+    createdAt: new Date(),
+    ...extra,
+  });
+  const edit = (body: unknown) =>
+    editMessage(
+      jsonRequest(`/api/messages/${MESSAGE}`, body, { method: "PATCH" }),
+      params({ messageId: MESSAGE })
+    );
+  const recall = () =>
+    recallMessage(
+      jsonRequest(`/api/messages/${MESSAGE}`, null, { method: "DELETE" }),
+      params({ messageId: MESSAGE })
+    );
+
+  beforeEach(() => {
+    asMember();
+    prisma.message.update.mockImplementation(async ({ data }: any) => ({ ...own(), ...data }));
+    // the edited message is the conversation's last one
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE });
+  });
+
+  it("returns 404 to non-members", async () => {
+    prisma.message.findUnique.mockResolvedValue(own());
+    asNonMember();
+    expect((await edit({ message: "hello" })).status).toBe(404);
+    expect((await recall()).status).toBe(404);
+    expect(prisma.message.update).not.toHaveBeenCalled();
+  });
+
+  it("lets only the sender edit, and only for a while", async () => {
+    prisma.message.findUnique.mockResolvedValue(own({ senderId: OTHER }));
+    expect((await edit({ message: "hello" })).status).toBe(403);
+
+    prisma.message.findUnique.mockResolvedValue(
+      own({ createdAt: new Date(Date.now() - 16 * 60 * 1000) })
+    );
+    expect((await edit({ message: "hello" })).status).toBe(403);
+    expect(prisma.message.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty or unchanged text", async () => {
+    prisma.message.findUnique.mockResolvedValue(own());
+    expect((await edit({ message: "  " })).status).toBe(400);
+    expect((await edit({ message: "helo" })).status).toBe(400);
+  });
+
+  it("edits the text, marks it edited and updates chat and inbox", async () => {
+    prisma.message.findUnique.mockResolvedValue(own());
+
+    expect((await edit({ message: " hello " })).status).toBe(200);
+
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: MESSAGE },
+        data: { body: "hello", editedAt: expect.any(Date) },
+      })
+    );
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:update",
+      expect.objectContaining({ body: "hello" })
+    );
+    // the inbox preview changes without moving the conversation up
+    expect(mocks.emitToUser).toHaveBeenCalledWith(other.email, "conversation:update", {
+      id: CONVERSATION,
+      messages: [expect.objectContaining({ body: "hello" })],
+    });
+  });
+
+  it("doesn't touch the inbox when an older message is edited", async () => {
+    prisma.message.findUnique.mockResolvedValue(own());
+    prisma.message.findFirst.mockResolvedValue({ id: "eeeeeeeeeeeeeeeeeeeeeeee" });
+    await edit({ message: "hello" });
+    expect(mocks.emitToUser).not.toHaveBeenCalled();
+  });
+
+  it("refuses to recall someone else's message or a call", async () => {
+    prisma.message.findUnique.mockResolvedValue(own({ senderId: OTHER }));
+    expect((await recall()).status).toBe(403);
+    prisma.message.findUnique.mockResolvedValue(own({ isCall: true, body: null }));
+    expect((await recall()).status).toBe(403);
+    expect(prisma.message.update).not.toHaveBeenCalled();
+  });
+
+  it("recalls: clears text, image and reactions, and removes the image from S3", async () => {
+    prisma.message.findUnique.mockResolvedValue(own({ body: null, image: uploadUrl(ME) }));
+
+    expect((await recall()).status).toBe(200);
+
+    expect(prisma.reaction.deleteMany).toHaveBeenCalledWith({ where: { messageId: MESSAGE } });
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { body: null, image: null, editedAt: null, deletedAt: expect.any(Date) },
+      })
+    );
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:update",
+      expect.objectContaining({ deletedAt: expect.any(Date) })
+    );
+    await vi.waitFor(() =>
+      expect(mocks.deleteUploadedObjects).toHaveBeenCalledWith([uploadUrl(ME)])
+    );
+  });
+
+  it("can't recall twice", async () => {
+    prisma.message.findUnique.mockResolvedValue(own({ deletedAt: new Date() }));
+    expect((await recall()).status).toBe(403);
+  });
+});
+
+describe("POST /api/messages replies", () => {
+  const send = (body: Record<string, unknown>) =>
+    sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, ...body }));
+
+  beforeEach(() => {
+    asMember();
+    prisma.message.create.mockImplementation(async ({ data }: any) => ({
+      id: "eeeeeeeeeeeeeeeeeeeeeeee",
+      createdAt: new Date(),
+      ...data,
+    }));
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+  });
+
+  it("stores the replied-to message of the same conversation", async () => {
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE });
+
+    expect((await send({ message: "ok", replyToId: MESSAGE })).status).toBe(200);
+
+    expect(prisma.message.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: MESSAGE, conversationId: CONVERSATION }),
+      })
+    );
+    expect(prisma.message.create.mock.calls[0][0].data.replyToId).toBe(MESSAGE);
+  });
+
+  it("rejects a reply to a missing, recalled or foreign message", async () => {
+    prisma.message.findFirst.mockResolvedValue(null);
+    expect((await send({ message: "ok", replyToId: MESSAGE })).status).toBe(400);
+    expect((await send({ message: "ok", replyToId: "nope" })).status).toBe(400);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("reactions on a recalled message", () => {
+  it("are refused", async () => {
+    prisma.message.findUnique.mockResolvedValue({
+      conversationId: CONVERSATION,
+      deletedAt: new Date(),
+    });
+    asMember();
+    const response = await toggleReaction(
+      jsonRequest(`/api/messages/${MESSAGE}/reactions`, { emoji: "👍" }),
+      params({ messageId: MESSAGE })
+    );
+    expect(response.status).toBe(400);
+    expect(prisma.reaction.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("rate limits on settings and new chats", () => {
+  it("limits settings changes per user", async () => {
+    prisma.user.update.mockResolvedValue(me);
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      statuses.push((await updateSettings(jsonRequest("/api/settings", { name: `n${i}` }))).status);
+    }
+    expect(statuses.slice(0, 10).every((status) => status === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+
+  it("limits opening chats per user", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: OTHER });
+    prisma.conversation.findFirst.mockResolvedValue({ id: CONVERSATION });
+    const statuses: number[] = [];
+    for (let i = 0; i < 21; i++) {
+      statuses.push(
+        (await createConversation(jsonRequest("/api/conversations", { userId: OTHER }))).status
+      );
+    }
+    expect(statuses[19]).toBe(200);
+    expect(statuses[20]).toBe(429);
   });
 });

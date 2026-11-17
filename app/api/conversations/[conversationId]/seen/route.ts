@@ -5,6 +5,8 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
+import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
+import { logError } from "@/app/libs/log";
 
 interface IParams {
   conversationId?: string;
@@ -20,6 +22,11 @@ export async function POST(
 
     if (!currentUser?.id || !currentUser?.email) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const limited = await rateLimit("seen", currentUser.id);
+    if (!limited.ok) {
+      return tooManyRequests(limited.retryAfter);
     }
 
     const conversation = await getConversationForUser(
@@ -66,7 +73,7 @@ export async function POST(
 
     return new NextResponse("Success");
   } catch (error) {
-    console.log(error, "ERROR_MESSAGES_SEEN");
+    logError("messages_seen", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

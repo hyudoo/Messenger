@@ -38,11 +38,16 @@ type CallRow = {
 const CALLS: Record<string, CallRow> = {};
 const callById = (id: string) => Object.values(CALLS).find((call) => call.id === id);
 
+// user id -> the session token's exp (seconds), for the expiry test
+const TOKEN_EXP: Record<string, number> = {};
+
 // The session cookie value is the user id; getToken turns it into a token.
 vi.mock("next-auth/jwt", () => ({
   getToken: vi.fn(async ({ req }: any) => {
     const id = req.cookies["next-auth.session-token"];
-    return id ? { email: `${id.slice(0, 4)}@example.com`, sub: id } : null;
+    return id
+      ? { email: `${id.slice(0, 4)}@example.com`, sub: id, ...(TOKEN_EXP[id] && { exp: TOKEN_EXP[id] }) }
+      : null;
   }),
 }));
 
@@ -83,14 +88,20 @@ vi.mock("@/app/libs/prismadb", () => ({
         const call = callById(where.id);
         return call ? { ...call, isCall: true, sender: userOf(call.senderId), seen: [] } : null;
       }),
-      // the recent call messages, filtered like the real query (member, not sent by me)
+      // the recent call messages, filtered like the real query (my conversations, not sent by me)
       findMany: vi.fn(async ({ where }: any) =>
         RECENT_CALLS.filter(
           (call) =>
             call.senderId !== where.senderId.not &&
-            MEMBERS[call.conversationId]?.includes(where.conversation.userIds.has)
+            where.conversationId.in.includes(call.conversationId)
         ).map((call) => ({ ...call, sender: userOf(call.senderId) }))
       ),
+    },
+    // resendRingingCalls: the user's conversations
+    user: {
+      findUnique: vi.fn(async ({ where }: any) => ({
+        conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
+      })),
     },
   },
 }));
@@ -141,6 +152,7 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
 
 afterEach(async () => {
   RECENT_CALLS.length = 0;
+  Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
   await Promise.all(
@@ -614,5 +626,45 @@ describe("socket server lifecycle", () => {
     expect(await disconnected).toBe("transport close");
     const error = await next<Error>(client(url, ME), "connect_error");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("typing and session expiry", () => {
+  it("relays typing only between sockets in the conversation room, and not too often", async () => {
+    const { io, url } = await startServer();
+    const a = (await connected(url, ME)).socket;
+    const b = (await connected(url, OTHER)).socket;
+    const stranger = (await connected(url, STRANGER)).socket;
+    a.emit("conversation:join", CONVERSATION);
+    b.emit("conversation:join", CONVERSATION);
+    await vi.waitFor(async () =>
+      expect(await io.in(conversationRoom(CONVERSATION)).fetchSockets()).toHaveLength(2)
+    );
+
+    const got = vi.fn();
+    b.on("typing", got);
+    const strangerGot = vi.fn();
+    stranger.on("typing", strangerGot);
+
+    a.emit("typing", CONVERSATION, true);
+    a.emit("typing", CONVERSATION, true); // within the interval: dropped
+    a.emit("typing", CONVERSATION, false); // "stopped" always goes through
+    stranger.emit("typing", CONVERSATION, true); // not in the room: dropped
+
+    await vi.waitFor(() => expect(got).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(got.mock.calls.map(([event]) => event)).toEqual([
+      { conversationId: CONVERSATION, email: emailOf(ME), typing: true },
+      { conversationId: CONVERSATION, email: emailOf(ME), typing: false },
+    ]);
+    expect(strangerGot).not.toHaveBeenCalled();
+  });
+
+  it("drops the socket's transport when its session expires", async () => {
+    const { url } = await startServer();
+    TOKEN_EXP[ME] = Math.floor(Date.now() / 1000) + 1;
+    const { socket } = await connected(url, ME);
+    // a transport close: a real client reconnects and is authenticated again
+    expect(await next<string>(socket, "disconnect")).toBe("transport close");
   });
 });

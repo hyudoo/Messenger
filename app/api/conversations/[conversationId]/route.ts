@@ -4,6 +4,7 @@ import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { canDeleteConversation } from "@/app/libs/conversation-permissions";
 import { deleteConversation } from "@/app/libs/conversation-delete";
+import { logError } from "@/app/libs/log";
 
 interface IParams {
   conversationId?: string;
@@ -37,7 +38,7 @@ export async function DELETE(
 
     return NextResponse.json(await deleteConversation(existingConversation));
   } catch (error) {
-    console.log(error, "ERROR_CONVERSATION_DELETE");
+    logError("conversation_delete", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

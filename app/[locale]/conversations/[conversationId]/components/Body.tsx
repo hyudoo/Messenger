@@ -19,7 +19,13 @@ import { format, isToday, isYesterday } from "date-fns";
 interface BodyProps {
   initialMessages: FullMessageType[];
   initialHasMore: boolean;
+  // the conversation's members, for the names in "X is typing"
+  members: SafeUser[];
 }
+
+// "typing" events refresh every few seconds while someone types (Form); without one for this
+// long the indicator goes, so a lost "stopped typing" can't leave it stuck
+const TYPING_TIMEOUT_MS = 5000;
 
 interface MessagePage {
   messages: FullMessageType[];
@@ -50,6 +56,7 @@ const outboxMessage = (item: OutboxItem, me: Partial<SafeUser>): FullMessageType
     sender: me,
     seen: [],
     reactions: [],
+    replyTo: item.replyTo ?? null,
   }) as unknown as FullMessageType;
 
 // "Today", "Yesterday" or the date, between the messages of different days
@@ -74,6 +81,7 @@ const DayDivider: React.FC<{ date: Date | string }> = ({ date }) => {
 const Body: React.FC<BodyProps> = ({
   initialMessages = [],
   initialHasMore,
+  members,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
@@ -84,6 +92,8 @@ const Body: React.FC<BodyProps> = ({
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   // messages that arrived while the user was scrolled up
   const [unseenCount, setUnseenCount] = useState(0);
+  // email -> when their last "typing" arrived
+  const [typing, setTyping] = useState<Record<string, number>>({});
   const loadingOlderRef = useRef(false);
   // scrollHeight before older messages were prepended, to keep the viewport in place
   const heightBeforePrependRef = useRef<number | null>(null);
@@ -133,17 +143,57 @@ const Body: React.FC<BodyProps> = ({
       markSeen();
     };
 
-    const messageHandler = (message: FullMessageType) => showIncoming([message]);
+    const stopTypingOf = (email: string | null | undefined) =>
+      setTyping((current) => {
+        if (!email || !(email in current)) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[email];
+        return next;
+      });
 
+    const messageHandler = (message: FullMessageType) => {
+      stopTypingOf(message.sender?.email);
+      showIncoming([message]);
+    };
+
+    // An edited / recalled message replaces its copy, and the quotes of the replies to it.
     const updateMessagesHandler = (newMessage: FullMessageType) => {
       setMessages((current) =>
         current.map((currentMessage) => {
           if (currentMessage.id === newMessage.id) {
             return newMessage;
           }
+          if (currentMessage.replyTo?.id === newMessage.id) {
+            return {
+              ...currentMessage,
+              replyTo: {
+                ...currentMessage.replyTo,
+                body: newMessage.body,
+                image: newMessage.image,
+                deletedAt: newMessage.deletedAt,
+              },
+            };
+          }
           return currentMessage;
         })
       );
+    };
+
+    const typingHandler = (event: {
+      conversationId: string;
+      email: string;
+      typing: boolean;
+    }) => {
+      if (event.conversationId !== conversationId || event.email === myEmailRef.current) {
+        return; // another chat, or the user's own other tab
+      }
+      if (event.typing) {
+        setTyping((current) => ({ ...current, [event.email]: Date.now() }));
+      } else {
+        stopTypingOf(event.email);
+      }
     };
 
     // Messages sent while the socket was down never arrive as messages:new, so every
@@ -181,7 +231,9 @@ const Body: React.FC<BodyProps> = ({
     socket.on("messages:new", messageHandler);
     socket.on("messages:update", updateMessagesHandler);
     socket.on("connect", resyncHandler);
+    socket.on("typing", typingHandler);
     return () => {
+      socket.off("typing", typingHandler);
       unsubscribe();
       document.removeEventListener("visibilitychange", markSeen);
       socket.off("messages:new", messageHandler);
@@ -189,6 +241,26 @@ const Body: React.FC<BodyProps> = ({
       socket.off("connect", resyncHandler);
     };
   }, [conversationId]);
+
+  // drops typing entries that weren't refreshed in time
+  const typingCount = Object.keys(typing).length;
+  useEffect(() => {
+    if (typingCount === 0) {
+      return;
+    }
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setTyping((current) => {
+        const fresh = Object.entries(current).filter(([, at]) => now - at < TYPING_TIMEOUT_MS);
+        return fresh.length === Object.keys(current).length ? current : Object.fromEntries(fresh);
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [typingCount]);
+
+  const typingNames = Object.keys(typing)
+    .map((email) => members.find((member) => member.email === email)?.name)
+    .filter((name): name is string => !!name);
 
   // After older messages are prepended, shift the scroll position by the added
   // height so the message the user was looking at stays put. After new ones
@@ -334,6 +406,16 @@ const Body: React.FC<BodyProps> = ({
             </div>
           );
         })}
+        {typingNames.length > 0 && (
+          <div className="flex items-center gap-2 px-4 pt-2 text-xs text-muted-foreground" aria-live="polite">
+            <span className="flex gap-0.5" aria-hidden>
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
+            </span>
+            {t("typing", { names: typingNames.join(", "), count: typingNames.length })}
+          </div>
+        )}
         <div className="pt-24" ref={bottomRef} />
       </div>
       {unseenCount > 0 && (

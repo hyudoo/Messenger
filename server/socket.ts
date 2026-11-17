@@ -16,10 +16,13 @@ import {
   conversationRoom,
   userRoom,
 } from "../app/libs/socket-rooms";
+import { logError } from "../app/libs/log";
 
 interface SocketData {
   email: string;
   userId: string;
+  // when the session token (JWT) expires, ms; the socket is dropped then (see scheduleExpiry)
+  expiresAt?: number;
   // when this socket joined its current call room; orders host / second peer
   callJoinedAt?: number;
 }
@@ -104,8 +107,39 @@ const authenticate = async (req: IncomingMessage) => {
   if (!token?.email || !token.sub) {
     return null;
   }
-  return { email: token.email, userId: token.sub };
+  return {
+    email: token.email,
+    userId: token.sub,
+    expiresAt: typeof token.exp === "number" ? token.exp * 1000 : undefined,
+  };
 };
+
+// setTimeout overflows past ~24.8 days (sessions last 30)
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
+// The socket was authenticated once, with the session cookie of that moment. When that session
+// expires, close the transport: the client reconnects on its own and the auth middleware checks
+// the cookie again (refreshed by next-auth while the user is active), or refuses a signed-out one.
+const scheduleExpiry = (socket: AppSocket) => {
+  const { expiresAt } = socket.data;
+  if (!expiresAt) {
+    return;
+  }
+  let timer: ReturnType<typeof setTimeout>;
+  const arm = () => {
+    const delay = expiresAt - Date.now();
+    timer =
+      delay > MAX_TIMER_MS
+        ? setTimeout(arm, MAX_TIMER_MS)
+        : setTimeout(() => socket.conn.close(), Math.max(delay, 0));
+  };
+  arm();
+  socket.on("disconnect", () => clearTimeout(timer));
+};
+
+// "typing" relays: at most one "started typing" per socket per this interval (clients send one
+// every few seconds while typing; this only stops a flood)
+const TYPING_MIN_INTERVAL_MS = 1000;
 
 const isMember = async (conversationId: unknown, userId: string) => {
   if (typeof conversationId !== "string") {
@@ -131,12 +165,21 @@ const isMember = async (conversationId: unknown, userId: string) => {
 // abandoned (caller gone) calls are not re-sent.
 const resendRingingCalls = async (io: AppServer, socket: AppSocket) => {
   const { userId } = socket.data;
+  // runs on every connection: the user's conversation ids first, so the call query uses the
+  // (conversationId, createdAt) index instead of a relation filter (a $lookup over messages)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { conversationIds: true },
+  });
+  if (!user || user.conversationIds.length === 0) {
+    return;
+  }
   const calls = await prisma.message.findMany({
     where: {
+      conversationId: { in: user.conversationIds },
       isCall: true,
       createdAt: { gte: new Date(Date.now() - CALL_RING_TIMEOUT_MS) },
       senderId: { not: userId },
-      conversation: { userIds: { has: userId } },
     },
     orderBy: { createdAt: "desc" },
     select: { conversationId: true, senderId: true, sender: true, callType: true },
@@ -177,8 +220,8 @@ const attachRedisAdapter = async (io: AppServer): Promise<RedisClient | null> =>
   }
   const pubClient = createClient({ url });
   const subClient = pubClient.duplicate();
-  pubClient.on("error", (error) => console.log(error, "REDIS_PUB_ERROR"));
-  subClient.on("error", (error) => console.log(error, "REDIS_SUB_ERROR"));
+  pubClient.on("error", (error) => logError("redis_pub", error));
+  subClient.on("error", (error) => logError("redis_sub", error));
   // node-redis retries forever without settling connect(); fail the boot instead
   // of hanging silently when Redis is unreachable at startup
   await Promise.race([
@@ -216,9 +259,10 @@ export const initSocketServer = async (httpServer: HttpServer) => {
     const { email, userId } = socket.data;
 
     socket.join(userRoom(email));
+    scheduleExpiry(socket);
 
     resendRingingCalls(io, socket).catch((error) =>
-      console.log(error, "ERROR_RESEND_RINGING_CALLS")
+      logError("resend_ringing_calls", error)
     );
 
     socket.on("conversation:join", async (conversationId: unknown) => {
@@ -231,6 +275,29 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       if (typeof conversationId === "string") {
         socket.leave(conversationRoom(conversationId));
       }
+    });
+
+    // "X is typing…": relayed to the others in the conversation room, which only members can
+    // join (conversation:join checks), so no database lookup per keystroke. The client stops
+    // showing it after a few seconds without a refresh, so a lost "stopped" is harmless.
+    let lastTypingAt = 0;
+    socket.on("typing", (conversationId: unknown, typing: unknown) => {
+      if (typeof conversationId !== "string") {
+        return;
+      }
+      const room = conversationRoom(conversationId);
+      if (!socket.rooms.has(room)) {
+        return;
+      }
+      const isTyping = typing === true;
+      if (isTyping) {
+        const now = Date.now();
+        if (now - lastTypingAt < TYPING_MIN_INTERVAL_MS) {
+          return;
+        }
+        lastTypingAt = now;
+      }
+      socket.to(room).emit("typing", { conversationId, email, typing: isTyping });
     });
 
     // Video call: at most two peers per room. Stamp, join and snapshot the room
@@ -271,7 +338,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
           try {
             isHost = await claimCallHost(redis, io, roomId as string, socket.id);
           } catch (error) {
-            console.log(error, "ERROR_CALL_HOST");
+            logError("call_host", error);
             socket.leave(room);
             return ack({ ok: false });
           }
@@ -362,7 +429,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
           await moveCallSafely(io, roomId, "miss");
         }
       } catch (error) {
-        console.log(error, "ERROR_CALL_CANCEL");
+        logError("call_cancel", error);
       }
     };
 
@@ -372,7 +439,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       if (typeof roomId !== "string" || !socket.rooms.has(callRoom(roomId))) {
         return;
       }
-      notifyCancelled(roomId).catch((error) => console.log(error, "ERROR_CALL_CANCEL"));
+      notifyCancelled(roomId).catch((error) => logError("call_cancel", error));
       void moveCallSafely(io, roomId, "miss");
     });
 
@@ -407,7 +474,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
           io.emit("presence:offline", email);
         }
       } catch (error) {
-        console.log(error, "ERROR_PRESENCE_OFFLINE");
+        logError("presence_offline", error);
       }
     });
 
@@ -421,7 +488,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         Array.from(new Set(sockets.map((peer) => peer.data.email)))
       );
     } catch (error) {
-      console.log(error, "ERROR_PRESENCE_LIST");
+      logError("presence_list", error);
     }
   });
 

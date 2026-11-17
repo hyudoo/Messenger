@@ -4,6 +4,11 @@ import { splitLinks } from "@/app/libs/linkify";
 import { matchesSearch, normalizeSearch } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { countUnread, formatUnread } from "@/app/libs/unread";
+import {
+  canEditMessage,
+  canRecallMessage,
+  canReplyToMessage,
+} from "@/app/libs/message-actions";
 
 describe("splitLinks", () => {
   it("leaves text without links alone", () => {
@@ -114,5 +119,37 @@ describe("countUnread", () => {
   it("caps the label at 99+", () => {
     expect(formatUnread(7)).toBe("7");
     expect(formatUnread(100)).toBe("99+");
+  });
+});
+
+describe("message actions", () => {
+  const message = (extra: Record<string, unknown> = {}) => ({
+    senderId: "me",
+    body: "hi",
+    isCall: null,
+    deletedAt: null,
+    createdAt: new Date("2026-11-17T10:00:00Z"),
+    ...extra,
+  });
+  const at = (minutes: number) => new Date("2026-11-17T10:00:00Z").getTime() + minutes * 60_000;
+
+  it("edits only one's own text within the window", () => {
+    expect(canEditMessage(message(), "me", at(14))).toBe(true);
+    expect(canEditMessage(message(), "me", at(16))).toBe(false);
+    expect(canEditMessage(message(), "other", at(1))).toBe(false);
+    expect(canEditMessage(message({ body: null }), "me", at(1))).toBe(false);
+    expect(canEditMessage(message({ deletedAt: new Date() }), "me", at(1))).toBe(false);
+  });
+
+  it("recalls one's own messages but not calls, once", () => {
+    expect(canRecallMessage(message(), "me")).toBe(true);
+    expect(canRecallMessage(message(), "other")).toBe(false);
+    expect(canRecallMessage(message({ isCall: true }), "me")).toBe(false);
+    expect(canRecallMessage(message({ deletedAt: new Date() }), "me")).toBe(false);
+  });
+
+  it("replies to anything still there", () => {
+    expect(canReplyToMessage(message({ senderId: "other" }))).toBe(true);
+    expect(canReplyToMessage(message({ deletedAt: new Date() }))).toBe(false);
   });
 });

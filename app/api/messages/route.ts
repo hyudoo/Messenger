@@ -5,12 +5,14 @@ import getCurrentUser from "@/app/actions/getCurrentUser";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import prisma from "@/app/libs/prismadb";
-import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
+import { MESSAGE_INCLUDE, NOT_RECALLED } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
+import { logError } from "@/app/libs/log";
 
 const MAX_MESSAGE_LENGTH = 5000;
 // the sender's tab id for an optimistic message (app/hooks/useOutbox.ts); only echoed back
 const CLIENT_ID = /^[\w-]{1,64}$/;
+const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +26,8 @@ export async function POST(request: Request) {
       return tooManyRequests(limited.retryAfter);
     }
 
-    const { message, isCall, callType, image, conversationId, clientId } = await request.json();
+    const { message, isCall, callType, image, conversationId, clientId, replyToId } =
+      await request.json();
 
     const conversation = await getConversationForUser(
       conversationId,
@@ -48,12 +51,25 @@ export async function POST(request: Request) {
     if (!body && !image && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
     }
+    // a reply quotes a message of the same conversation that is still there (not recalled)
+    if (replyToId !== undefined && replyToId !== null) {
+      const original =
+        typeof replyToId === "string" && OBJECT_ID.test(replyToId) && !isCall
+          ? await prisma.message.findFirst({
+              where: { id: replyToId, conversationId: conversation.id, ...NOT_RECALLED },
+              select: { id: true },
+            })
+          : null;
+      if (!original) {
+        return new NextResponse("Invalid reply", { status: 400 });
+      }
+    }
     if (image) {
       // keeps the file from the pending-upload expiry; fails if it was never uploaded
       try {
         await markUploadsUsed([image]);
       } catch (error) {
-        console.log(error, "ERROR_MARK_UPLOAD_USED");
+        logError("mark_upload_used", error);
         return new NextResponse("Image not found", { status: 400 });
       }
     }
@@ -71,6 +87,7 @@ export async function POST(request: Request) {
         conversationId: conversation.id,
         senderId: currentUser.id,
         seenIds: [currentUser.id],
+        replyToId: replyToId || undefined,
       },
     });
 
@@ -111,7 +128,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newMessage);
   } catch (error) {
-    console.log(error, "ERROR_MESSAGES");
+    logError("messages", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

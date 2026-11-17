@@ -24,6 +24,10 @@ import { toast } from "react-hot-toast";
 import Avatar from "@/app/components/Avatar";
 import ImageModal from "./ImageModal";
 import { ReactionChips, ReactionPicker } from "./MessageReactions";
+import { ReplyQuote, messageElementId } from "./MessageReply";
+import useComposer from "@/app/hooks/useComposer";
+import { canEditMessage, canRecallMessage, canReplyToMessage } from "@/app/libs/message-actions";
+import { HiArrowUturnLeft, HiPencil, HiTrash } from "react-icons/hi2";
 
 interface MessageBoxProps {
   data: FullMessageType;
@@ -92,6 +96,76 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call
   );
 };
 
+// Hover actions next to the bubble (always shown on touch screens, like the reaction smiley):
+// reply, and for the sender edit (text, for a while) and recall (two clicks: the second confirms).
+const MessageActions: React.FC<{ message: FullMessageType; isOwn: boolean }> = ({
+  message,
+  isOwn,
+}) => {
+  const t = useTranslations("chat");
+  const { startReply, startEdit } = useComposer();
+  const [confirmRecall, setConfirmRecall] = useState(false);
+  // the sender's id is the message's own when it is the user's (no session id needed)
+  const myId = isOwn ? message.senderId : "";
+
+  const recall = () => {
+    if (!confirmRecall) {
+      setConfirmRecall(true);
+      setTimeout(() => setConfirmRecall(false), 3000);
+      return;
+    }
+    setConfirmRecall(false);
+    axios
+      .delete(`/api/messages/${message.id}`)
+      .catch(() => toast.error(t("recall_failed")));
+  };
+
+  const button =
+    "rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground";
+  return (
+    <div
+      className={clsx(
+        "flex shrink-0 items-center transition group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100",
+        confirmRecall ? "opacity-100" : "opacity-0"
+      )}>
+      {canReplyToMessage(message) && (
+        <button
+          type="button"
+          onClick={() => startReply(message)}
+          aria-label={t("reply")}
+          title={t("reply")}
+          className={button}>
+          <HiArrowUturnLeft size={16} aria-hidden />
+        </button>
+      )}
+      {canEditMessage(message, myId) && (
+        <button
+          type="button"
+          onClick={() => startEdit(message)}
+          aria-label={t("edit")}
+          title={t("edit")}
+          className={button}>
+          <HiPencil size={16} aria-hidden />
+        </button>
+      )}
+      {canRecallMessage(message, myId) && (
+        <button
+          type="button"
+          onClick={recall}
+          aria-label={confirmRecall ? t("recall_confirm") : t("recall")}
+          title={confirmRecall ? t("recall_confirm") : t("recall")}
+          className={clsx(button, confirmRecall && "bg-rose-500 text-white hover:bg-rose-600 hover:text-white")}>
+          {confirmRecall ? (
+            <span className="px-1 text-xs font-medium">{t("recall_confirm")}</span>
+          ) : (
+            <HiTrash size={16} aria-hidden />
+          )}
+        </button>
+      )}
+    </div>
+  );
+};
+
 const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true, pending }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -101,7 +175,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
   const myEmail = session.data?.user?.email;
   const isOwn = myEmail === data?.sender?.email;
 
-  const reactions = data.reactions ?? [];
+  const recalled = !!data.deletedAt;
+  const reactions = recalled ? [] : (data.reactions ?? []);
   const myReaction = reactions.find((reaction) => myEmail && reaction.user.email === myEmail)?.emoji;
   // the conversation room sends the updated message back (messages:update)
   const react = (emoji: string) => {
@@ -130,7 +205,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
     !data.image && !data.isCall && data.body ? countEmojiOnly(data.body) : 0;
   const jumbo = emojiCount > 0 && emojiCount <= JUMBO_EMOJI_MAX;
 
-  const message = jumbo
+  const message = recalled
+    ? // a placeholder, not a bubble of content: outlined, muted, italic
+      "w-fit max-w-full rounded-2xl border px-3 py-2 text-sm italic text-muted-foreground"
+    : jumbo
     ? clsx(
         "w-fit select-text leading-tight",
         emojiCount === 1 ? "text-5xl" : "text-4xl"
@@ -145,7 +223,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
       );
 
   return (
-    <div className={container}>
+    <div id={messageElementId(data.id)} className={clsx(container, "rounded-lg")}>
       <div className={avatar}>
         <Avatar user={data.sender} />
       </div>
@@ -158,11 +236,13 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             </div>
           </div>
         )}
+        {data.replyTo && !recalled && <ReplyQuote reply={data.replyTo} isOwn={isOwn} />}
         <div
           className={clsx("group flex max-w-full items-center gap-1", isOwn && "flex-row-reverse")}
           // the time of a grouped message, on hover
           title={showHeader ? undefined : format(new Date(data.createdAt), "p", { locale: dateLocale })}>
           <div className={message}>
+            {recalled && t("chat.recalled")}
             {data.image && (
               <ImageModal
                 src={data.image}
@@ -193,9 +273,13 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
             )}
             {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
           </div>
-          {/* nothing to react to before the server has the message */}
-          {!pending && <ReactionPicker onReact={react} mine={myReaction} />}
+          {/* nothing to react to (or act on) before the server has the message, or once recalled */}
+          {!pending && !recalled && <ReactionPicker onReact={react} mine={myReaction} />}
+          {!pending && !recalled && <MessageActions message={data} isOwn={isOwn} />}
         </div>
+        {data.editedAt && !recalled && (
+          <div className="text-xs font-light text-muted-foreground">{t("chat.edited")}</div>
+        )}
         {pending?.status === "sending" && (
           <div className="text-xs font-light text-muted-foreground">{t("chat.sending")}</div>
         )}

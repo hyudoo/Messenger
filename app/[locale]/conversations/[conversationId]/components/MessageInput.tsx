@@ -8,6 +8,9 @@ interface MessageInputProps {
   onChange: (value: string) => void;
   onSubmit: () => void;
   onPaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  // Esc: cancels a reply / edit (only passed while there is one)
+  onEscape?: () => void;
+  onBlur?: () => void;
   placeholder?: string;
   ref: React.RefObject<HTMLTextAreaElement | null>;
 }
@@ -23,6 +26,8 @@ const MessageInput: React.FC<MessageInputProps> = ({
   onChange,
   onSubmit,
   onPaste,
+  onEscape,
+  onBlur,
   placeholder,
   ref,
 }) => {
@@ -36,6 +41,11 @@ const MessageInput: React.FC<MessageInputProps> = ({
   }, [value, ref]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Escape" && onEscape) {
+      event.preventDefault();
+      onEscape();
+      return;
+    }
     if (
       event.key === "Enter" &&
       !event.shiftKey &&
@@ -57,6 +67,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={onPaste}
+        onBlur={onBlur}
         autoComplete="off"
         aria-label={placeholder}
         placeholder={placeholder}

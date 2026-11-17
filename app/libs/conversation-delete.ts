@@ -2,6 +2,7 @@ import prisma from "./prismadb";
 import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
 import { cleanUpUploads } from "./upload-cleanup";
 import { ConversationWithUsers } from "@/app/types";
+import { logError } from "./log";
 
 // Prisma has no $pull for scalar lists, so remove the deleted messages from the
 // members' User.seenMessageIds with one raw update. Runs in the background:
@@ -25,7 +26,7 @@ const pullSeenMessageIds = (userIds: string[], messageIds: string[]) => {
         },
       ],
     })
-    .catch((error) => console.log(error, "ERROR_PULL_SEEN_MESSAGE_IDS"));
+    .catch((error) => logError("pull_seen_message_ids", error));
 };
 
 // Deletes a conversation for all its members (callers check who may): DELETE /api/conversations/[id],

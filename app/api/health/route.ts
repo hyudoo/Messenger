@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import prisma from "@/app/libs/prismadb";
+import { logError } from "@/app/libs/log";
 
 // Liveness / readiness for Docker's HEALTHCHECK and the deploy job: 200 once the database answers
 // and the socket.io server is running (started by server.ts), 503 otherwise. Public and cheap; it
@@ -19,7 +20,7 @@ const pingDatabase = async () => {
     ]);
     return true;
   } catch (error) {
-    console.log(error, "ERROR_HEALTH_DATABASE");
+    logError("health_database", error);
     return false;
   }
 };

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { validatePassword } from "@/app/libs/password";
 import prisma from "@/app/libs/prismadb";
 import { clientIp, rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
+import { logError } from "@/app/libs/log";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_NAME_LENGTH = 100;
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(user);
   } catch (error: any) {
-    console.log(error, "REGISTRATION_ERROR");
+    logError("registration", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

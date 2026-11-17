@@ -7,6 +7,7 @@ import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { emitToConversation } from "@/app/libs/socket-server";
+import { logError } from "@/app/libs/log";
 
 interface IParams {
   messageId?: string;
@@ -48,12 +49,16 @@ export async function POST(
     // "missing" and "not a member" look the same
     const message = await prisma.message.findUnique({
       where: { id: messageId },
-      select: { conversationId: true },
+      select: { conversationId: true, deletedAt: true },
     });
     const conversation =
       message && (await getConversationForUser(message.conversationId, currentUser.id));
     if (!conversation) {
       return new NextResponse("Not found", { status: 404 });
+    }
+    // a recalled message has nothing left to react to
+    if (message.deletedAt) {
+      return new NextResponse("Message recalled", { status: 400 });
     }
 
     const key = { messageId_userId: { messageId, userId: currentUser.id } };
@@ -80,7 +85,7 @@ export async function POST(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.log(error, "ERROR_REACTION");
+    logError("reaction", error);
     return new NextResponse("Error", { status: 500 });
   }
 }

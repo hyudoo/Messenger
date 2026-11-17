@@ -78,7 +78,8 @@
     "no_results": "No conversations found.",
     "last_from": "{name}: {text}",
     "you": "You",
-    "unread": "{count, plural, one {# unread message} other {# unread messages}}"
+    "unread": "{count, plural, one {# unread message} other {# unread messages}}",
+    "last_recalled": "Message unsent."
   },
   "chat": {
     "placeholder": "Write a message",
@@ -107,7 +108,24 @@
     "sending": "Sending...",
     "retry": "Retry",
     "discard": "Discard",
-    "image_uploading": "Uploading image..."
+    "image_uploading": "Uploading image...",
+    "reply": "Reply",
+    "edit": "Edit",
+    "recall": "Unsend",
+    "recall_confirm": "Unsend?",
+    "recall_failed": "Couldn't unsend the message!",
+    "recalled": "Message unsent",
+    "edited": "Edited",
+    "editing": "Editing message",
+    "replying_to": "Replying to {name}",
+    "cancel_compose": "Cancel",
+    "save_edit": "Save changes",
+    "edit_failed": "Couldn't edit the message!",
+    "edit_expired": "This message can no longer be edited.",
+    "reply_image": "Photo",
+    "reply_call": "Call",
+    "reply_jump": "Go to the original message",
+    "typing": "{count, plural, one {{names} is typing...} other {{names} are typing...}}"
   },
   "profile": {
     "close": "Close panel",

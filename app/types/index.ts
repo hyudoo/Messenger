@@ -10,11 +10,18 @@ export type MessageReaction = {
   user: { name: string | null; email: string | null };
 };
 
+// The replied-to message as shown above a reply (REPLY_PREVIEW_SELECT, app/libs/message-include.ts).
+export type ReplyPreview = Pick<Message, "id" | "body" | "image" | "isCall" | "deletedAt"> & {
+  sender: { name: string | null; email: string | null };
+};
+
 export type FullMessageType = Message & {
   sender: SafeUser;
   seen: SafeUser[];
   // missing where only a preview is loaded (the conversation list)
   reactions?: MessageReaction[];
+  // missing where only a preview is loaded (the conversation list)
+  replyTo?: ReplyPreview | null;
   // messages:new only: the sending tab's outbox id (app/hooks/useOutbox.ts)
   clientId?: string;
 };

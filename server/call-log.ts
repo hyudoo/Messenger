@@ -4,6 +4,7 @@ import type { CallStatus, Prisma } from "@prisma/client";
 import prisma from "../app/libs/prismadb";
 import { MESSAGE_INCLUDE } from "../app/libs/message-include";
 import { conversationRoom, userRoom } from "../app/libs/socket-rooms";
+import { logError } from "../app/libs/log";
 
 // The call message (the one /api/messages created with isCall, status "ringing") records how the
 // call went. Only the socket server sees who joins and leaves the call room, so it moves the status:
@@ -85,6 +86,6 @@ export const moveCall = async (
 // For handlers that must never throw (socket events, disconnects)
 export const moveCallSafely = (io: AnyServer, conversationId: string, move: CallMove) =>
   moveCall(io, conversationId, move).catch((error) => {
-    console.log(error, "ERROR_CALL_LOG");
+    logError("call_log", error);
     return false;
   });
