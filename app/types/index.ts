@@ -69,6 +69,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
     muted?: boolean;
     // the message mentions the recipient (a group's "@Name")
     mentioned?: boolean;
+    // the recipient read it without a read receipt (it isn't in `seen`): their count goes to 0
+    read?: boolean;
   };
 
 export type ConversationWithUsers = Conversation & {

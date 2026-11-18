@@ -59,6 +59,8 @@ interface MessageBoxProps {
   showHeader?: boolean;
   // a message from the outbox that the server hasn't confirmed yet (app/hooks/useOutbox.ts)
   pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
+  // false when the user hides their own read receipts: no "seen by" faces
+  showReceipts?: boolean;
 }
 
 // The body with http(s) links clickable (opened in a new tab, without the referrer) and
@@ -290,7 +292,13 @@ const SeenAvatars: React.FC<{ users: FullMessageType["seen"] }> = ({ users }) =>
   );
 };
 
-const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true, pending }) => {
+const MessageBox: React.FC<MessageBoxProps> = ({
+  data,
+  isLast,
+  showHeader = true,
+  pending,
+  showReceipts = true,
+}) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
   const session = useSession();
@@ -521,7 +529,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
         {reactions.length > 0 && (
           <ReactionChips reactions={reactions} myEmail={myEmail} onReact={react} />
         )}
-        {isLast && seenBy.length > 0 && <SeenAvatars users={seenBy} />}
+        {isLast && showReceipts && seenBy.length > 0 && <SeenAvatars users={seenBy} />}
       </div>
     </div>
   );

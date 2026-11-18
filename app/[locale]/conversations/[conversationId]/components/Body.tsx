@@ -28,6 +28,8 @@ interface BodyProps {
   // the first message the user hadn't read when opening the chat: a "new messages" divider goes
   // before it, and the chat opens there instead of at the bottom
   firstUnreadId?: string | null;
+  // false when the user hides their read receipts (then they see nobody's either)
+  showReceipts?: boolean;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -94,6 +96,7 @@ const Body: React.FC<BodyProps> = ({
   initialHasMore,
   firstUnreadId,
   members,
+  showReceipts = true,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
@@ -488,6 +491,7 @@ const Body: React.FC<BodyProps> = ({
                 )}
                 <MessageBox
                   isLast={i === shown.length - 1}
+                  showReceipts={showReceipts}
                   showHeader={startsGroup(previous, message)}
                   data={message}
                   pending={

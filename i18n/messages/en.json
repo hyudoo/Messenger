@@ -386,5 +386,19 @@
     "invalid": "It was turned off or reset. Ask a member of the group for a new one.",
     "failed": "Couldn't join the group!",
     "too_fast": "You're going too fast, wait a moment and try again!"
+  },
+  "privacy": {
+    "title": "Privacy",
+    "description": "Applies at once. If you stop sharing, you won't see other people's either.",
+    "activity": "Active status",
+    "activity_hint": "Let people see when you're online or were last active.",
+    "receipts": "Read receipts",
+    "receipts_hint": "Let people see that you've read their messages.",
+    "blocked_title": "Blocked people ({count})",
+    "blocked_none": "You haven't blocked anyone.",
+    "unblock": "Unblock",
+    "loading": "Loading...",
+    "load_failed": "Couldn't load your privacy settings!",
+    "failed": "Couldn't save the change!"
   }
 }

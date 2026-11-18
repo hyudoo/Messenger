@@ -386,5 +386,19 @@
     "invalid": "Link này đã bị tắt hoặc đặt lại. Hãy xin link mới từ thành viên của nhóm.",
     "failed": "Không tham gia được nhóm!",
     "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
+  },
+  "privacy": {
+    "title": "Quyền riêng tư",
+    "description": "Áp dụng ngay. Tắt chia sẻ thì bạn cũng không thấy của người khác.",
+    "activity": "Trạng thái hoạt động",
+    "activity_hint": "Cho người khác thấy khi bạn đang online hoặc hoạt động lần cuối.",
+    "receipts": "Thông báo đã xem",
+    "receipts_hint": "Cho người khác thấy bạn đã xem tin nhắn của họ.",
+    "blocked_title": "Người đã chặn ({count})",
+    "blocked_none": "Bạn chưa chặn ai.",
+    "unblock": "Bỏ chặn",
+    "loading": "Đang tải...",
+    "load_failed": "Không tải được cài đặt quyền riêng tư!",
+    "failed": "Không lưu được thay đổi!"
   }
 }

@@ -26,6 +26,12 @@ model User {
   pinnedConversationIds String[] @db.ObjectId
   // people this user blocked (POST /api/users/[userId]/block; app/libs/blocks.ts). Private too
   blockedUserIds        String[] @db.ObjectId
+  // privacy settings (PATCH /api/settings/privacy; app/libs/privacy.ts). Private too.
+  // hideActivity: nobody sees when the user is online / was last active, and they see nobody's.
+  // hideReadReceipts: their reads are kept in Message.privateSeenIds (never sent to anyone)
+  // instead of `seen`, and they see nobody's read receipts.
+  hideActivity          Boolean?
+  hideReadReceipts      Boolean?
   updatedAt      DateTime  @updatedAt
 
   conversationIds String[]       @db.ObjectId
@@ -128,6 +134,9 @@ model Message {
   // users who deleted the message for themselves only (DELETE ...?scope=me). Never sent to
   // clients (app/libs/prismadb.ts omits it)
   hiddenForIds String[] @db.ObjectId
+  // who read it without telling anyone (User.hideReadReceipts): counts for their unread / read
+  // marker like seenIds, but is omitted from every message row (app/libs/prismadb.ts)
+  privateSeenIds String[] @db.ObjectId
   // the body without case or Vietnamese diacritics (searchTextOf), what search matches against;
   // older messages get it from scripts/backfill-search-text.ts
   searchText String?

@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   emitToConversation: vi.fn(),
   removeUserFromConversationRoom: vi.fn(),
   notifyBlocksChanged: vi.fn(),
+  notifyActivityPrivacyChanged: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
   pushNewMessage: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@/app/libs/socket-server", () => ({
   emitToConversation: mocks.emitToConversation,
   removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
   notifyBlocksChanged: mocks.notifyBlocksChanged,
+  notifyActivityPrivacyChanged: mocks.notifyActivityPrivacyChanged,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/app/libs/s3")>()),
@@ -66,6 +68,7 @@ import {
 } from "@/app/api/conversations/[conversationId]/members/[userId]/route";
 import { POST as setInvite } from "@/app/api/conversations/[conversationId]/invite/route";
 import { POST as joinByLink } from "@/app/api/join/[code]/route";
+import { GET as getPrivacy, PATCH as setPrivacy } from "@/app/api/settings/privacy/route";
 import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
@@ -2021,5 +2024,71 @@ describe("group photo, admins, invite links", () => {
       expect((await join(CODE)).status).toBe(200);
       expect(prisma.conversation.update).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("privacy", () => {
+  const patch = (body: unknown) =>
+    setPrivacy(jsonRequest("/api/settings/privacy", body, { method: "PATCH" }));
+  const seen = () =>
+    markSeen(
+      jsonRequest(`/api/conversations/${CONVERSATION}/seen`, {}),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns the settings and the blocked people", async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ hideActivity: true, hideReadReceipts: null })
+      .mockResolvedValueOnce({ blockedUserIds: [OTHER] });
+    prisma.user.findMany.mockResolvedValue([{ id: OTHER, name: "B", email: other.email, image: null }]);
+    expect(await (await getPrivacy()).json()).toEqual({
+      hideActivity: true,
+      hideReadReceipts: false,
+      blocked: [{ id: OTHER, name: "B", email: other.email, image: null }],
+    });
+  });
+
+  it("validates, saves and re-announces only a changed active status", async () => {
+    expect((await patch({ hideActivity: "yes" })).status).toBe(400);
+    prisma.user.findUnique.mockResolvedValue({ hideActivity: false, hideReadReceipts: false });
+    prisma.user.update.mockResolvedValue({ hideActivity: true, hideReadReceipts: false });
+    expect(await (await patch({ hideActivity: true })).json()).toEqual({
+      hideActivity: true,
+      hideReadReceipts: false,
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: ME },
+      data: { hideActivity: true },
+      select: { hideActivity: true, hideReadReceipts: true },
+    });
+    expect(mocks.notifyActivityPrivacyChanged).toHaveBeenCalledWith(me.email, true);
+
+    mocks.notifyActivityPrivacyChanged.mockClear();
+    prisma.user.update.mockResolvedValue({ hideActivity: false, hideReadReceipts: true });
+    await patch({ hideReadReceipts: true });
+    expect(mocks.notifyActivityPrivacyChanged).not.toHaveBeenCalled();
+  });
+
+  it("keeps a read without a receipt private: no seen, no update to the room", async () => {
+    asMember();
+    prisma.user.findUnique.mockResolvedValue({ hideActivity: false, hideReadReceipts: true });
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE, seenIds: [OTHER], privateSeenIds: [] });
+    prisma.message.update.mockResolvedValue({ id: MESSAGE, seen: [other] });
+
+    expect((await seen()).status).toBe(200);
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { privateSeenIds: { push: ME } } })
+    );
+    expect(mocks.emitToConversation).not.toHaveBeenCalled();
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.objectContaining({ id: CONVERSATION, read: true })
+    );
+
+    prisma.message.update.mockClear();
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE, seenIds: [], privateSeenIds: [ME] });
+    await seen();
+    expect(prisma.message.update).not.toHaveBeenCalled();
   });
 });

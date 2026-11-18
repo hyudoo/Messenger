@@ -59,6 +59,9 @@ vi.mock("next-auth/jwt", () => ({
   }),
 }));
 
+// users who hide their activity (User.hideActivity)
+const HIDERS = vi.hoisted(() => new Set<string>());
+
 vi.mock("@/app/libs/prismadb", () => ({
   default: {
     conversation: {
@@ -115,7 +118,7 @@ vi.mock("@/app/libs/prismadb", () => ({
       findUnique: vi.fn(async ({ where }: any) => {
         if (where.email) {
           const id = ALL_IDS().find((candidate) => emailOf(candidate) === where.email);
-          return id ? { id } : null;
+          return id ? { id, hideActivity: HIDERS.has(id) } : null;
         }
         return {
           conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
@@ -124,6 +127,12 @@ vi.mock("@/app/libs/prismadb", () => ({
       }),
       // app/libs/blocks.ts: who blocked a user / the users a user blocked
       findMany: vi.fn(async ({ where }: any) => {
+        // server/socket.ts: who among these emails hides their activity
+        if (where.email) {
+          return ALL_IDS()
+            .filter((id) => where.email.in.includes(emailOf(id)))
+            .map((id) => ({ email: emailOf(id), hideActivity: HIDERS.has(id) }));
+        }
         const ids = where.blockedUserIds
           ? ALL_IDS().filter((id) => (BLOCKS[id] ?? []).includes(where.blockedUserIds.has))
           : where.id.in;
@@ -134,7 +143,11 @@ vi.mock("@/app/libs/prismadb", () => ({
 }));
 
 import { closeSocketServer, initSocketServer } from "@/server/socket";
-import { emitToConversation, removeUserFromConversationRoom } from "@/app/libs/socket-server";
+import {
+  emitToConversation,
+  notifyActivityPrivacyChanged,
+  removeUserFromConversationRoom,
+} from "@/app/libs/socket-server";
 import { callRoom, conversationRoom } from "@/app/libs/socket-rooms";
 
 // ---- harness ----
@@ -178,13 +191,17 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
   );
 
 // the servers' block caches are global: a test's closing disconnects refill them, so start clean
-beforeEach(() => globalThis.blockCache?.clear());
+beforeEach(() => {
+  globalThis.blockCache?.clear();
+  globalThis.activityCache?.clear();
+});
 
 afterEach(async () => {
   RECENT_CALLS.length = 0;
   pushMissedCall.mockClear();
   Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
   Object.keys(BLOCKS).forEach((id) => delete BLOCKS[id]);
+  HIDERS.clear();
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
   await Promise.all(
@@ -818,5 +835,46 @@ describe("typing and session expiry", () => {
     const { socket } = await connected(url, ME);
     // a transport close: a real client reconnects and is authenticated again
     expect(await next<string>(socket, "disconnect")).toBe("transport close");
+  });
+});
+
+describe("hidden activity", () => {
+  it("leaves a user who hides their activity out of presence, and them out of everyone's", async () => {
+    HIDERS.add(ME);
+    const { url } = await startServer();
+    const c = (await connected(url, THIRD)).socket;
+    const cOnline = vi.fn();
+    c.on("presence:online", cOnline);
+
+    const a = await connected(url, ME);
+    // ME sees nobody, and nobody hears ME come online
+    expect(a.online).toEqual([]);
+    const aOnline = vi.fn();
+    a.socket.on("presence:online", aOnline);
+    const b = await connected(url, OTHER);
+    expect(b.online).toContain(emailOf(THIRD));
+    expect(b.online).not.toContain(emailOf(ME));
+    await vi.waitFor(() => expect(cOnline).toHaveBeenCalledWith(emailOf(OTHER)));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(cOnline).not.toHaveBeenCalledWith(emailOf(ME));
+    expect(aOnline).not.toHaveBeenCalled();
+  });
+
+  it("announces the user offline when they turn it on, and online again when they turn it off", async () => {
+    const { url } = await startServer();
+    await connected(url, ME);
+    const c = (await connected(url, THIRD)).socket;
+    const offline = vi.fn();
+    const online = vi.fn();
+    c.on("presence:offline", offline);
+    c.on("presence:online", online);
+
+    HIDERS.add(ME);
+    notifyActivityPrivacyChanged(emailOf(ME), true);
+    await vi.waitFor(() => expect(offline).toHaveBeenCalledWith(emailOf(ME)));
+
+    HIDERS.delete(ME);
+    notifyActivityPrivacyChanged(emailOf(ME), false);
+    await vi.waitFor(() => expect(online).toHaveBeenCalledWith(emailOf(ME)));
   });
 });

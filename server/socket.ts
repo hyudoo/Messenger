@@ -10,7 +10,7 @@ import prisma from "../app/libs/prismadb";
 import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
 import { moveCallSafely } from "./call-log";
 import { getRedisUrl } from "../app/libs/redis-url";
-import { blockCache, setIO } from "../app/libs/socket-server";
+import { activityCache, blockCache, setIO } from "../app/libs/socket-server";
 import { blockPartnersOf } from "../app/libs/blocks";
 import {
   callRoom,
@@ -19,6 +19,7 @@ import {
 } from "../app/libs/socket-rooms";
 import { logError } from "../app/libs/log";
 import { createPresence, type Presence } from "./presence";
+import { ACTIVITY_HIDDEN_ROOM } from "../app/libs/socket-rooms";
 
 interface SocketData {
   email: string;
@@ -213,6 +214,54 @@ const hiddenFor = (email: string) => {
   return hidden;
 };
 
+// Whether a user hides their activity (User.hideActivity): then no one gets their online /
+// offline, and they get no one's. Cached per user on globalThis (activityCache), cleared by
+// PATCH /api/settings/privacy here and through "privacy:changed" on the other instances.
+const hidesActivity = (email: string) => {
+  const cache = activityCache();
+  let hidden = cache.get(email);
+  if (!hidden) {
+    hidden = prisma.user
+      .findUnique({ where: { email }, select: { hideActivity: true } })
+      .then((user) => !!user?.hideActivity)
+      .catch((error) => {
+        logError("activity_privacy", error);
+        cache.delete(email);
+        return false;
+      });
+    cache.set(email, hidden);
+  }
+  return hidden;
+};
+
+// The ones among these who hide their activity, filling the cache for the unknown ones with one query.
+const activityHidersAmong = async (emails: string[]) => {
+  const cache = activityCache();
+  const unknown = emails.filter((email) => !cache.has(email));
+  if (unknown.length > 0) {
+    const rows = prisma.user
+      .findMany({ where: { email: { in: unknown } }, select: { email: true, hideActivity: true } })
+      .catch((error) => {
+        logError("activity_privacy", error);
+        return null;
+      });
+    unknown.forEach((email) =>
+      cache.set(
+        email,
+        rows.then((found) => {
+          if (!found) {
+            cache.delete(email);
+            return false;
+          }
+          return !!found.find((row) => row.email === email)?.hideActivity;
+        })
+      )
+    );
+  }
+  const flags = await Promise.all(emails.map(hidesActivity));
+  return new Set(emails.filter((_, i) => flags[i]));
+};
+
 // "Active 5 minutes ago": stamped on every disconnect (only shown while the user is offline, so
 // a stamp while another tab stays open is harmless). Fire-and-forget.
 const touchLastSeen = (userId: string) => {
@@ -329,15 +378,39 @@ export const initSocketServer = async (httpServer: HttpServer) => {
   const io: AppServer = new Server(httpServer);
   const redis = await attachRedisAdapter(io);
   globalThis.ioClustered = !!redis;
-  // online / offline go to everyone here except the user's block partners
+  // online / offline go to everyone here except the user's block partners and the people who hide
+  // their activity; nothing goes out for someone who hides theirs
+  const announceTo = (event: "presence:online" | "presence:offline", email: string) =>
+    hiddenFor(email).then((hidden) => {
+      const except = [...Array.from(hidden).map(userRoom), ACTIVITY_HIDDEN_ROOM];
+      io.local.except(except).emit(event, email);
+    });
   const presence = createPresence(io, {
     clustered: !!redis,
     announce: (event, email) => {
-      void hiddenFor(email).then((hidden) => {
-        const except = Array.from(hidden).map(userRoom);
-        (except.length > 0 ? io.local.except(except) : io.local).emit(event, email);
+      void hidesActivity(email).then((hides) => {
+        if (!hides) {
+          return announceTo(event, email);
+        }
       });
     },
+  });
+  // "hide activity" turned on / off (here or on another instance): an online user goes offline /
+  // comes back online for the others
+  const activityPrivacyChanged = (email: string) => {
+    activityCache().delete(email);
+    if (!presence.list().includes(email)) {
+      return;
+    }
+    void hidesActivity(email).then((hides) =>
+      announceTo(hides ? "presence:offline" : "presence:online", email)
+    );
+  };
+  globalThis.onActivityPrivacyChanged = activityPrivacyChanged;
+  io.on("privacy:changed", (email: unknown) => {
+    if (typeof email === "string") {
+      activityPrivacyChanged(email);
+    }
   });
   // a block / unblock on another instance
   io.on("blocks:changed", (emails: unknown) => {
@@ -345,14 +418,22 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       emails.forEach((email) => typeof email === "string" && blockCache().delete(email));
     }
   });
-  // the online list as this user may see it
-  const sendPresenceList = (socket: AppSocket) =>
-    hiddenFor(socket.data.email).then((hidden) =>
-      socket.emit(
-        "presence:list",
-        presence.list().filter((online) => !hidden.has(online))
-      )
+  // the online list as this user may see it: nobody when they hide their own activity
+  const sendPresenceList = async (socket: AppSocket) => {
+    if (await hidesActivity(socket.data.email)) {
+      socket.emit("presence:list", []);
+      return;
+    }
+    const online = presence.list();
+    const [hidden, hiders] = await Promise.all([
+      hiddenFor(socket.data.email),
+      activityHidersAmong(online),
+    ]);
+    socket.emit(
+      "presence:list",
+      online.filter((email) => !hidden.has(email) && !hiders.has(email))
     );
+  };
   presences.set(io, presence);
 
   io.use(async (socket, next) => {
@@ -369,6 +450,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
 
     socket.join(userRoom(email));
     scheduleExpiry(socket);
+    void hidesActivity(email).then((hides) => hides && socket.join(ACTIVITY_HIDDEN_ROOM));
 
     resendRingingCalls(io, socket).catch((error) =>
       logError("resend_ringing_calls", error)

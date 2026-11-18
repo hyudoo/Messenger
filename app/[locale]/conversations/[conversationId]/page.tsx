@@ -6,6 +6,8 @@ import getConversationSettings from "@/app/actions/getConversationSettings";
 import getBlockState from "@/app/actions/getBlockState";
 import { findPinnedMessages } from "@/app/actions/getPinnedMessages";
 import { findFirstUnread } from "@/app/libs/unread";
+import { privacyOf } from "@/app/libs/privacy";
+import prisma from "@/app/libs/prismadb";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
@@ -49,7 +51,31 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   const block = await getBlockState(other?.id);
   const pins = await findPinnedMessages(conversation.pinnedMessageIds ?? []).catch(() => []);
   const blocked = block.byMe || block.byThem;
-  const firstUnreadId = currentUser ? findFirstUnread(messages, currentUser.id) : null;
+  const privacy = currentUser
+    ? await privacyOf(currentUser.id).catch(() => ({ hideActivity: false, hideReadReceipts: false }))
+    : null;
+  // someone hiding their read receipts reads into privateSeenIds (omitted from the rows), so their
+  // read marker on this page needs those too
+  const privatelyRead =
+    currentUser && privacy?.hideReadReceipts && messages.length > 0
+      ? await prisma.message
+          .findMany({
+            where: { id: { in: messages.map((message) => message.id) }, privateSeenIds: { has: currentUser.id } },
+            select: { id: true },
+          })
+          .then((rows) => new Set(rows.map((row) => row.id)))
+          .catch(() => new Set<string>())
+      : new Set<string>();
+  const firstUnreadId = currentUser
+    ? findFirstUnread(
+        messages.map((message) =>
+          privatelyRead.has(message.id)
+            ? { ...message, privateSeenIds: [currentUser.id] }
+            : message
+        ),
+        currentUser.id
+      )
+    : null;
 
   return (
     <div className="lg:pl-80 h-full">
@@ -67,6 +93,8 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
           initialHasMore={hasMore}
           members={conversation.users}
           firstUnreadId={firstUnreadId}
+          // hiding one's own read receipts also hides everyone else's
+          showReceipts={!privacy?.hideReadReceipts}
         />
         {blocked && other ? (
           <BlockedNotice other={other} byMe={block.byMe} />

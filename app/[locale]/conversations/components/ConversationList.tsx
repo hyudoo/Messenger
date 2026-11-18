@@ -142,7 +142,12 @@ const ConversationList: React.FC<ConversationListProps> = ({
     const nextUnread = (target: FullConversationType, update: ConversationUpdate) => {
       const last = update.messages?.[update.messages.length - 1];
       const me = myEmailRef.current;
-      if (!last || last.sender?.email === me || last.seen?.some((user) => user.email === me)) {
+      if (
+        update.read ||
+        !last ||
+        last.sender?.email === me ||
+        last.seen?.some((user) => user.email === me)
+      ) {
         return 0;
       }
       const watching =

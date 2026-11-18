@@ -2,6 +2,7 @@ import prisma from "@/app/libs/prismadb";
 import { UNREAD_SCAN_LIMIT, countUnread } from "@/app/libs/unread";
 import getCurrentUser from "./getCurrentUser";
 import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
+import { activityHiddenAmong } from "@/app/libs/privacy";
 
 // Unread count of one conversation: scans its newest messages (index conversationId + createdAt)
 // back to the user's read marker, at most UNREAD_SCAN_LIMIT of them.
@@ -11,7 +12,8 @@ const unreadIn = async (conversationId: string, userId: string) =>
       where: { conversationId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: UNREAD_SCAN_LIMIT,
-      select: { senderId: true, seenIds: true },
+      // privateSeenIds: the user's reads while hiding read receipts
+      select: { senderId: true, seenIds: true, privateSeenIds: true },
     }),
     userId
   );
@@ -50,8 +52,15 @@ export const findConversationsForUser = async (userId: string) => {
     },
   });
 
-  // block partners come without their last active time
-  const partners = await blockPartnersOf(userId).catch(() => new Map<string, string | null>());
+  // block partners and hidden activity come without their last active time
+  const [partners, hidden] = await Promise.all([
+    blockPartnersOf(userId).catch(() => new Map<string, string | null>()),
+    activityHiddenAmong(
+      userId,
+      Array.from(new Set(conversations.flatMap((conversation) => conversation.userIds)))
+    ).catch(() => new Set<string>()),
+  ]);
+  const noLastSeen = new Set([...Array.from(partners.keys()), ...Array.from(hidden)]);
 
   // only conversations whose last message is unread need a scan (usually few)
   return Promise.all(
@@ -63,7 +72,7 @@ export const findConversationsForUser = async (userId: string) => {
           : 0;
       return {
         ...conversation,
-        users: hideLastSeen(conversation.users, partners),
+        users: hideLastSeen(conversation.users, noLastSeen),
         unreadCount: unread,
         muted: !!settings?.mutedConversationIds.includes(conversation.id),
         pinned: !!settings?.pinnedConversationIds.includes(conversation.id),
