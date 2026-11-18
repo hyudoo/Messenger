@@ -2,6 +2,13 @@
 /.next
 /coverage
 /tests
+# E2E tests and their output
+/e2e
+/playwright.config.ts
+/.next-e2e
+/test-results
+/playwright-report
+/e2e-output
 /note
 .git
 .claude

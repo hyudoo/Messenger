@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm test`: Vitest. `npx vitest run tests/api/routes.test.ts -t "DELETE"` runs one file / matching tests.
   - Redis tests need `TEST_REDIS_URL` (see `.claude/rules/testing.md`).
   - Run from `E:\gitlab\Messenger` (uppercase drive), or every Vitest file fails.
+- `npm run test:e2e`: Playwright E2E in Chromium (`e2e/`, see `.claude/rules/testing.md`). It starts its own app on port 3100 (`e2e/serve.ts`: in-memory MongoDB, seeded users, `.next-e2e/`), so it runs next to `npm run dev`. First run: `npx playwright install chromium`.
 - `npx tsc --noEmit`: typecheck.
 - `npx prisma db push`: sync `prisma/schema.prisma` to MongoDB, including its `@@index`es (no migrations). `npx prisma generate` regenerates the client (also on `postinstall`).
 - Both `package-lock.json` and `yarn.lock` are committed (npm keeps both in sync).

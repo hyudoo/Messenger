@@ -1086,11 +1086,15 @@ describe("GET /api/conversations/[id]/search", () => {
 
   it("searches the folded text (no case or diacritics), newest first", async () => {
     asMember();
-    prisma.message.findMany.mockResolvedValue([{ id: MESSAGE, body: "Chào" }]);
+    // the first lookup: the messages the user hid for themselves (none)
+    prisma.message.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ id: MESSAGE, body: "Chào" }]);
     expect(await (await search(" CHÀO ")).json()).toEqual([{ id: MESSAGE, body: "Chào" }]);
-    const { where, take } = prisma.message.findMany.mock.calls[0][0];
+    const { where, take } = prisma.message.findMany.mock.calls[1][0];
     expect(take).toBe(30);
     expect(where.conversationId).toBe(CONVERSATION);
+    expect(where.id).toBeUndefined();
     expect(where.AND[2]).toEqual({
       OR: [
         { searchText: { contains: "chao" } },
@@ -1336,16 +1340,35 @@ describe("deleting a message for oneself", () => {
     expect((await hide()).status).toBe(400);
   });
 
-  it("leaves hidden messages out of the pages", async () => {
+  it("leaves hidden messages out of the pages, by id", async () => {
+    asMember();
+    // the viewer's hidden ones are looked up first (a positive `has`: NOT has would also drop
+    // every message without the list, i.e. nearly all on MongoDB)
+    prisma.message.findMany.mockResolvedValueOnce([{ id: "hidden" }]).mockResolvedValue([]);
+    await olderMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/messages?before=${MESSAGE}`, null, { method: "GET" }),
+      params({ conversationId: CONVERSATION })
+    );
+    expect(prisma.message.findMany).toHaveBeenNthCalledWith(1, {
+      where: { conversationId: CONVERSATION, hiddenForIds: { has: ME } },
+      select: { id: true },
+    });
+    expect(prisma.message.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { conversationId: CONVERSATION, id: { notIn: ["hidden"] } },
+      })
+    );
+  });
+
+  it("filters nothing when the viewer hid nothing", async () => {
     asMember();
     await olderMessages(
       jsonRequest(`/api/conversations/${CONVERSATION}/messages?before=${MESSAGE}`, null, { method: "GET" }),
       params({ conversationId: CONVERSATION })
     );
-    expect(prisma.message.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { conversationId: CONVERSATION, NOT: { hiddenForIds: { has: ME } } },
-      })
+    expect(prisma.message.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { conversationId: CONVERSATION } })
     );
   });
 });

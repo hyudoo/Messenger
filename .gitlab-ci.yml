@@ -47,6 +47,29 @@ test:
     - docker rm -f "$TEST_REDIS" > /dev/null 2>&1 || true
     - docker network rm "$TEST_NETWORK" > /dev/null 2>&1 || true
 
+# Playwright E2E tests (e2e/, playwright.config.ts) in Microsoft's Playwright image, whose Chromium and system
+# libraries match the locked @playwright/test version (bump the tag with it). The app runs from e2e/serve.ts with an
+# in-memory MongoDB (mongodb-memory-server downloads mongod once into ~/.cache, kept in the messenger-mongod volume),
+# no Redis and dummy AWS values. Not needed by deploy and allowed to fail while it settles in; on failure the HTML
+# report and traces are kept as artifacts (e2e-output/)
+e2e:
+  tags:
+    - main
+  stage: build
+  interruptible: true
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - mkdir -p e2e-output
+    - docker run --rm --ipc=host -e CI=true -e AWS_REGION=ap-southeast-1 -e AWS_S3_BUCKET=e2e-bucket -e AWS_ACCESS_KEY_ID=e2e -e AWS_SECRET_ACCESS_KEY=e2e -v "$PWD":/src:ro -v "$PWD/e2e-output":/out -v messenger-npm:/root/.npm -v messenger-mongod:/root/.cache mcr.microsoft.com/playwright:v1.65.1-noble sh -c "cp -a /src /app && cd /app && npm ci --no-audit --no-fund && (npx playwright test || (cp -r playwright-report test-results /out/ 2>/dev/null; exit 1))"
+  artifacts:
+    when: on_failure
+    expire_in: 1 week
+    paths:
+      - e2e-output/
+
 # Known vulnerabilities in the locked dependencies (OSV database). Informational only: it never blocks a deploy,
 # since a fix often waits on an upstream release. Accepted advisories live in osv-scanner.toml.
 # When the job turns orange, read its log and bump or replace the package it names

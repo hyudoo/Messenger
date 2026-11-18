@@ -77,6 +77,8 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // the E2E server builds into its own folder (e2e/serve.ts), so it can run next to `npm run dev`
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   serverExternalPackages: ["bcrypt"],
   // Next's own header is noise and tells attackers the framework
   poweredByHeader: false,

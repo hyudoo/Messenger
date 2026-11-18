@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import prisma from "@/app/libs/prismadb";
+import { hiddenMessageIds } from "@/app/actions/getMessages";
 import { NOT_RECALLED, NOT_SYSTEM } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
@@ -40,10 +41,12 @@ export async function GET(request: Request, { params }: { params: Promise<IParam
       return new NextResponse("Invalid query", { status: 400 });
     }
 
+    // not the ones the user deleted for themselves (see hiddenMessageIds for why not `NOT has`)
+    const hidden = await hiddenMessageIds(conversation.id, currentUser.id);
     const messages = await prisma.message.findMany({
       where: {
         conversationId: conversation.id,
-        NOT: { hiddenForIds: { has: currentUser.id } },
+        ...(hidden.length > 0 && { id: { notIn: hidden } }),
         AND: [
           NOT_RECALLED,
           NOT_SYSTEM,

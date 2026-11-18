@@ -277,7 +277,22 @@ const Body: React.FC<BodyProps> = ({
       });
   };
 
+  // A negotiation that starts again (call:ready or an offer arriving twice: a re-mount, a
+  // re-join) replaces the connection: the old one is closed, and every async step below works on
+  // its own connection and stops once it is no longer the current one. Before, a late offer /
+  // answer of the old connection was set on the new one ("The SDP does not match").
   const createPeerConnection = () => {
+    const previous = rtcConnection.current;
+    if (previous) {
+      previous.onicecandidate = null;
+      previous.ontrack = null;
+      previous.onconnectionstatechange = null;
+      previous.close();
+      // its remote tracks ended with it; the new connection brings its own
+      remoteStream.current
+        ?.getTracks()
+        .forEach((track) => remoteStream.current?.removeTrack(track));
+    }
     // We create a RTC Peer Connection
     const connection = new RTCPeerConnection({ iceServers });
 
@@ -310,20 +325,24 @@ const Body: React.FC<BodyProps> = ({
   const initiateCall = () => {
     if (host.current) {
       setStatus("connecting");
-      rtcConnection.current = createPeerConnection();
+      const connection = createPeerConnection();
+      rtcConnection.current = connection;
       // Host creates offer
       userStream.current?.getTracks().forEach((track) => {
-        rtcConnection.current?.addTrack(track, userStream.current!);
+        connection.addTrack(track, userStream.current!);
       });
       // an audio call still negotiates video, so either side can turn its
       // camera on later with replaceTrack, without a new offer / answer
       if (!userStream.current?.getVideoTracks().length) {
-        rtcConnection.current.addTransceiver("video", { direction: "sendrecv" });
+        connection.addTransceiver("video", { direction: "sendrecv" });
       }
-      rtcConnection
-        .current!.createOffer()
-        .then((offer) => {
-          rtcConnection.current!.setLocalDescription(offer);
+      connection
+        .createOffer()
+        .then(async (offer) => {
+          if (rtcConnection.current !== connection) {
+            return; // replaced meanwhile
+          }
+          await connection.setLocalDescription(offer);
           // Send offer to the other peer via the socket server
           signal("call:offer", offer);
         })
@@ -334,13 +353,13 @@ const Body: React.FC<BodyProps> = ({
   };
 
   const handleReceivedOffer = (offer: RTCSessionDescriptionInit) => {
-    rtcConnection.current = createPeerConnection();
+    const connection = createPeerConnection();
+    rtcConnection.current = connection;
     userStream.current?.getTracks().forEach((track) => {
       // Adding tracks to the RTCPeerConnection to give peer access to it
-      rtcConnection.current?.addTrack(track, userStream.current!);
+      connection.addTrack(track, userStream.current!);
     });
 
-    const connection = rtcConnection.current;
     connection
       .setRemoteDescription(offer)
       .then(() => {
@@ -356,8 +375,11 @@ const Body: React.FC<BodyProps> = ({
         });
         return connection.createAnswer();
       })
-      .then((answer) => {
-        rtcConnection.current!.setLocalDescription(answer);
+      .then(async (answer) => {
+        if (rtcConnection.current !== connection) {
+          return; // a newer offer replaced this one
+        }
+        await connection.setLocalDescription(answer);
         signal("call:answer", answer);
       })
       .catch((error) => {
@@ -366,9 +388,12 @@ const Body: React.FC<BodyProps> = ({
   };
 
   const handleAnswerReceived = (answer: RTCSessionDescriptionInit) => {
-    rtcConnection
-      .current!.setRemoteDescription(answer)
-      .catch((error) => console.log(error));
+    const connection = rtcConnection.current;
+    // only the answer to our current offer: one to an offer we replaced is late
+    if (!connection || connection.signalingState !== "have-local-offer") {
+      return;
+    }
+    connection.setRemoteDescription(answer).catch((error) => console.log(error));
   };
 
   const handleICECandidateEvent = async (event: RTCPeerConnectionIceEvent) => {
@@ -380,9 +405,8 @@ const Body: React.FC<BodyProps> = ({
   const handlerNewIceCandidateMsg = (incoming: RTCIceCandidate) => {
     // We cast the incoming candidate to RTCIceCandidate
     const candidate = new RTCIceCandidate(incoming);
-    rtcConnection
-      .current!.addIceCandidate(candidate)
-      .catch((error) => console.log(error));
+    // none yet, or one of a connection that was replaced: dropped
+    rtcConnection.current?.addIceCandidate(candidate).catch((error) => console.log(error));
   };
 
   const handleTrackEvent = (event: RTCTrackEvent) => {
