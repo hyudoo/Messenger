@@ -11,7 +11,7 @@ import { deleteConversation } from "@/app/libs/conversation-delete";
 import { emitGroupUpdate } from "@/app/libs/conversation-members";
 import { lastSeenViewsOf } from "@/app/libs/privacy";
 import { postSystemMessage } from "@/app/libs/system-message";
-import { emitToUser } from "@/app/libs/socket-server";
+import { emitToUser, notifyContactsChanged } from "@/app/libs/socket-server";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -107,6 +107,9 @@ export async function PATCH(
     });
 
     const added = updated.users.filter((user) => addIds.includes(user.id));
+    if (added.length > 0) {
+      notifyContactsChanged(updated.users.map((user) => user.email));
+    }
     await emitGroupUpdate(
       updated,
       updated.users.filter((user) => !addIds.includes(user.id))

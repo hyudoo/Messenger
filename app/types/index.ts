@@ -4,7 +4,11 @@ import { CallType, Conversation, Message, User } from "@prisma/client";
 // a user row as queries return it (app/libs/prismadb.ts omits these fields)
 export type SafeUser = Omit<
   User,
-  "hashedPassword" | "mutedConversationIds" | "pinnedConversationIds" | "blockedUserIds"
+  | "hashedPassword"
+  | "mutedConversationIds"
+  | "pinnedConversationIds"
+  | "blockedUserIds"
+  | "friendIds"
 >;
 
 // A reaction as MESSAGE_INCLUDE loads it (app/libs/message-include.ts).

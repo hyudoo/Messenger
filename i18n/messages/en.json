@@ -33,7 +33,7 @@
   },
   "nav": {
     "chat": "Chat",
-    "users": "People",
+    "users": "Contacts",
     "logout": "Log out",
     "settings": "Settings"
   },
@@ -226,12 +226,33 @@
     "invite_approval": "Admins approve new members",
     "join_requests": "{count, plural, one {# person wants to join} other {# people want to join}}",
     "approve": "Approve",
-    "decline": "Decline"
+    "decline": "Decline",
+    "no_friends": "Members are picked from your friends. Add friends on the Contacts page first."
   },
   "users": {
-    "title": "People",
-    "search": "Search by name or email",
-    "no_results": "Nobody found."
+    "title": "Contacts",
+    "search": "Search friends, or find people by name or email",
+    "no_results": "Nobody found.",
+    "friends_heading": "{count, plural, =0 {Friends} other {Friends (#)}}",
+    "no_friends": "No friends yet. Find people by name or email above.",
+    "requests_heading": "{count, plural, one {# friend request} other {# friend requests}}",
+    "sent_heading": "Sent requests",
+    "people_heading": "People",
+    "searching": "Searching…",
+    "no_people": "Nobody found.",
+    "add_friend": "Add friend",
+    "requested": "Requested",
+    "accept": "Accept",
+    "decline": "Decline",
+    "cancel": "Cancel",
+    "unfriend": "Unfriend",
+    "unfriend_confirm": "Click again to unfriend",
+    "open_chat": "Send a message",
+    "now_friends": "You and {name} are now friends!",
+    "cannot_add": "You can't add this person.",
+    "too_many": "You have too many requests waiting.",
+    "too_fast": "You're going too fast, wait a moment and try again!",
+    "failed": "Couldn't update, try again!"
   },
   "settings": {
     "profile_title": "Profile",

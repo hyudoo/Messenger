@@ -56,3 +56,7 @@ export const matchesSearch = (query: string, ...fields: (string | null | undefin
   const haystack = fields.map(normalizeSearch).join(" ");
   return words.every((word) => haystack.includes(word));
 };
+
+// "Find people" (GET /api/users/search): a name query needs this many characters (an email is
+// matched whole)
+export const MIN_NAME_QUERY = 2;

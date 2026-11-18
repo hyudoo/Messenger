@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   emitToConversation: vi.fn(),
   removeUserFromConversationRoom: vi.fn(),
   notifyBlocksChanged: vi.fn(),
+  notifyContactsChanged: vi.fn(),
   notifyActivityPrivacyChanged: vi.fn(),
   callRoomSize: vi.fn(),
   markUploadsUsed: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@/app/libs/socket-server", () => ({
   removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
   notifyBlocksChanged: mocks.notifyBlocksChanged,
   notifyActivityPrivacyChanged: mocks.notifyActivityPrivacyChanged,
+  notifyContactsChanged: mocks.notifyContactsChanged,
   callRoomSize: mocks.callRoomSize,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
@@ -78,6 +80,14 @@ import { GET as searchEverywhere } from "@/app/api/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
 import { POST as blockUser } from "@/app/api/users/[userId]/block/route";
+import { POST as requestFriend } from "@/app/api/friends/requests/route";
+import {
+  DELETE as cancelFriendRequest,
+  POST as answerFriendRequest,
+} from "@/app/api/friends/requests/[requestId]/route";
+import { DELETE as unfriendUser } from "@/app/api/friends/[userId]/route";
+import { GET as searchPeople } from "@/app/api/users/search/route";
+
 import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
 import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
@@ -2269,6 +2279,146 @@ describe("group photo, admins, invite links", () => {
         expect(prisma.message.create).not.toHaveBeenCalled();
       });
     });
+  });
+});
+
+describe("friends", () => {
+  const REQUEST = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const ask = (userId: unknown) => requestFriend(jsonRequest("/api/friends/requests", { userId }));
+  const answer = (accept: unknown) =>
+    answerFriendRequest(
+      jsonRequest(`/api/friends/requests/${REQUEST}`, { accept }),
+      params({ requestId: REQUEST })
+    );
+  // what the caller's / the other's friendIds hold (findUnique with a select on friendIds)
+  const friendsOf = (lists: Record<string, string[]>) =>
+    prisma.user.findUnique.mockImplementation(async ({ where, select }: any) =>
+      select?.friendIds ? { friendIds: lists[where.id] ?? [] } : { id: where.id, email: user(where.id).email }
+    );
+
+  it("refuses itself, unknown people, and block partners", async () => {
+    expect((await ask(ME)).status).toBe(400);
+    expect((await ask("nope")).status).toBe(400);
+    prisma.user.findUnique.mockResolvedValue(null);
+    expect((await ask(OTHER)).status).toBe(404);
+
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(1);
+    expect((await ask(OTHER)).status).toBe(403);
+    expect(prisma.friendRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("sends a request, once, and tells both sides", async () => {
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(0);
+    prisma.friendRequest.findUnique.mockResolvedValue(null);
+    prisma.friendRequest.count.mockResolvedValue(0);
+    prisma.friendRequest.create.mockResolvedValue({ id: REQUEST });
+
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "requested" });
+    expect(prisma.friendRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { fromId: ME, toId: OTHER } })
+    );
+    expect(mocks.notifyContactsChanged).toHaveBeenCalledWith([me.email, other.email], true);
+
+    // asked already: nothing new
+    prisma.friendRequest.create.mockClear();
+    prisma.friendRequest.findUnique.mockImplementation(async ({ where }: any) =>
+      where.fromId_toId.fromId === ME ? { id: REQUEST } : null
+    );
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "pending" });
+    expect(prisma.friendRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts theirs instead when they asked first: friends on both sides", async () => {
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(0);
+    prisma.friendRequest.findUnique.mockImplementation(async ({ where }: any) =>
+      where.fromId_toId.fromId === OTHER ? { id: REQUEST } : null
+    );
+
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "accepted" });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ME }, data: { friendIds: { set: [OTHER] } } })
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [ME] } } })
+    );
+    expect(prisma.friendRequest.deleteMany).toHaveBeenCalled();
+  });
+
+  it("lets only the recipient answer, and only the sender cancel", async () => {
+    const request = (fromId: string, toId: string) => ({
+      id: REQUEST,
+      fromId,
+      toId,
+      from: { email: user(fromId).email },
+      to: { email: user(toId).email },
+    });
+    // sent by ME: ME can't answer it, but can cancel it
+    prisma.friendRequest.findUnique.mockResolvedValue(request(ME, OTHER));
+    expect((await answer(true)).status).toBe(404);
+    const cancelled = await cancelFriendRequest(
+      jsonRequest(`/api/friends/requests/${REQUEST}`, null, { method: "DELETE" }),
+      params({ requestId: REQUEST })
+    );
+    expect(cancelled.status).toBe(204);
+    expect(prisma.friendRequest.delete).toHaveBeenCalledWith({ where: { id: REQUEST } });
+
+    // sent to ME: declining drops it, accepting makes friends
+    prisma.friendRequest.findUnique.mockResolvedValue(request(OTHER, ME));
+    expect((await answer("yes")).status).toBe(400);
+    expect(await (await answer(false)).json()).toEqual({ accepted: false });
+    friendsOf({});
+    expect(await (await answer(true)).json()).toEqual({ accepted: true });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [ME] } } })
+    );
+    expect(mocks.notifyContactsChanged).toHaveBeenCalledWith([other.email, me.email], true);
+  });
+
+  it("unfriends both sides, only a friend", async () => {
+    const unfriend = (userId: string) =>
+      unfriendUser(jsonRequest(`/api/friends/${userId}`, null, { method: "DELETE" }), params({ userId }));
+    friendsOf({});
+    expect((await unfriend(OTHER)).status).toBe(404);
+
+    friendsOf({ [ME]: [OTHER, THIRD], [OTHER]: [ME] });
+    expect((await unfriend(OTHER)).status).toBe(204);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ME }, data: { friendIds: { set: [THIRD] } } })
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [] } } })
+    );
+  });
+
+  it("finds people by exact email or by name, without emails, never the caller or block partners", async () => {
+    const find = (q: string) =>
+      searchPeople(jsonRequest(`/api/users/search?q=${encodeURIComponent(q)}`, null, { method: "GET" }));
+    expect((await find("a")).status).toBe(400);
+
+    // THIRD blocked ME
+    prisma.user.findUnique.mockResolvedValue({ blockedUserIds: [], friendIds: [] });
+    prisma.user.findMany.mockImplementation(async ({ where }: any) =>
+      where.blockedUserIds ? [{ id: THIRD, email: third.email }] : [{ id: OTHER, name: other.name, image: null }]
+    );
+    prisma.friendRequest.findMany.mockResolvedValue([{ fromId: OTHER, toId: ME }]);
+
+    expect(await (await find("user")).json()).toEqual([
+      { id: OTHER, name: other.name, image: null, relation: "incoming" },
+    ]);
+    const byName = prisma.user.findMany.mock.calls.find(([args]: any) => args.select?.name)![0];
+    expect(byName.where).toEqual({
+      id: { notIn: [ME, THIRD] },
+      name: { contains: "user", mode: "insensitive" },
+    });
+    expect(byName.select).toEqual({ id: true, name: true, image: true });
+
+    prisma.user.findMany.mockClear();
+    await find(other.email!);
+    const byEmail = prisma.user.findMany.mock.calls.find(([args]: any) => args.select?.name)![0];
+    expect(byEmail.where.email).toEqual({ equals: other.email, mode: "insensitive" });
   });
 });
 

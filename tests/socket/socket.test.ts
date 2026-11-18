@@ -12,6 +12,8 @@ const GROUP = "abababababababababababab";
 
 // user id -> the ids they blocked
 const BLOCKS: Record<string, string[]> = {};
+// user id -> their friends (User.friendIds, both sides)
+const FRIENDS: Record<string, string[]> = {};
 const ALL_IDS = () => [ME, OTHER, THIRD, STRANGER];
 
 // conversation id -> member ids
@@ -64,6 +66,12 @@ const HIDERS = vi.hoisted(() => new Set<string>());
 vi.mock("@/app/libs/prismadb", () => ({
   default: {
     conversation: {
+      // contactsOf: the user's conversations' members
+      findMany: vi.fn(async ({ where }: any) =>
+        Object.entries(MEMBERS)
+          .filter(([, members]) => members.includes(where.userIds.has))
+          .map(([, members]) => ({ userIds: members }))
+      ),
       findFirst: vi.fn(async ({ where }: any) =>
         MEMBERS[where.id]?.includes(where.userIds.has)
           ? {
@@ -117,7 +125,7 @@ vi.mock("@/app/libs/prismadb", () => ({
       findUnique: vi.fn(async ({ where }: any) => {
         if (where.email) {
           const id = ALL_IDS().find((candidate) => emailOf(candidate) === where.email);
-          return id ? { id, hideActivity: HIDERS.has(id) } : null;
+          return id ? { id, hideActivity: HIDERS.has(id), friendIds: FRIENDS[id] ?? [] } : null;
         }
         return {
           conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
@@ -145,6 +153,7 @@ import { closeSocketServer, initSocketServer } from "@/server/socket";
 import {
   emitToConversation,
   notifyActivityPrivacyChanged,
+  notifyContactsChanged,
   removeUserFromConversationRoom,
 } from "@/app/libs/socket-server";
 import { callRoom, conversationRoom } from "@/app/libs/socket-rooms";
@@ -192,6 +201,7 @@ const joinCall = (socket: ClientSocket, roomId: string) =>
 beforeEach(() => {
   globalThis.blockCache?.clear();
   globalThis.activityCache?.clear();
+  globalThis.contactCache?.clear();
 });
 
 afterEach(async () => {
@@ -199,6 +209,7 @@ afterEach(async () => {
   pushMissedCall.mockClear();
   Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
   Object.keys(BLOCKS).forEach((id) => delete BLOCKS[id]);
+  Object.keys(FRIENDS).forEach((id) => delete FRIENDS[id]);
   HIDERS.clear();
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
@@ -793,6 +804,44 @@ describe("socket server lifecycle", () => {
     expect(await disconnected).toBe("transport close");
     const error = await next<Error>(client(url, ME), "connect_error");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("presence scope (contacts)", () => {
+  it("shares presence only with friends and people in a shared conversation", async () => {
+    const { url } = await startServer();
+    // ME shares a conversation with OTHER; STRANGER shares none with anyone
+    const a = (await connected(url, ME)).socket;
+    const aOnline = vi.fn();
+    a.on("presence:online", aOnline);
+
+    const stranger = await connected(url, STRANGER);
+    // only themselves
+    expect(stranger.online).toEqual([emailOf(STRANGER)]);
+    const b = await connected(url, OTHER);
+    expect(b.online).toContain(emailOf(ME));
+    expect(b.online).not.toContain(emailOf(STRANGER));
+    await vi.waitFor(() => expect(aOnline).toHaveBeenCalledWith(emailOf(OTHER)));
+    expect(aOnline).not.toHaveBeenCalledWith(emailOf(STRANGER));
+
+    // ME and STRANGER become friends: both tabs are told, and the lists now have each other
+    FRIENDS[ME] = [STRANGER];
+    FRIENDS[STRANGER] = [ME];
+    const told = next<{ friends: boolean }>(stranger.socket, "contacts:update");
+    notifyContactsChanged([emailOf(ME), emailOf(STRANGER)], true);
+    expect(await told).toEqual({ friends: true });
+    const list = next<string[]>(stranger.socket, "presence:list");
+    stranger.socket.emit("presence:sync");
+    expect((await list).sort()).toEqual([emailOf(ME), emailOf(STRANGER)].sort());
+
+    // and STRANGER going offline now reaches ME, not OTHER
+    const aOffline = next<string>(a, "presence:offline");
+    const bOffline = vi.fn();
+    b.socket.on("presence:offline", bOffline);
+    stranger.socket.close();
+    expect(await aOffline).toBe(emailOf(STRANGER));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(bOffline).not.toHaveBeenCalled();
   });
 });
 

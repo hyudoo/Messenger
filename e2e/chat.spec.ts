@@ -10,9 +10,10 @@ test("two people chat in real time", async ({ browser }) => {
   // Bob waits in his inbox
   await bob.goto("/en/conversations");
 
-  // Alice starts the chat from the people page and writes
+  // Alice finds Bob on the contacts page ("Find people": they aren't friends) and writes
   await alice.goto("/en/users");
-  await alice.getByRole("button", { name: new RegExp(E2E_USERS.bob.name) }).click();
+  await alice.getByPlaceholder(/find people/i).fill(E2E_USERS.bob.name);
+  await alice.getByRole("button", { name: new RegExp(E2E_USERS.bob.name) }).first().click();
   await expect(alice).toHaveURL(/\/en\/conversations\/[a-f\d]{24}$/);
   await send(alice, "Hello Bob from E2E");
   await expect(chatMessage(alice, "Hello Bob from E2E")).toBeVisible();

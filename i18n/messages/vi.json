@@ -33,7 +33,7 @@
   },
   "nav": {
     "chat": "Trò chuyện",
-    "users": "Mọi người",
+    "users": "Danh bạ",
     "logout": "Đăng xuất",
     "settings": "Cài đặt"
   },
@@ -226,12 +226,33 @@
     "invite_approval": "Quản trị viên duyệt thành viên mới",
     "join_requests": "{count} người muốn tham gia",
     "approve": "Duyệt",
-    "decline": "Từ chối"
+    "decline": "Từ chối",
+    "no_friends": "Thành viên được chọn từ bạn bè. Hãy kết bạn ở trang Danh bạ trước."
   },
   "users": {
-    "title": "Mọi người",
-    "search": "Tìm theo tên hoặc email",
-    "no_results": "Không tìm thấy ai."
+    "title": "Danh bạ",
+    "search": "Tìm bạn bè, hoặc tìm người theo tên / email",
+    "no_results": "Không tìm thấy ai.",
+    "friends_heading": "{count, plural, =0 {Bạn bè} other {Bạn bè (#)}}",
+    "no_friends": "Chưa có bạn bè. Tìm người theo tên hoặc email ở ô trên.",
+    "requests_heading": "{count, plural, other {# lời mời kết bạn}}",
+    "sent_heading": "Lời mời đã gửi",
+    "people_heading": "Mọi người",
+    "searching": "Đang tìm…",
+    "no_people": "Không tìm thấy ai.",
+    "add_friend": "Kết bạn",
+    "requested": "Đã gửi lời mời",
+    "accept": "Chấp nhận",
+    "decline": "Từ chối",
+    "cancel": "Huỷ",
+    "unfriend": "Huỷ kết bạn",
+    "unfriend_confirm": "Bấm lần nữa để huỷ kết bạn",
+    "open_chat": "Nhắn tin",
+    "now_friends": "Bạn và {name} đã là bạn bè!",
+    "cannot_add": "Bạn không thể kết bạn với người này.",
+    "too_many": "Bạn có quá nhiều lời mời đang chờ.",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!",
+    "failed": "Không cập nhật được, thử lại nhé!"
   },
   "settings": {
     "profile_title": "Hồ sơ",

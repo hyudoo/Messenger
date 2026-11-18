@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
-import { notifyBlocksChanged } from "@/app/libs/socket-server";
+import { notifyBlocksChanged, notifyContactsChanged } from "@/app/libs/socket-server";
+import { unfriend } from "@/app/libs/friends";
 import { logError } from "@/app/libs/log";
 
 interface IParams {
@@ -12,7 +13,8 @@ interface IParams {
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
-// POST { blocked }: blocks or unblocks a user (app/libs/blocks.ts has what that means). Both
+// POST { blocked }: blocks or unblocks a user (app/libs/blocks.ts has what that means; blocking
+// also unfriends them and drops friend requests between them). Both
 // sides' tabs are told (block:update) and the presence they see is recomputed.
 export async function POST(request: Request, { params }: { params: Promise<IParams> }) {
   try {
@@ -47,6 +49,20 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
       data: { blockedUserIds },
       select: { id: true },
     });
+
+    // blocking also ends a friendship and any friend request between them
+    if (blocked) {
+      await unfriend(currentUser.id, userId);
+      await prisma.friendRequest.deleteMany({
+        where: {
+          OR: [
+            { fromId: currentUser.id, toId: userId },
+            { fromId: userId, toId: currentUser.id },
+          ],
+        },
+      });
+      notifyContactsChanged([currentUser.email, target.email], true);
+    }
 
     notifyBlocksChanged([currentUser.email, target.email].filter((email): email is string => !!email));
     return NextResponse.json({ userId, blocked });

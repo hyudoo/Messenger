@@ -32,6 +32,8 @@ model User {
   // instead of `seen`, and they see nobody's read receipts.
   hideActivity          Boolean?
   hideReadReceipts      Boolean?
+  // friends (app/libs/friends.ts), kept on both sides. Private too
+  friendIds             String[] @db.ObjectId
   updatedAt      DateTime  @updatedAt
 
   conversationIds String[]       @db.ObjectId
@@ -44,6 +46,25 @@ model User {
   messages          Message[]
   reactions         Reaction[]
   pushSubscriptions WebPushSubscription[]
+
+  sentFriendRequests     FriendRequest[] @relation("FriendRequestFrom")
+  receivedFriendRequests FriendRequest[] @relation("FriendRequestTo")
+}
+
+// A friend request waiting for its recipient (app/libs/friends.ts): accepted (both become friends,
+// User.friendIds) or declined, it is deleted; its sender may cancel it. One per pair and direction;
+// a request towards someone who already asked us accepts theirs instead.
+model FriendRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+
+  fromId String @db.ObjectId
+  from   User   @relation("FriendRequestFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId   String @db.ObjectId
+  to     User   @relation("FriendRequestTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
 }
 
 // A browser's Web Push subscription (app/libs/web-push.ts). One row per browser endpoint: signing

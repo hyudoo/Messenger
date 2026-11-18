@@ -16,13 +16,17 @@ const useActiveChannel = () => {
     }
 
     const socket = getSocket();
+    // friends or shared conversations changed: whose presence this user sees changed too
+    const resync = () => socket.emit("presence:sync");
     socket.on("presence:list", set);
+    socket.on("contacts:update", resync);
     socket.on("presence:online", add);
     socket.on("presence:offline", remove);
     socket.connect();
 
     return () => {
       socket.off("presence:list", set);
+      socket.off("contacts:update", resync);
       socket.off("presence:online", add);
       socket.off("presence:offline", remove);
       socket.disconnect();

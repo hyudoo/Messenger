@@ -96,6 +96,10 @@ const GroupChatModal: React.FC<GroupChatModalProps> = ({
                 }
                 value={members}
               />
+              {/* members are picked from friends (getUsers) */}
+              {users.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t("group.no_friends")}</p>
+              )}
             </div>
           </div>
         </div>

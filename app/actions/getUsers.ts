@@ -1,32 +1,28 @@
 import prisma from "@/app/libs/prismadb";
-import getSession from "./getSession";
 import getCurrentUser from "./getCurrentUser";
 import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
+import { friendIdsOf } from "@/app/libs/friends";
 import { activityHiddenAmong } from "@/app/libs/privacy";
 
+// The user's friends (app/libs/friends.ts), by name: the contacts page, and the people a new group
+// or a group's "Add" picks from. Others are found with "Find people" (GET /api/users/search).
 const getUsers = async () => {
-  const session = await getSession();
-  if (!session?.user?.email) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser?.id) {
     return [];
   }
 
   try {
+    const friendIds = await friendIdsOf(currentUser.id);
+    if (friendIds.length === 0) {
+      return [];
+    }
     const users = await prisma.user.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      where: {
-        NOT: {
-          email: session.user.email,
-        },
-      },
+      where: { id: { in: friendIds } },
+      orderBy: { name: "asc" },
     });
 
     // block partners and hidden activity come without their last active time
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return users;
-    }
     const [partners, hidden] = await Promise.all([
       blockPartnersOf(currentUser.id).catch(() => new Map<string, string | null>()),
       activityHiddenAmong(
@@ -35,7 +31,7 @@ const getUsers = async () => {
       ).catch(() => new Set<string>()),
     ]);
     return hideLastSeen(users, new Set([...Array.from(partners.keys()), ...Array.from(hidden)]));
-  } catch (error: any) {
+  } catch {
     return [];
   }
 };

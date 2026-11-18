@@ -12,6 +12,9 @@ declare global {
   var blockCache: Map<string, Promise<Set<string>>> | undefined;
   // email -> whether they hide their activity (User.hideActivity; filled by server/socket.ts)
   var activityCache: Map<string, Promise<boolean>> | undefined;
+  // email -> the emails whose presence they see and who see theirs: friends and the people they
+  // share a conversation with (filled by server/socket.ts contactsOf)
+  var contactCache: Map<string, { at: number; contacts: Promise<Set<string>> }> | undefined;
   // set by server/socket.ts: re-announces a user's presence after a privacy change, here
   var onActivityPrivacyChanged: ((email: string) => void) | undefined;
 }
@@ -23,6 +26,9 @@ export const activityCache = (): Map<string, Promise<boolean>> =>
 // process, separate module copies).
 export const blockCache = (): Map<string, Promise<Set<string>>> =>
   (globalThis.blockCache ??= new Map());
+
+export const contactCache = (): Map<string, { at: number; contacts: Promise<Set<string>> }> =>
+  (globalThis.contactCache ??= new Map());
 
 export const setIO = (server: Server) => {
   globalThis.io = server;
@@ -74,6 +80,27 @@ export const notifyBlocksChanged = (emails: string[]) => {
     }
   }
   emails.forEach((email) => emitToUser(email, "block:update", {}));
+};
+
+// After who is in whose presence changed for these users (friends added / removed, a conversation
+// created, people joining or leaving one): forgets their cached contacts here and on the other
+// instances ("contacts:changed"), and tells their tabs (contacts:update), which ask for the
+// presence list again (presence:sync) and, with `friends`, reload the contacts page.
+export const notifyContactsChanged = (emails: (string | null | undefined)[], friends = false) => {
+  const list = Array.from(new Set(emails.filter((email): email is string => !!email)));
+  if (list.length === 0) {
+    return;
+  }
+  list.forEach((email) => contactCache().delete(email));
+  const io = getIO();
+  if (globalThis.ioClustered) {
+    try {
+      io?.serverSideEmit("contacts:changed", list);
+    } catch {
+      // the others' caches expire on their own (CONTACTS_TTL_MS)
+    }
+  }
+  list.forEach((email) => emitToUser(email, "contacts:update", { friends }));
 };
 
 // After the user turned "hide activity" on / off: their sockets (every instance) join / leave the

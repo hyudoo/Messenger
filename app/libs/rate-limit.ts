@@ -44,6 +44,8 @@ export const LIMITS = {
   seen: { limit: 120, windowMs: 60_000 },
   // per user: link preview images, fetched through the server when a chat shows them
   previewImage: { limit: 120, windowMs: 60_000 },
+  // per user: friend requests, answers, unfriending
+  friend: { limit: 30, windowMs: 60_000 },
 } as const;
 
 type LimitName = keyof typeof LIMITS;

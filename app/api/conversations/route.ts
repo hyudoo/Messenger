@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { findConversationsForUser } from "@/app/actions/getConversation";
 import getCurrentUser from "@/app/actions/getCurrentUser";
-import { emitToUser } from "@/app/libs/socket-server";
+import { emitToUser, notifyContactsChanged } from "@/app/libs/socket-server";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import prisma from "@/app/libs/prismadb";
 import { ConversationWithUsers } from "@/app/types";
@@ -18,6 +18,8 @@ const isObjectId = (value: unknown): value is string =>
 
 // each member gets it with the others as they may see them (lastSeenViewsOf)
 const notifyMembers = async (conversation: ConversationWithUsers) => {
+  // they now share a conversation: each other's presence
+  notifyContactsChanged(conversation.users.map((user) => user.email));
   const usersFor = await lastSeenViewsOf(conversation.users);
   conversation.users.forEach((user) => {
     if (user.email) {

@@ -11,7 +11,7 @@ import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
 import { declineCall, moveCallSafely } from "./call-log";
 import { maxCallPeers, type CallPeer } from "../app/libs/call-mesh";
 import { getRedisUrl } from "../app/libs/redis-url";
-import { activityCache, blockCache, setIO } from "../app/libs/socket-server";
+import { activityCache, blockCache, contactCache, setIO } from "../app/libs/socket-server";
 import { blockPartnersOf } from "../app/libs/blocks";
 import {
   callRoom,
@@ -167,6 +167,48 @@ const hiddenFor = (email: string) => {
     cache.set(email, hidden);
   }
   return hidden;
+};
+
+// Whose presence a user sees, and who sees theirs (the same, since both relations are mutual):
+// their friends and everyone they share a conversation with (emails). Cached per user on
+// globalThis (contactCache) for CONTACTS_TTL_MS, and cleared sooner by notifyContactsChanged
+// (friends added / removed, conversations created, joined or left) here and through
+// "contacts:changed" on the other instances.
+const CONTACTS_TTL_MS = 10 * 60 * 1000;
+const contactsOf = (email: string) => {
+  const cache = contactCache();
+  const cached = cache.get(email);
+  if (cached && Date.now() - cached.at < CONTACTS_TTL_MS) {
+    return cached.contacts;
+  }
+  const contacts = prisma.user
+    .findUnique({ where: { email }, select: { id: true, friendIds: true } })
+    .then(async (user) => {
+      if (!user) {
+        return new Set<string>();
+      }
+      const conversations = await prisma.conversation.findMany({
+        where: { userIds: { has: user.id } },
+        select: { userIds: true },
+      });
+      const ids = new Set([...user.friendIds, ...conversations.flatMap((item) => item.userIds)]);
+      ids.delete(user.id);
+      const users =
+        ids.size > 0
+          ? await prisma.user.findMany({
+              where: { id: { in: Array.from(ids) } },
+              select: { email: true },
+            })
+          : [];
+      return new Set(users.flatMap((other) => (other.email ? [other.email] : [])));
+    })
+    .catch((error) => {
+      logError("contacts", error);
+      cache.delete(email);
+      return new Set<string>();
+    });
+  cache.set(email, { at: Date.now(), contacts });
+  return contacts;
 };
 
 // Whether a user hides their activity (User.hideActivity): then no one gets their online /
@@ -349,12 +391,15 @@ export const initSocketServer = async (httpServer: HttpServer) => {
   const io: AppServer = new Server(httpServer);
   const redis = await attachRedisAdapter(io);
   globalThis.ioClustered = !!redis;
-  // online / offline go to everyone here except the user's block partners and the people who hide
-  // their activity; nothing goes out for someone who hides theirs
+  // online / offline go to the user's contacts here (friends, people they share a conversation
+  // with), except their block partners and the people who hide their activity; nothing goes out
+  // for someone who hides theirs
   const announceTo = (event: "presence:online" | "presence:offline", email: string) =>
-    hiddenFor(email).then((hidden) => {
-      const except = [...Array.from(hidden).map(userRoom), ACTIVITY_HIDDEN_ROOM];
-      io.local.except(except).emit(event, email);
+    Promise.all([contactsOf(email), hiddenFor(email)]).then(([contacts, hidden]) => {
+      // the user's own other tabs too (their own avatar's dot)
+      const to = [email, ...Array.from(contacts).filter((contact) => !hidden.has(contact))];
+      // never an empty room list, which would mean everyone
+      io.local.to(to.map(userRoom)).except(ACTIVITY_HIDDEN_ROOM).emit(event, email);
     });
   const presence = createPresence(io, {
     clustered: !!redis,
@@ -383,19 +428,29 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       activityPrivacyChanged(email);
     }
   });
+  // friends or conversations changed on another instance
+  io.on("contacts:changed", (emails: unknown) => {
+    if (Array.isArray(emails)) {
+      emails.forEach((email) => typeof email === "string" && contactCache().delete(email));
+    }
+  });
   // a block / unblock on another instance
   io.on("blocks:changed", (emails: unknown) => {
     if (Array.isArray(emails)) {
       emails.forEach((email) => typeof email === "string" && blockCache().delete(email));
     }
   });
-  // the online list as this user may see it: nobody when they hide their own activity
+  // the online list as this user may see it: their contacts only, nobody when they hide their own
+  // activity
   const sendPresenceList = async (socket: AppSocket) => {
     if (await hidesActivity(socket.data.email)) {
       socket.emit("presence:list", []);
       return;
     }
-    const online = presence.list();
+    const contacts = await contactsOf(socket.data.email);
+    const online = presence
+      .list()
+      .filter((email) => email === socket.data.email || contacts.has(email));
     const [hidden, hiders] = await Promise.all([
       hiddenFor(socket.data.email),
       activityHidersAmong(online),

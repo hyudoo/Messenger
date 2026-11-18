@@ -1,7 +1,7 @@
 import prisma from "./prismadb";
 import { deleteConversation } from "./conversation-delete";
 import { postSystemMessage } from "./system-message";
-import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
+import { emitToUser, notifyContactsChanged, removeUserFromConversationRoom } from "./socket-server";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
 import { lastSeenViewsOf } from "./privacy";
 import { joinRequestIdsOf, notifyJoinRequestsChanged } from "./join-requests";
@@ -69,6 +69,8 @@ export const removeGroupMember = async (
     removeUserFromConversationRoom(member.email, conversation.id);
   }
   await emitGroupUpdate(updated, updated.users);
+  // presence: the one gone may no longer share a conversation with the others
+  notifyContactsChanged(conversation.users.map((user) => user.email));
   await postSystemMessage(
     actorId === memberId
       ? { conversation: updated, actorId, type: "left" }
@@ -96,6 +98,7 @@ export const joinGroup = async (conversation: ConversationWithUsers, user: SafeU
     notifyJoinRequestsChanged(updated);
   }
   await emitGroupUpdate(updated, conversation.users);
+  notifyContactsChanged(updated.users.map((member) => member.email));
   const event = await postSystemMessage({
     conversation: updated,
     actorId: user.id,

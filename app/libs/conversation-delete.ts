@@ -1,5 +1,5 @@
 import prisma from "./prismadb";
-import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
+import { emitToUser, notifyContactsChanged, removeUserFromConversationRoom } from "./socket-server";
 import { cleanUpUploads } from "./upload-cleanup";
 import { ConversationWithUsers } from "@/app/types";
 import { logError } from "./log";
@@ -69,6 +69,8 @@ export const deleteConversation = async (conversation: ConversationWithUsers) =>
       removeUserFromConversationRoom(user.email, conversation.id);
     }
   });
+  // they may no longer share any conversation (presence)
+  notifyContactsChanged(conversation.users.map((user) => user.email));
 
   return deletedConversation;
 };
