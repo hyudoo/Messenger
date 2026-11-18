@@ -121,39 +121,61 @@ export const isFetchableUrl = (value: string) => {
 
 // ---- fetching ----
 
-const getOnce = (url: string) =>
-  new Promise<{ status: number; location?: string; type: string; body: string }>((resolve, reject) => {
+type GetOptions = {
+  accept: string;
+  // the response types that are read (anything else: no body)
+  type: RegExp;
+  maxBytes: number;
+  // more than maxBytes: keep the start (a page's <head>) or give up (an image)
+  truncate: boolean;
+};
+
+const PAGE: GetOptions = {
+  accept: "text/html,application/xhtml+xml",
+  type: /text\/html|application\/xhtml/i,
+  maxBytes: MAX_BYTES,
+  truncate: true,
+};
+
+const getOnce = (url: string, options: GetOptions) =>
+  new Promise<{ status: number; location?: string; type: string; body: Buffer | null }>((resolve, reject) => {
     const client = url.startsWith("https:") ? https : http;
     const request = client.get(
       url,
       {
         lookup: safeLookup,
         timeout: TIMEOUT_MS,
-        headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" },
+        headers: { "User-Agent": USER_AGENT, Accept: options.accept },
       },
       (response) => {
         const status = response.statusCode ?? 0;
         const type = String(response.headers["content-type"] ?? "");
         if (status >= 300 && status < 400) {
           response.resume();
-          return resolve({ status, location: response.headers.location, type, body: "" });
+          return resolve({ status, location: response.headers.location, type, body: null });
         }
-        if (status !== 200 || !/text\/html|application\/xhtml/i.test(type)) {
+        if (status !== 200 || !options.type.test(type)) {
           response.resume();
-          return resolve({ status, type, body: "" });
+          return resolve({ status, type, body: null });
         }
         const chunks: Buffer[] = [];
         let size = 0;
+        let tooBig = false;
         response.on("data", (chunk: Buffer) => {
           size += chunk.length;
           chunks.push(chunk);
           // the <head> is enough: stop reading big pages
-          if (size >= MAX_BYTES) {
+          if (size >= options.maxBytes) {
+            tooBig = !options.truncate && size > options.maxBytes;
             response.destroy();
           }
         });
         response.on("close", () =>
-          resolve({ status, type, body: Buffer.concat(chunks).subarray(0, MAX_BYTES).toString("utf8") })
+          resolve({
+            status,
+            type,
+            body: tooBig ? null : Buffer.concat(chunks).subarray(0, options.maxBytes),
+          })
         );
         response.on("error", reject);
       }
@@ -162,21 +184,46 @@ const getOnce = (url: string) =>
     request.on("error", reject);
   });
 
-// The page's HTML and its final URL (after redirects), or null.
-export const fetchPage = async (start: string) => {
+// GET with every hop checked (isFetchableUrl + safeLookup), redirects followed by hand.
+const fetchChecked = async (start: string, options: GetOptions) => {
   let url = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     if (!isFetchableUrl(url)) {
       return null;
     }
-    const response = await getOnce(url);
+    const response = await getOnce(url, options);
     if (response.location) {
       url = new URL(response.location, url).toString();
       continue;
     }
-    return response.body ? { html: response.body, url } : null;
+    return response.body && response.body.length > 0
+      ? { body: response.body, type: response.type, url }
+      : null;
   }
   return null;
+};
+
+// The page's HTML and its final URL (after redirects), or null.
+export const fetchPage = async (start: string) => {
+  const page = await fetchChecked(start, PAGE);
+  return page ? { html: page.body.toString("utf8"), url: page.url } : null;
+};
+
+// Raster images a preview may show (no SVG: it could carry script when opened from our origin).
+const PREVIEW_IMAGE_TYPE = /^image\/(jpeg|png|gif|webp|avif)\s*(;|$)/i;
+export const MAX_PREVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
+
+// A preview's image, fetched by the server (GET /api/messages/[id]/preview-image) so the linked
+// site never sees the reader's IP: same checks as the page, raster images only, at most
+// MAX_PREVIEW_IMAGE_BYTES. null when it can't be fetched.
+export const fetchPreviewImage = async (url: string) => {
+  const image = await fetchChecked(url, {
+    accept: "image/avif,image/webp,image/png,image/jpeg,image/gif",
+    type: PREVIEW_IMAGE_TYPE,
+    maxBytes: MAX_PREVIEW_IMAGE_BYTES,
+    truncate: false,
+  });
+  return image ? { body: image.body, type: image.type.split(";")[0].trim().toLowerCase() } : null;
 };
 
 // ---- parsing ----

@@ -7,6 +7,9 @@ export const INVITE_CODE = /^[A-Za-z0-9_-]{16}$/;
 export const isInviteCode = (value: unknown): value is string =>
   typeof value === "string" && INVITE_CODE.test(value);
 
+// at most this many people waiting for an admin's approval per group (POST /api/join/<code>: 409)
+export const MAX_JOIN_REQUESTS = 50;
+
 // the path of the join page (without the locale)
 export const invitePath = (code: string) => `/join/${code}`;
 

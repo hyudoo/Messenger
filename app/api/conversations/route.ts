@@ -9,16 +9,19 @@ import { ConversationWithUsers } from "@/app/types";
 import { logError } from "@/app/libs/log";
 import { normalizeGroupName } from "@/app/libs/conversation-permissions";
 import { postSystemMessage } from "@/app/libs/system-message";
+import { lastSeenViewsOf } from "@/app/libs/privacy";
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
 const isObjectId = (value: unknown): value is string =>
   typeof value === "string" && OBJECT_ID.test(value);
 
-const notifyMembers = (conversation: ConversationWithUsers) => {
+// each member gets it with the others as they may see them (lastSeenViewsOf)
+const notifyMembers = async (conversation: ConversationWithUsers) => {
+  const usersFor = await lastSeenViewsOf(conversation.users);
   conversation.users.forEach((user) => {
     if (user.email) {
-      emitToUser(user.email, "conversation:new", conversation);
+      emitToUser(user.email, "conversation:new", { ...conversation, users: usersFor(user.id) });
     }
   });
 };
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
         },
       });
 
-      notifyMembers(newConversation);
+      await notifyMembers(newConversation);
       // the first message: "X created the group" (also moves it to the top of the inboxes)
       await postSystemMessage({
         conversation: newConversation,
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
       },
     });
 
-    notifyMembers(newConversation);
+    await notifyMembers(newConversation);
     return NextResponse.json(newConversation);
   } catch (error: any) {
     logError("conversations", error);

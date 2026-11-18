@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   fetchPage,
+  fetchPreviewImage,
   firstLink,
   isFetchableUrl,
   isPublicAddress,
@@ -127,6 +128,8 @@ describe("fetching", () => {
     try {
       await expect(fetchPage(`http://127.0.0.1:${port}/`)).resolves.toBeNull();
       await expect(fetchPage("http://127.0.0.1/")).resolves.toBeNull();
+      await expect(fetchPreviewImage(`http://127.0.0.1:${port}/a.png`)).resolves.toBeNull();
+      await expect(fetchPreviewImage("http://localhost/a.png")).resolves.toBeNull();
       expect(hits).toBe(0);
     } finally {
       server.close();

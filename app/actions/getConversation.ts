@@ -3,6 +3,7 @@ import { UNREAD_SCAN_LIMIT, countUnread } from "@/app/libs/unread";
 import getCurrentUser from "./getCurrentUser";
 import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
 import { activityHiddenAmong } from "@/app/libs/privacy";
+import { hiddenAmong, lastVisibleMessage } from "@/app/libs/inbox-preview";
 
 // Unread count of one conversation: scans its newest messages (index conversationId + createdAt)
 // back to the user's read marker, at most UNREAD_SCAN_LIMIT of them.
@@ -62,9 +63,20 @@ export const findConversationsForUser = async (userId: string) => {
   ]);
   const noLastSeen = new Set([...Array.from(partners.keys()), ...Array.from(hidden)]);
 
+  // a last message the user deleted for themselves isn't their preview: the newest one they can
+  // still see is (looked up only for those conversations, usually none)
+  const hiddenLast = await hiddenAmong(
+    conversations.flatMap((conversation) => conversation.messages.map((message) => message.id)),
+    userId
+  );
+
   // only conversations whose last message is unread need a scan (usually few)
   return Promise.all(
     conversations.map(async (conversation) => {
+      if (conversation.messages[0] && hiddenLast.has(conversation.messages[0].id)) {
+        const visible = await lastVisibleMessage(conversation.id, userId);
+        conversation = { ...conversation, messages: visible ? [visible] : [] };
+      }
       const last = conversation.messages[0];
       const unread =
         last && last.senderId !== userId && !last.seenIds.includes(userId)

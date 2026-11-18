@@ -220,7 +220,11 @@
     "invite_off": "Turn off",
     "invite_copy": "Copy",
     "invite_copied": "Invite link copied!",
-    "invite_copy_failed": "Couldn't copy the link!"
+    "invite_copy_failed": "Couldn't copy the link!",
+    "invite_approval": "Admins approve new members",
+    "join_requests": "{count, plural, one {# person wants to join} other {# people want to join}}",
+    "approve": "Approve",
+    "decline": "Decline"
   },
   "users": {
     "title": "People",
@@ -304,6 +308,7 @@
     "someone": "Someone",
     "pinned": "{actor} pinned a message",
     "photo": "{actor} changed the group photo",
+    "photo_removed": "{actor} removed the group photo",
     "promoted": "{actor} made {users} an admin",
     "demoted": "{actor} removed {users} as admin",
     "joined": "{actor} joined the group via the invite link"
@@ -339,7 +344,9 @@
     "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "voice": "Sent a voice message.",
     "file": "Sent the file {name}.",
-    "mentioned_you": "Mentioned you: {text}"
+    "mentioned_you": "Mentioned you: {text}",
+    "call_answer": "Answer",
+    "call_decline": "Decline"
   },
   "viewer": {
     "close": "Close",
@@ -391,7 +398,12 @@
     "invalid_title": "This invite link no longer works",
     "invalid": "It was turned off or reset. Ask a member of the group for a new one.",
     "failed": "Couldn't join the group!",
-    "too_fast": "You're going too fast, wait a moment and try again!"
+    "too_fast": "You're going too fast, wait a moment and try again!",
+    "ask": "Ask to join",
+    "approval_hint": "An admin has to approve new members.",
+    "requested": "Request sent. The chat opens here once an admin approves it.",
+    "declined": "An admin declined your request.",
+    "requests_full": "Too many people are waiting to join this group, try again later!"
   },
   "privacy": {
     "title": "Privacy",

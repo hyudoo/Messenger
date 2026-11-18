@@ -723,6 +723,27 @@ describe.skipIf(!process.env.TEST_REDIS_URL)("socket server on two instances (Re
     expect(await ready).toMatchObject({ from: third.id, userId: THIRD });
   });
 
+  it("clears the block cache on the other instance (blocks:changed)", async () => {
+    const [one, two] = await twoInstances();
+    // OTHER (on instance two) blocked ME: the cached filter hides ME from them
+    BLOCKS[OTHER] = [ME];
+    const b = await connected(two.url, OTHER);
+    await connected(one.url, ME);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(globalThis.blockCache?.has(emailOf(OTHER))).toBe(true);
+
+    // unblocked on instance one. Both instances share globalThis in this process, and an
+    // instance doesn't receive its own serverSideEmit, so only instance two's handler can clear it
+    delete BLOCKS[OTHER];
+    one.io.serverSideEmit("blocks:changed", [emailOf(OTHER), emailOf(ME)]);
+    await vi.waitFor(() => expect(globalThis.blockCache?.has(emailOf(OTHER))).toBe(false));
+
+    // the refreshed list on instance two shows ME again
+    const list = next<string[]>(b.socket, "presence:list");
+    b.socket.emit("presence:sync");
+    expect(await list).toContain(emailOf(ME));
+  });
+
   it("admits both peers when they join on two instances at the same time", async () => {
     const [one, two] = await twoInstances();
     for (let round = 0; round < 3; round++) {

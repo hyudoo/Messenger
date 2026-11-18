@@ -99,6 +99,11 @@ model Conversation {
   // Groups only: the code of the invite link /join/<code>, while one is on (admins create / reset /
   // turn it off). Random, so no unique index (Mongo would also count every missing one as a duplicate)
   inviteCode    String?
+  // Groups only: joining by the invite link needs an admin's approval (admins turn it on / off)
+  joinApproval  Boolean?
+  // Groups only: people who asked to join by the link while approval was on, oldest first
+  // (POST /api/join/<code>); an admin approves or declines each
+  joinRequestIds String[] @db.ObjectId
   // messages pinned to the top of the chat, latest first (POST /api/messages/[id]/pin)
   pinnedMessageIds String[] @db.ObjectId
 
@@ -200,6 +205,8 @@ enum SystemType {
   left
   pinned
   photo
+  // the group photo was removed (no picture: AvatarGroup goes back to the members' faces)
+  photo_removed
   promoted
   demoted
   joined

@@ -10,7 +10,8 @@ interface IParams {
   code: string;
 }
 
-// An invite link (/join/<code>): the group's photo, name and size, and a button to join it.
+// An invite link (/join/<code>): the group's photo, name and size, and a button to join it (or to
+// ask to, when an admin must approve; then it waits for the answer).
 // proxy.ts sends signed-out visitors to the login page and back here. Members go straight to the
 // chat; a reset or turned-off link says so.
 const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
@@ -35,7 +36,12 @@ const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
             <p className="mt-1 text-sm text-muted-foreground">
               {t("members", { count: group.userIds.length })}
             </p>
-            <JoinButton code={code} />
+            <JoinButton
+              code={code}
+              groupId={group.id}
+              approval={!!group.joinApproval}
+              requested={!!currentUser && (group.joinRequestIds ?? []).includes(currentUser.id)}
+            />
           </>
         ) : (
           <>

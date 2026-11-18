@@ -8,7 +8,7 @@ import { getToken } from "next-auth/jwt";
 
 import prisma from "../app/libs/prismadb";
 import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
-import { moveCallSafely } from "./call-log";
+import { declineCall, moveCallSafely } from "./call-log";
 import { maxCallPeers, type CallPeer } from "../app/libs/call-mesh";
 import { getRedisUrl } from "../app/libs/redis-url";
 import { activityCache, blockCache, setIO } from "../app/libs/socket-server";
@@ -567,31 +567,11 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       )
     );
 
-    // The callee declined a ringing call. 1:1: every member's tabs hear it (the
-    // caller's call screen leaves, the callee's other tabs stop ringing). Group:
-    // the others may still answer, so only the decliner's own tabs hear it.
+    // The callee declined a ringing call (declineCall, shared with the push notification's button).
     socket.on("call:decline", async (roomId: unknown) => {
-      if (typeof roomId !== "string") {
-        return;
+      if (typeof roomId === "string") {
+        await declineCall(io, roomId, { id: userId, email });
       }
-      const conversation = await prisma.conversation
-        .findFirst({
-          where: { id: roomId, userIds: { has: userId } },
-          select: { isGroup: true, users: { select: { email: true } } },
-        })
-        .catch(() => null); // malformed ObjectId
-      if (!conversation) {
-        return;
-      }
-      // logged before call:declined goes out: the caller's call screen leaves on it, and that leave
-      // must find the call already declined (not still ringing, which would log it as missed)
-      if (!conversation.isGroup) {
-        await moveCallSafely(io, roomId, "decline");
-      }
-      const emails = conversation.isGroup
-        ? [email]
-        : conversation.users.flatMap((user) => (user.email ? [user.email] : []));
-      io.to(emails.map(userRoom)).emit("call:declined", { roomId, by: email });
     });
 
     // Stops the ringing for this call on the other members' tabs (call:cancelled;

@@ -220,7 +220,11 @@
     "invite_off": "Tắt link",
     "invite_copy": "Sao chép",
     "invite_copied": "Đã sao chép link mời!",
-    "invite_copy_failed": "Không sao chép được link!"
+    "invite_copy_failed": "Không sao chép được link!",
+    "invite_approval": "Quản trị viên duyệt thành viên mới",
+    "join_requests": "{count} người muốn tham gia",
+    "approve": "Duyệt",
+    "decline": "Từ chối"
   },
   "users": {
     "title": "Mọi người",
@@ -304,6 +308,7 @@
     "someone": "Ai đó",
     "pinned": "{actor} đã ghim một tin nhắn",
     "photo": "{actor} đã đổi ảnh nhóm",
+    "photo_removed": "{actor} đã xoá ảnh nhóm",
     "promoted": "{actor} đã cho {users} làm quản trị viên",
     "demoted": "{actor} đã bỏ quyền quản trị viên của {users}",
     "joined": "{actor} đã tham gia nhóm qua link mời"
@@ -339,7 +344,9 @@
     "missed_call": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
     "voice": "Đã gửi một tin nhắn thoại.",
     "file": "Đã gửi tệp {name}.",
-    "mentioned_you": "Đã nhắc đến bạn: {text}"
+    "mentioned_you": "Đã nhắc đến bạn: {text}",
+    "call_answer": "Trả lời",
+    "call_decline": "Từ chối"
   },
   "viewer": {
     "close": "Đóng",
@@ -391,7 +398,12 @@
     "invalid_title": "Link mời không còn hiệu lực",
     "invalid": "Link này đã bị tắt hoặc đặt lại. Hãy xin link mới từ thành viên của nhóm.",
     "failed": "Không tham gia được nhóm!",
-    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!",
+    "ask": "Xin tham gia",
+    "approval_hint": "Quản trị viên cần duyệt thành viên mới.",
+    "requested": "Đã gửi yêu cầu. Khi quản trị viên duyệt, đoạn chat sẽ mở ở đây.",
+    "declined": "Quản trị viên đã từ chối yêu cầu của bạn.",
+    "requests_full": "Có quá nhiều người đang chờ vào nhóm này, hãy thử lại sau!"
   },
   "privacy": {
     "title": "Quyền riêng tư",

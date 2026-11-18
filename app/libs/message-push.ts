@@ -29,7 +29,13 @@ interface ConversationPush {
 const pushToConversation = (
   { conversation, sender, recipientIds }: ConversationPush,
   text: (t: Translate) => string,
-  options: { tag: string; topic: string; ttlSeconds?: number; call?: { expiresAt?: number } }
+  options: {
+    tag: string;
+    topic: string;
+    ttlSeconds?: number;
+    // a ringing call (expiresAt) gets "Answer" / "Decline" buttons (sw.js)
+    call?: { expiresAt?: number };
+  }
 ) =>
   sendPush(
     recipientIds,
@@ -48,7 +54,17 @@ const pushToConversation = (
         ...(options.call && {
           // a ringing call stays up (closed by sw.js when the ringing ends)
           requireInteraction: !!options.call.expiresAt,
-          ...(options.call.expiresAt && { expiresAt: options.call.expiresAt }),
+          ...(options.call.expiresAt && {
+            expiresAt: options.call.expiresAt,
+            // sw.js has no translations: the button titles come along
+            actions: [
+              { action: "answer", title: translator(locale)("call_answer") },
+              { action: "decline", title: translator(locale)("call_decline") },
+            ],
+            answerPath: `/room/${conversation.id}`,
+            answerUrl: `/${locale}/room/${conversation.id}`,
+            declineUrl: `/api/calls/${conversation.id}/decline`,
+          }),
         }),
       };
     },

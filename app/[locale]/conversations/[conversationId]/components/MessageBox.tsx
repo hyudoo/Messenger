@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Fragment, memo, useState } from "react";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
-import { FullMessageType } from "@/app/types";
+import { FullMessageType, MessageReaction } from "@/app/types";
+import { toggleReaction } from "@/app/libs/reaction-toggle";
 import { useTranslations } from "next-intl";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import {
@@ -335,18 +336,34 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   const isOwn = myEmail === data?.sender?.email;
 
   const recalled = !!data.deletedAt;
+  // Optimistic reactions: the chips change at once. The override holds only while `data.reactions`
+  // is still the list it was made from; the server's messages:update (a new list) replaces it,
+  // and a failed request drops it.
+  const [optimistic, setOptimistic] = useState<{
+    from: FullMessageType["reactions"];
+    value: MessageReaction[];
+  } | null>(null);
+  const serverReactions =
+    optimistic && optimistic.from === data.reactions ? optimistic.value : data.reactions;
   // none on a recalled message or a call (calls from before the rule may still have some)
-  const reactions = canReactToMessage(data) ? (data.reactions ?? []) : [];
+  const reactions = canReactToMessage(data) ? (serverReactions ?? []) : [];
   const myReaction = reactions.find((reaction) => myEmail && reaction.user.email === myEmail)?.emoji;
   // the conversation room sends the updated message back (messages:update)
   const react = (emoji: string) => {
+    if (myEmail) {
+      setOptimistic({
+        from: data.reactions,
+        value: toggleReaction(reactions, { email: myEmail, name: session.data?.user?.name ?? null }, emoji),
+      });
+    }
     axios
       .post(`/api/messages/${data.id}/reactions`, { emoji })
-      .catch((error) =>
+      .catch((error) => {
+        setOptimistic(null);
         toast.error(
           error?.response?.status === 429 ? t("chat.send_too_fast") : t("reactions.failed")
-        )
-      );
+        );
+      });
   };
 
   // nothing to react to (or act on) before the server has the message, once recalled, or
@@ -482,7 +499,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
               />
             )}
             {data.linkPreview && !recalled && (
-              <LinkPreviewCard preview={data.linkPreview} isOwn={isOwn} />
+              <LinkPreviewCard messageId={data.id} preview={data.linkPreview} isOwn={isOwn} />
             )}
             {data.attachment?.kind === "voice" && (
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />

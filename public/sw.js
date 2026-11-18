@@ -31,7 +31,16 @@ self.addEventListener("push", (event) => {
         tag: data.tag,
         renotify: !!data.tag,
         requireInteraction: !!data.requireInteraction,
-        data: { url: data.url || "/", path: data.path, expiresAt: data.expiresAt },
+        // a ringing call: "Answer" / "Decline" (titles in the user's language, from the server)
+        ...(Array.isArray(data.actions) && { actions: data.actions.slice(0, 2) }),
+        data: {
+          url: data.url || "/",
+          path: data.path,
+          expiresAt: data.expiresAt,
+          answerUrl: data.answerUrl,
+          answerPath: data.answerPath,
+          declineUrl: data.declineUrl,
+        },
       });
       // a ringing call goes away when the ringing ends (if it wasn't replaced by "missed" already)
       if (ringsFor !== null) {
@@ -45,21 +54,42 @@ self.addEventListener("push", (event) => {
   );
 });
 
+// Opens a path in the app: an open tab navigates itself (client-side, keeping its locale:
+// MessageNotifications), else a new window opens the full URL.
+const openInApp = async (url, path) => {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const open = windows[0];
+  if (open) {
+    await open.focus();
+    open.postMessage({ type: "notification:open", path: path || url });
+    return;
+  }
+  await self.clients.openWindow(url);
+};
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const { url = "/", path } = event.notification.data || {};
+  const data = event.notification.data || {};
+  const { url = "/", path } = data;
+  const ringing = !!data.expiresAt && data.expiresAt > Date.now();
 
   event.waitUntil(
     (async () => {
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      const open = windows[0];
-      if (open) {
-        // an open tab navigates itself (client-side, keeping its locale): MessageNotifications
-        await open.focus();
-        open.postMessage({ type: "notification:open", path: path || url });
+      // "Decline" on a ringing call: no window needed (the session cookie goes along)
+      if (event.action === "decline" && data.declineUrl) {
+        if (ringing) {
+          await fetch(data.declineUrl, { method: "POST", credentials: "same-origin" }).catch(
+            () => undefined
+          );
+        }
         return;
       }
-      await self.clients.openWindow(url);
+      // "Answer": straight into the call room (once it stopped ringing: the chat, like a click)
+      if (event.action === "answer" && data.answerUrl && ringing) {
+        await openInApp(data.answerUrl, data.answerPath);
+        return;
+      }
+      await openInApp(url, path);
     })()
   );
 });

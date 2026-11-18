@@ -48,11 +48,13 @@ export const FileCard: React.FC<Props & { messageId?: string }> = ({ attachment,
 };
 
 // The first link's preview, under the text: image, site, title, description; opens the link.
-// The image is loaded straight from the site (any https host), without a referrer.
+// The image comes through the server (GET /api/messages/[id]/preview-image), so the site never
+// sees the reader; it is hidden when that fails.
 export const LinkPreviewCard: React.FC<{
+  messageId: string;
   preview: NonNullable<FullMessageType["linkPreview"]>;
   isOwn: boolean;
-}> = ({ preview, isOwn }) => (
+}> = ({ messageId, preview, isOwn }) => (
   <a
     href={preview.url}
     target="_blank"
@@ -62,13 +64,15 @@ export const LinkPreviewCard: React.FC<{
       isOwn ? "border-white/30 bg-white/10" : "border-border bg-background"
     )}>
     {preview.image && (
-      // any host: next/image only allows the configured ones
+      // an API route, not a static image: next/image would only re-fetch it
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={preview.image}
+        src={`/api/messages/${messageId}/preview-image`}
         alt=""
-        referrerPolicy="no-referrer"
         loading="lazy"
+        onError={(event) => {
+          event.currentTarget.style.display = "none";
+        }}
         className="h-36 w-full object-cover"
       />
     )}
