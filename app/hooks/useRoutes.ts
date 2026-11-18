@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 import { usePathname } from "@/i18n/navigation";
 import { removePushSubscription } from "@/app/libs/push-client";
 import useConversation from "./useConversation";
+import useFriendRequestCount from "./useFriendRequestCount";
 
 const useRoutes = () => {
   const t = useTranslations("nav");
@@ -14,6 +15,7 @@ const useRoutes = () => {
   // without the locale prefix
   const pathname = usePathname();
   const { conversationId } = useConversation();
+  const friendRequests = useFriendRequestCount();
 
   const routes = useMemo(
     () => [
@@ -28,6 +30,8 @@ const useRoutes = () => {
         href: "/users",
         icon: HiUsers,
         active: pathname === "/users",
+        // friend requests waiting
+        badge: friendRequests,
       },
       {
         label: t("logout"),
@@ -41,7 +45,7 @@ const useRoutes = () => {
         icon: HiArrowLeftOnRectangle,
       },
     ],
-    [pathname, conversationId, t, locale]
+    [pathname, conversationId, t, locale, friendRequests]
   );
   return routes;
 };

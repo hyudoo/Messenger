@@ -33,7 +33,8 @@ import ConfirmModal from "./ConfirmModal";
 import ConversationSearch from "./ConversationSearch";
 import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "@/i18n/navigation";
-import { HiNoSymbol } from "react-icons/hi2";
+import type { Relation } from "@/app/libs/friends";
+import { HiNoSymbol, HiUserGroup, HiUserPlus } from "react-icons/hi2";
 import { ConversationSettings } from "@/app/types";
 import { GroupInvite, GroupMembers, GroupName, GroupPhoto } from "./GroupSettings";
 
@@ -47,8 +48,11 @@ interface ProfileDrawerProps {
   users: SafeUser[];
   // the user's own settings of this conversation (from the page; kept live below)
   settings: { muted: boolean; pinned: boolean };
-  // 1:1: whether the user blocked the other one
+  // 1:1: whether the user blocked the other one / either blocked the other
   blockedByMe: boolean;
+  blocked: boolean;
+  // 1:1: how the user stands with the other one
+  friendRelation: Relation;
 }
 
 const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
@@ -58,6 +62,8 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
   users,
   settings: initialSettings,
   blockedByMe,
+  blocked,
+  friendRelation,
 }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -115,6 +121,40 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
       .catch(() => toast.error(t("block.failed")))
       .finally(() => setSavingSetting(false));
   };
+
+  // 1:1 "Add friend" (or "Accept" when they asked: the same request accepts theirs); the page
+  // reloads with the new state, also when the other side answers (contacts:update)
+  const [befriending, setBefriending] = useState(false);
+  const addFriend = () => {
+    setBefriending(true);
+    axios
+      .post(`/api/friends/requests`, { userId: otherUser.id })
+      .then(() => router.refresh())
+      .catch((error) =>
+        toast.error(error?.response?.status === 429 ? t("users.too_fast") : t("users.failed"))
+      )
+      .finally(() => setBefriending(false));
+  };
+  useEffect(() => {
+    if (data.isGroup) {
+      return;
+    }
+    const socket = getSocket();
+    const changed = (payload: { friends?: boolean }) => payload?.friends && router.refresh();
+    socket.on("contacts:update", changed);
+    return () => {
+      socket.off("contacts:update", changed);
+    };
+  }, [data.isGroup, router]);
+  const friendLabel =
+    friendRelation === "friend"
+      ? t("users.friends_badge")
+      : friendRelation === "outgoing"
+        ? t("users.requested")
+        : friendRelation === "incoming"
+          ? t("users.accept_request")
+          : t("users.add_friend");
+  const canBefriend = friendRelation === "none" || friendRelation === "incoming";
 
   const close = () => {
     onClose();
@@ -257,6 +297,29 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                                 </span>
                                 <span className="text-sm font-light text-muted-foreground">
                                   {t("profile.leave")}
+                                </span>
+                              </button>
+                            )}
+                            {!data.isGroup && !blocked && (
+                              <button
+                                type="button"
+                                disabled={!canBefriend || befriending}
+                                onClick={addFriend}
+                                className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75 disabled:cursor-default disabled:hover:opacity-100">
+                                <span
+                                  className={
+                                    friendRelation === "friend"
+                                      ? "w-10 h-10 rounded-full flex items-center justify-center bg-sky-500/15 text-sky-500"
+                                      : "w-10 h-10 bg-muted rounded-full flex items-center justify-center"
+                                  }>
+                                  {friendRelation === "friend" ? (
+                                    <HiUserGroup size={20} aria-hidden />
+                                  ) : (
+                                    <HiUserPlus size={20} aria-hidden />
+                                  )}
+                                </span>
+                                <span className="text-sm font-light text-muted-foreground">
+                                  {friendLabel}
                                 </span>
                               </button>
                             )}

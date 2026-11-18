@@ -14,6 +14,7 @@ import useStartCall from "@/app/hooks/useStartCall";
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import ProfileDrawer from "./ProfileDrawer";
+import type { Relation } from "@/app/libs/friends";
 import { Link } from "@/i18n/navigation";
 
 interface HeaderProps {
@@ -27,9 +28,18 @@ interface HeaderProps {
   // a 1:1 chat where the user blocked the other one / where either blocked the other (no calls)
   blockedByMe: boolean;
   blocked: boolean;
+  // 1:1: friends / asked / they asked / none
+  friendRelation: Relation;
 }
 
-const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedByMe, blocked }) => {
+const Header: React.FC<HeaderProps> = ({
+  conversation,
+  users,
+  settings,
+  blockedByMe,
+  blocked,
+  friendRelation,
+}) => {
   const t = useTranslations();
   const otherUser = useOtherUser(conversation);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -50,6 +60,8 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedB
         users={users}
         settings={settings}
         blockedByMe={blockedByMe}
+        blocked={blocked}
+        friendRelation={friendRelation}
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />

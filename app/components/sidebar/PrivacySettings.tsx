@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 
 type Blocked = { id: string; name: string | null; email: string | null; image: string | null };
 type Privacy = { hideActivity: boolean; hideReadReceipts: boolean; blocked: Blocked[] };
@@ -49,6 +49,7 @@ const Switch: React.FC<{
 // theme) and the blocked people with Unblock. Mounted only while the modal is open.
 const PrivacySettings: React.FC = () => {
   const t = useTranslations("privacy");
+  const tLegal = useTranslations("legal");
   const router = useRouter();
   const [privacy, setPrivacy] = useState<Privacy | null>(null);
   const [failed, setFailed] = useState(false);
@@ -152,6 +153,14 @@ const PrivacySettings: React.FC = () => {
           </div>
         </div>
       )}
+      <div className="mt-6 flex gap-4 text-xs">
+        <Link href="/privacy" target="_blank" className="text-sky-500 hover:underline">
+          {tLegal("privacy_link")}
+        </Link>
+        <Link href="/terms" target="_blank" className="text-sky-500 hover:underline">
+          {tLegal("terms_link")}
+        </Link>
+      </div>
     </div>
   );
 };

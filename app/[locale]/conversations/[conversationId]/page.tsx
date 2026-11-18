@@ -7,6 +7,7 @@ import getBlockState from "@/app/actions/getBlockState";
 import { findPinnedMessages } from "@/app/actions/getPinnedMessages";
 import { findFirstUnread } from "@/app/libs/unread";
 import { privacyOf } from "@/app/libs/privacy";
+import { relationsWith } from "@/app/libs/friends";
 import prisma from "@/app/libs/prismadb";
 
 import Header from "./components/Header";
@@ -51,6 +52,11 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
   const block = await getBlockState(other?.id);
   const pins = await findPinnedMessages(conversation.pinnedMessageIds ?? []).catch(() => []);
   const blocked = block.byMe || block.byThem;
+  // 1:1: how the user stands with the other one (the drawer's "Add friend")
+  const friendRelation =
+    currentUser && other
+      ? (await relationsWith(currentUser.id, [other.id]).catch(() => null))?.get(other.id) ?? "none"
+      : "none";
   const privacy = currentUser
     ? await privacyOf(currentUser.id).catch(() => ({ hideActivity: false, hideReadReceipts: false }))
     : null;
@@ -86,6 +92,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
           settings={settings}
           blockedByMe={block.byMe}
           blocked={blocked}
+          friendRelation={friendRelation}
         />
         <PinnedBar conversationId={conversation.id} initialPins={pins} />
         <Body

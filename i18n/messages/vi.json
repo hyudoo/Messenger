@@ -252,7 +252,9 @@
     "cannot_add": "Bạn không thể kết bạn với người này.",
     "too_many": "Bạn có quá nhiều lời mời đang chờ.",
     "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!",
-    "failed": "Không cập nhật được, thử lại nhé!"
+    "failed": "Không cập nhật được, thử lại nhé!",
+    "friends_badge": "Bạn bè",
+    "accept_request": "Chấp nhận lời mời"
   },
   "settings": {
     "profile_title": "Hồ sơ",
@@ -443,5 +445,165 @@
     "loading": "Đang tải...",
     "load_failed": "Không tải được cài đặt quyền riêng tư!",
     "failed": "Không lưu được thay đổi!"
+  },
+  "legal": {
+    "back": "Quay lại",
+    "updated": "Cập nhật lần cuối: 18/11/2026",
+    "privacy_link": "Chính sách quyền riêng tư",
+    "terms_link": "Điều khoản dịch vụ",
+    "agree": "Khi tiếp tục, bạn đồng ý với Điều khoản dịch vụ và Chính sách quyền riêng tư.",
+    "privacy": {
+      "title": "Chính sách quyền riêng tư",
+      "intro": "Chính sách này giải thích Messenger thu thập những thông tin nào khi bạn sử dụng, cách thông tin đó được dùng và lưu trữ, và những lựa chọn mà bạn có.",
+      "sections": [
+        {
+          "title": "1. Thông tin chúng tôi thu thập",
+          "paragraphs": [
+            "Thông tin tài khoản: tên, địa chỉ email và ảnh đại diện. Nếu bạn đăng ký bằng email và mật khẩu, chúng tôi chỉ lưu bản băm một chiều của mật khẩu, không bao giờ lưu mật khẩu gốc. Nếu bạn đăng nhập bằng GitHub hoặc Google, chúng tôi nhận tên, email và ảnh đại diện từ nhà cung cấp đó.",
+            "Nội dung bạn gửi: tin nhắn, hình ảnh, tệp, tin nhắn thoại, biểu cảm, tin nhắn đã ghim, và các nhóm bạn tạo hoặc tham gia.",
+            "Danh bạ: bạn bè, lời mời kết bạn và những người bạn đã chặn.",
+            "Thông tin kỹ thuật: địa chỉ IP (dùng để giới hạn tần suất và bảo mật), thời điểm bạn hoạt động gần nhất, và nếu bạn bật thông báo, thông tin đăng ký nhận thông báo đẩy do trình duyệt cung cấp. Chế độ màu và ngôn ngữ bạn chọn được lưu trong trình duyệt của bạn."
+          ]
+        },
+        {
+          "title": "2. Cách chúng tôi sử dụng thông tin",
+          "paragraphs": [
+            "Chúng tôi chỉ dùng thông tin này để vận hành dịch vụ: đăng nhập cho bạn, chuyển tin nhắn và cuộc gọi theo thời gian thực, hiển thị hồ sơ của bạn cho những người bạn trò chuyện, cho phép bạn tìm kiếm trong các cuộc trò chuyện của mình, gửi những thông báo bạn yêu cầu và bảo vệ dịch vụ khỏi lạm dụng.",
+            "Chúng tôi không bán thông tin của bạn và không dùng tin nhắn của bạn cho quảng cáo."
+          ]
+        },
+        {
+          "title": "3. Cuộc gọi thoại và video",
+          "paragraphs": [
+            "Cuộc gọi được kết nối trực tiếp giữa trình duyệt của những người tham gia (WebRTC) và được mã hóa khi truyền. Khi không thể kết nối trực tiếp, dữ liệu đã mã hóa có thể đi qua một máy chủ chuyển tiếp (TURN). Chúng tôi không ghi âm hay ghi hình cuộc gọi.",
+            "Chúng tôi lưu nhật ký cuộc gọi trong cuộc trò chuyện: ai gọi, lúc nào, loại cuộc gọi và thời lượng."
+          ]
+        },
+        {
+          "title": "4. Nơi lưu trữ dữ liệu",
+          "paragraphs": [
+            "Dữ liệu tài khoản và tin nhắn được lưu trong cơ sở dữ liệu của chúng tôi. Hình ảnh, tệp và tin nhắn thoại được lưu trên Amazon Web Services (S3) và bất kỳ ai có đường dẫn đều có thể mở được, vì vậy hãy cẩn thận khi chia sẻ đường dẫn."
+          ]
+        },
+        {
+          "title": "5. Ai có thể thấy thông tin của bạn",
+          "paragraphs": [
+            "Người dùng khác có thể thấy tên, email và ảnh đại diện của bạn khi họ tìm kiếm bạn hoặc ở chung cuộc trò chuyện với bạn. Tin nhắn hiển thị với các thành viên của cuộc trò chuyện mà tin nhắn được gửi vào.",
+            "Chúng tôi chỉ chia sẻ dữ liệu với các nhà cung cấp dịch vụ khi cần để vận hành: lưu trữ và máy chủ (Amazon Web Services), đăng nhập (GitHub, Google) và dịch vụ thông báo đẩy của trình duyệt. Chúng tôi có thể cung cấp thông tin khi pháp luật yêu cầu."
+          ]
+        },
+        {
+          "title": "6. Lựa chọn của bạn",
+          "paragraphs": [
+            "Trong Cài đặt, bạn có thể ẩn trạng thái hoạt động và thông báo đã xem (khi đó bạn cũng sẽ không thấy của người khác), bật hoặc tắt thông báo và chỉnh sửa hồ sơ. Bạn có thể chặn người khác, thu hồi tin nhắn đã gửi, rời hoặc xóa cuộc trò chuyện."
+          ]
+        },
+        {
+          "title": "7. Thời gian lưu trữ",
+          "paragraphs": [
+            "Chúng tôi lưu thông tin của bạn trong suốt thời gian tài khoản còn tồn tại. Khi bạn thu hồi tin nhắn hoặc xóa cuộc trò chuyện, hình ảnh và tệp đi kèm sẽ bị xóa khỏi kho lưu trữ khi không còn nơi nào sử dụng. Các tệp đã tải lên nhưng chưa từng được gửi sẽ tự động bị xóa.",
+            "Để yêu cầu xóa tài khoản và dữ liệu, hãy liên hệ với chúng tôi (xem bên dưới)."
+          ]
+        },
+        {
+          "title": "8. Bảo mật",
+          "paragraphs": [
+            "Kết nối sử dụng HTTPS, mật khẩu được băm, việc đăng nhập và tải tệp lên đều bị giới hạn tần suất. Không có hệ thống nào an toàn tuyệt đối, vì vậy hãy dùng mật khẩu mạnh và không dùng lại ở nơi khác."
+          ]
+        },
+        {
+          "title": "9. Trẻ em",
+          "paragraphs": [
+            "Messenger không dành cho trẻ em dưới 13 tuổi và chúng tôi không cố ý thu thập thông tin của trẻ em."
+          ]
+        },
+        {
+          "title": "10. Thay đổi chính sách",
+          "paragraphs": [
+            "Chúng tôi có thể cập nhật chính sách này. Khi đó, ngày ở đầu trang sẽ được thay đổi. Việc bạn tiếp tục sử dụng Messenger sau khi có thay đổi đồng nghĩa với việc bạn chấp nhận chính sách mới."
+          ]
+        },
+        {
+          "title": "11. Liên hệ",
+          "paragraphs": [
+            "Nếu bạn có câu hỏi về chính sách này hoặc muốn truy cập hay xóa dữ liệu của mình, hãy liên hệ với đơn vị vận hành dịch vụ Messenger này."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Điều khoản dịch vụ",
+      "intro": "Các điều khoản này áp dụng cho việc bạn sử dụng Messenger. Khi tạo tài khoản hoặc sử dụng dịch vụ, bạn đồng ý với các điều khoản này. Nếu không đồng ý, vui lòng không sử dụng Messenger.",
+      "sections": [
+        {
+          "title": "1. Tài khoản của bạn",
+          "paragraphs": [
+            "Bạn phải từ 13 tuổi trở lên để sử dụng Messenger. Hãy cung cấp thông tin chính xác, giữ bí mật mật khẩu và báo cho chúng tôi nếu bạn nghĩ người khác đã dùng tài khoản của bạn. Bạn chịu trách nhiệm về mọi hoạt động diễn ra trên tài khoản của mình."
+          ]
+        },
+        {
+          "title": "2. Sử dụng hợp lệ",
+          "paragraphs": [
+            "Không dùng Messenger để gửi nội dung vi phạm pháp luật, quấy rối, thù ghét, đe dọa hoặc bóc lột tình dục; không gửi thư rác, mã độc hay đường dẫn lừa đảo; không mạo danh người khác hoặc chia sẻ nội dung mà bạn không có quyền chia sẻ.",
+            "Không tìm cách phá hoại, làm quá tải hoặc vượt qua cơ chế bảo mật và giới hạn của dịch vụ, truy cập tài khoản hay cuộc trò chuyện của người khác, hoặc thu thập dữ liệu từ dịch vụ bằng công cụ tự động."
+          ]
+        },
+        {
+          "title": "3. Nội dung của bạn",
+          "paragraphs": [
+            "Bạn vẫn sở hữu tin nhắn, hình ảnh, tệp và tin nhắn thoại mà bạn gửi. Bạn cho phép chúng tôi lưu trữ, xử lý và chuyển nội dung đó chỉ trong phạm vi cần thiết để cung cấp dịch vụ cho bạn và những người bạn trò chuyện.",
+            "Bạn chịu trách nhiệm về nội dung mình gửi. Thu hồi tin nhắn sẽ gỡ tin nhắn khỏi cuộc trò chuyện, nhưng người khác có thể đã xem, lưu hoặc chuyển tiếp nó."
+          ]
+        },
+        {
+          "title": "4. Nhóm",
+          "paragraphs": [
+            "Quản trị viên nhóm có thể chỉnh sửa nhóm, duyệt hoặc từ chối yêu cầu tham gia và xóa thành viên. Bất kỳ ai có đường dẫn mời đều có thể yêu cầu tham gia nhóm, vì vậy hãy cẩn thận khi chia sẻ đường dẫn mời."
+          ]
+        },
+        {
+          "title": "5. Cuộc gọi và thông báo",
+          "paragraphs": [
+            "Chất lượng cuộc gọi phụ thuộc vào mạng và thiết bị của bạn. Messenger không thay thế dịch vụ điện thoại và không thể dùng để gọi các dịch vụ khẩn cấp."
+          ]
+        },
+        {
+          "title": "6. Tạm ngưng và chấm dứt",
+          "paragraphs": [
+            "Chúng tôi có thể gỡ nội dung, tạm ngưng hoặc đóng các tài khoản vi phạm điều khoản này hoặc gây rủi ro cho người dùng khác hay cho dịch vụ. Bạn có thể ngừng sử dụng Messenger bất cứ lúc nào."
+          ]
+        },
+        {
+          "title": "7. Dịch vụ được cung cấp nguyên trạng",
+          "paragraphs": [
+            "Chúng tôi luôn cố gắng giữ Messenger hoạt động ổn định và an toàn, nhưng dịch vụ được cung cấp \"nguyên trạng\" và \"tùy theo khả năng sẵn có\", không kèm bất kỳ bảo đảm nào. Tính năng có thể thay đổi, dịch vụ có thể bị gián đoạn hoặc mất dữ liệu. Hãy tự lưu bản sao những gì quan trọng."
+          ]
+        },
+        {
+          "title": "8. Giới hạn trách nhiệm",
+          "paragraphs": [
+            "Trong phạm vi pháp luật cho phép, chúng tôi không chịu trách nhiệm về các thiệt hại gián tiếp, ngẫu nhiên hoặc hệ quả, hay việc mất dữ liệu, phát sinh từ việc bạn sử dụng Messenger hoặc từ nội dung do người dùng khác gửi."
+          ]
+        },
+        {
+          "title": "9. Quyền riêng tư",
+          "paragraphs": [
+            "Cách chúng tôi xử lý thông tin của bạn được mô tả trong Chính sách quyền riêng tư, là một phần của các điều khoản này."
+          ]
+        },
+        {
+          "title": "10. Thay đổi điều khoản",
+          "paragraphs": [
+            "Chúng tôi có thể cập nhật các điều khoản này. Khi đó, ngày ở đầu trang sẽ được thay đổi. Việc bạn tiếp tục sử dụng Messenger sau khi có thay đổi đồng nghĩa với việc bạn chấp nhận điều khoản mới."
+          ]
+        },
+        {
+          "title": "11. Liên hệ",
+          "paragraphs": [
+            "Nếu bạn có câu hỏi về các điều khoản này, hãy liên hệ với đơn vị vận hành dịch vụ Messenger này."
+          ]
+        }
+      ]
+    }
   }
 }

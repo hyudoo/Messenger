@@ -9,6 +9,21 @@ import { logError } from "@/app/libs/log";
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 
+// GET: how many friend requests wait for the caller (the badge on "Contacts").
+export async function GET() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser?.id) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+    const incoming = await prisma.friendRequest.count({ where: { toId: currentUser.id } });
+    return NextResponse.json({ incoming });
+  } catch (error) {
+    logError("friend_request_count", error);
+    return new NextResponse("Error", { status: 500 });
+  }
+}
+
 // POST { userId }: asks someone to be friends (sendFriendRequest). Someone who already asked the
 // caller: both are friends at once. Answers { status }: requested / pending (already asked) /
 // accepted / friends (already); 403 between block partners, 409 with too many waiting. Both
