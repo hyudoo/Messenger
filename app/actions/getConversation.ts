@@ -26,7 +26,7 @@ export const findConversationsForUser = async (userId: string) => {
   // the user's own muted / pinned lists (omitted from user rows by default)
   const settings = await prisma.user.findUnique({
     where: { id: userId },
-    select: { mutedConversationIds: true, pinnedConversationIds: true },
+    select: { mutedConversationIds: true, pinnedConversationIds: true, archivedConversationIds: true },
   });
   const conversations = await prisma.conversation.findMany({
     orderBy: {
@@ -88,6 +88,7 @@ export const findConversationsForUser = async (userId: string) => {
         unreadCount: unread,
         muted: !!settings?.mutedConversationIds.includes(conversation.id),
         pinned: !!settings?.pinnedConversationIds.includes(conversation.id),
+        archived: !!settings?.archivedConversationIds.includes(conversation.id),
       };
     })
   );

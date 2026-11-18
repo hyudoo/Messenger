@@ -11,6 +11,7 @@ const createClient = () =>
         hashedPassword: true,
         mutedConversationIds: true,
         pinnedConversationIds: true,
+        archivedConversationIds: true,
         blockedUserIds: true,
         hideActivity: true,
         hideReadReceipts: true,

@@ -7,6 +7,7 @@ export type SafeUser = Omit<
   | "hashedPassword"
   | "mutedConversationIds"
   | "pinnedConversationIds"
+  | "archivedConversationIds"
   | "blockedUserIds"
   | "friendIds"
 >;
@@ -45,10 +46,11 @@ export type FullConversationType = Conversation & {
   // the user's own settings (inbox only): no notifications / kept at the top
   muted?: boolean;
   pinned?: boolean;
+  archived?: boolean;
 };
 
 // Payload of "conversation:settings": the user changed their settings of a conversation.
-export type ConversationSettings = { id: string; muted: boolean; pinned: boolean };
+export type ConversationSettings = { id: string; muted: boolean; pinned: boolean; archived: boolean };
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
 // notifications), a seen update (messages only) or a group change (users with name / ownerId /

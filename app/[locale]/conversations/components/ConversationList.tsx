@@ -15,6 +15,7 @@ import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import MessageSearchResults, { MIN_MESSAGE_QUERY } from "./MessageSearchResults";
+import { HiArchiveBox, HiChevronDown } from "react-icons/hi2";
 import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
 import { ConversationSettings, ConversationUpdate, FullConversationType } from "@/app/types";
@@ -37,6 +38,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   const [items, setItems] = useState(initialItems);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // the "Archived" part of the list, unfolded
+  const [showArchived, setShowArchived] = useState(false);
   // conversation id -> email -> when their last "typing" arrived (conversation:typing)
   const [typing, setTyping] = useState<Record<string, Record<string, number>>>({});
 
@@ -54,9 +57,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
   // Tab title badge: "(3) Messenger" while there are unread messages. Re-applied after
   // navigations, which reset the title from the page metadata.
-  // muted conversations don't count (their own badges still show, greyed)
+  // muted and archived conversations don't count (their own badges still show, greyed)
   const totalUnread = items.reduce(
-    (sum, item) => sum + (item.muted ? 0 : (item.unreadCount ?? 0)),
+    (sum, item) => sum + (item.muted || item.archived ? 0 : (item.unreadCount ?? 0)),
     0
   );
   useEffect(() => {
@@ -75,8 +78,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
   // the search box also finds messages in every conversation once the query is long enough
   const searchingMessages = query.trim().length >= MIN_MESSAGE_QUERY;
 
-  // pinned conversations first (each part keeps its order: latest activity first)
-  const visibleItems = [
+  // pinned conversations first (each part keeps its order: latest activity first). Archived ones
+  // are left out of the list (under "Archived" at the end), but a search finds them too.
+  const matching = [
     ...items.filter((item) => item.pinned),
     ...items.filter((item) => !item.pinned),
   ].filter((item) =>
@@ -86,6 +90,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
       ...item.users.filter((user) => user.email !== myEmail).map((user) => user.name)
     )
   );
+  const visibleItems = query ? matching : matching.filter((item) => !item.archived);
+  const archivedItems = query ? [] : matching.filter((item) => item.archived);
 
   // The server puts every socket in its user's room on connect, so these
   // per-user events need no explicit subscription.
@@ -131,8 +137,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
             joinApproval: conversation.joinApproval ?? target.joinApproval,
             name: conversation.name ?? target.name,
           }),
+          // something new: an archived conversation comes back (the server unarchives it too)
           ...(conversation.lastMessageAt && {
             lastMessageAt: new Date(conversation.lastMessageAt),
+            archived: false,
           }),
         };
         if (!conversation.lastMessageAt) {
@@ -202,7 +210,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
     const settingsHandler = (settings: ConversationSettings) => {
       setItems((current) =>
         current.map((item) =>
-          item.id === settings.id ? { ...item, muted: settings.muted, pinned: settings.pinned } : item
+          item.id === settings.id
+            ? { ...item, muted: settings.muted, pinned: settings.pinned, archived: settings.archived }
+            : item
         )
       );
     };
@@ -327,6 +337,34 @@ const ConversationList: React.FC<ConversationListProps> = ({
           {/* a longer query also searches the messages, which say when nothing matches */}
           {query && !searchingMessages && visibleItems.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">{t("no_results")}</p>
+          )}
+          {archivedItems.length > 0 && (
+            <div className="mt-2 border-t pt-2">
+              <button
+                type="button"
+                aria-expanded={showArchived}
+                onClick={() => setShowArchived((shown) => !shown)}
+                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                <span className="flex items-center gap-2">
+                  <HiArchiveBox size={18} aria-hidden />
+                  {t("archived_heading", { count: archivedItems.length })}
+                </span>
+                <HiChevronDown
+                  size={16}
+                  aria-hidden
+                  className={clsx("transition", showArchived && "rotate-180")}
+                />
+              </button>
+              {showArchived &&
+                archivedItems.map((item) => (
+                  <ConversationBox
+                    key={item.id}
+                    data={item}
+                    selected={conversationId === item.id}
+                    typingNames={typingNames(item)}
+                  />
+                ))}
+            </div>
           )}
           {searchingMessages && <MessageSearchResults query={query.trim()} />}
         </div>

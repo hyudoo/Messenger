@@ -24,6 +24,9 @@ model User {
   // omitted from every query (app/libs/prismadb.ts) unless asked for
   mutedConversationIds  String[] @db.ObjectId
   pinnedConversationIds String[] @db.ObjectId
+  // conversations the user archived: out of the inbox list until a new message brings them back
+  // (app/libs/archive.ts). Private too
+  archivedConversationIds String[] @db.ObjectId
   // people this user blocked (POST /api/users/[userId]/block; app/libs/blocks.ts). Private too
   blockedUserIds        String[] @db.ObjectId
   // privacy settings (PATCH /api/settings/privacy; app/libs/privacy.ts). Private too.

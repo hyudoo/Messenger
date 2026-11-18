@@ -1,4 +1,5 @@
 import prisma from "./prismadb";
+import { unarchiveConversation } from "./archive";
 import { emitToConversation, emitToUser } from "./socket-server";
 import { pushIncomingCall, pushNewMessage } from "./message-push";
 import { ConversationWithUsers, FullMessageType } from "@/app/types";
@@ -33,6 +34,8 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
     data: { lastMessageAt: message.createdAt },
     select: { lastMessageAt: true },
   });
+  // archived somewhere: back in those inboxes
+  await unarchiveConversation(conversation.id);
 
   // clientId lets the sending tab swap its optimistic copy for this message, whichever of the
   // socket event and the HTTP response arrives first

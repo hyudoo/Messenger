@@ -1,4 +1,5 @@
 import { SystemType } from "@prisma/client";
+import { unarchiveConversation } from "./archive";
 
 import prisma from "./prismadb";
 import { MESSAGE_INCLUDE } from "./message-include";
@@ -52,6 +53,7 @@ export const postSystemMessage = async ({
       data: { lastMessageAt: message.createdAt },
       select: { lastMessageAt: true },
     });
+    await unarchiveConversation(conversation.id);
 
     emitToConversation(conversation.id, "messages:new", message);
     conversation.users.forEach((user) => {

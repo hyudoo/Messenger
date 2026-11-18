@@ -1059,10 +1059,11 @@ describe("PATCH /api/conversations/[id]/settings (mute, pin)", () => {
       jsonRequest(`/api/conversations/${CONVERSATION}/settings`, body, { method: "PATCH" }),
       params({ conversationId: CONVERSATION })
     );
-  const own = (muted: string[] = [], pinned: string[] = []) =>
+  const own = (muted: string[] = [], pinned: string[] = [], archived: string[] = []) =>
     prisma.user.findUniqueOrThrow.mockResolvedValue({
       mutedConversationIds: muted,
       pinnedConversationIds: pinned,
+      archivedConversationIds: archived,
     });
 
   it("returns 404 to non-members and 400 for nothing to change", async () => {
@@ -1077,12 +1078,13 @@ describe("PATCH /api/conversations/[id]/settings (mute, pin)", () => {
     asMember();
     own(["eeeeeeeeeeeeeeeeeeeeeeee"]);
     const body = await (await change({ muted: true, pinned: true })).json();
-    expect(body).toEqual({ id: CONVERSATION, muted: true, pinned: true });
+    expect(body).toEqual({ id: CONVERSATION, muted: true, pinned: true, archived: false });
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: ME },
       data: {
         mutedConversationIds: ["eeeeeeeeeeeeeeeeeeeeeeee", CONVERSATION],
         pinnedConversationIds: [CONVERSATION],
+        archivedConversationIds: [],
       },
       select: { id: true },
     });
@@ -1097,6 +1099,24 @@ describe("PATCH /api/conversations/[id]/settings (mute, pin)", () => {
     );
     own([], ["1", "2", "3", "4", "5"].map((n) => n.repeat(24)));
     expect((await change({ pinned: true })).status).toBe(409);
+  });
+
+  it("archives and unarchives", async () => {
+    asMember();
+    own();
+    expect((await change({ archived: "yes" })).status).toBe(400);
+    expect(await (await change({ archived: true })).json()).toEqual(
+      expect.objectContaining({ archived: true })
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ archivedConversationIds: [CONVERSATION] }),
+      })
+    );
+    own([], [], [CONVERSATION]);
+    expect(await (await change({ archived: false })).json()).toEqual(
+      expect.objectContaining({ archived: false })
+    );
   });
 });
 
@@ -1307,6 +1327,7 @@ describe("blocking", () => {
       blockedUserIds: [OTHER],
       mutedConversationIds: [],
       pinnedConversationIds: [],
+      archivedConversationIds: [],
     });
     prisma.user.findMany.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
       where.id ? [{ id: OTHER, email: other.email }] : []
@@ -1574,7 +1595,7 @@ describe("GET /api/conversations", () => {
     prisma.conversation.findMany.mockResolvedValue([{ id: CONVERSATION, messages: [] }]);
     const response = await listConversations();
     expect(await response.json()).toEqual([
-      { id: CONVERSATION, messages: [], unreadCount: 0, muted: false, pinned: false },
+      { id: CONVERSATION, messages: [], unreadCount: 0, muted: false, pinned: false, archived: false },
     ]);
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userIds: { has: ME } } })
@@ -1681,6 +1702,28 @@ describe("unread counts in the conversation list", () => {
         where: { conversationId: CONVERSATION, id: { notIn: [hidden] } },
       })
     );
+  });
+});
+
+describe("archived conversations come back with a new message", () => {
+  it("pulls the conversation from everyone's archived list when a message is delivered", async () => {
+    asMember();
+    prisma.message.create.mockResolvedValue({ id: MESSAGE, createdAt: new Date() });
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+    expect(
+      (await sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, message: "hi" })))
+        .status
+    ).toBe(200);
+    expect(prisma.$runCommandRaw).toHaveBeenCalledWith({
+      update: "User",
+      updates: [
+        {
+          q: { archivedConversationIds: { $oid: CONVERSATION } },
+          u: { $pull: { archivedConversationIds: { $oid: CONVERSATION } } },
+          multi: true,
+        },
+      ],
+    });
   });
 });
 

@@ -34,7 +34,7 @@ import ConversationSearch from "./ConversationSearch";
 import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "@/i18n/navigation";
 import type { Relation } from "@/app/libs/friends";
-import { HiNoSymbol, HiUserGroup, HiUserPlus } from "react-icons/hi2";
+import { HiArchiveBox, HiNoSymbol, HiUserGroup, HiUserPlus } from "react-icons/hi2";
 import { ConversationSettings } from "@/app/types";
 import { GroupInvite, GroupMembers, GroupName, GroupPhoto } from "./GroupSettings";
 
@@ -47,7 +47,7 @@ interface ProfileDrawerProps {
   // everyone but the user (groups: who can be added)
   users: SafeUser[];
   // the user's own settings of this conversation (from the page; kept live below)
-  settings: { muted: boolean; pinned: boolean };
+  settings: { muted: boolean; pinned: boolean; archived: boolean };
   // 1:1: whether the user blocked the other one / either blocked the other
   blockedByMe: boolean;
   blocked: boolean;
@@ -82,7 +82,7 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     const socket = getSocket();
     const handler = (update: ConversationSettings) => {
       if (update.id === data.id) {
-        setSettings({ muted: update.muted, pinned: update.pinned });
+        setSettings({ muted: update.muted, pinned: update.pinned, archived: update.archived });
       }
     };
     socket.on("conversation:settings", handler);
@@ -95,7 +95,9 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     setSavingSetting(true);
     axios
       .patch<ConversationSettings>(`/api/conversations/${data.id}/settings`, change)
-      .then(({ data: saved }) => setSettings({ muted: saved.muted, pinned: saved.pinned }))
+      .then(({ data: saved }) =>
+        setSettings({ muted: saved.muted, pinned: saved.pinned, archived: saved.archived })
+      )
       .catch((error) =>
         toast.error(
           error?.response?.status === 409 ? t("profile.pin_limit") : t("common.error")
@@ -285,6 +287,19 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                               </span>
                               <span className="text-sm font-light text-muted-foreground">
                                 {settings.pinned ? t("profile.unpin") : t("profile.pin")}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingSetting}
+                              aria-pressed={settings.archived}
+                              onClick={() => changeSetting({ archived: !settings.archived })}
+                              className="flex flex-col gap-3 items-center cursor-pointer hover:opacity-75 disabled:opacity-50">
+                              <span className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                                <HiArchiveBox size={20} aria-hidden />
+                              </span>
+                              <span className="text-sm font-light text-muted-foreground">
+                                {settings.archived ? t("profile.unarchive") : t("profile.archive")}
                               </span>
                             </button>
                             {canLeave && (

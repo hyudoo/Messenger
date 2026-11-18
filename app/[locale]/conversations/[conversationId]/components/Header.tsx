@@ -24,7 +24,7 @@ interface HeaderProps {
   // everyone but the user (groups: who can be added)
   users: SafeUser[];
   // the user's own settings of this conversation
-  settings: { muted: boolean; pinned: boolean };
+  settings: { muted: boolean; pinned: boolean; archived: boolean };
   // a 1:1 chat where the user blocked the other one / where either blocked the other (no calls)
   blockedByMe: boolean;
   blocked: boolean;

@@ -88,7 +88,8 @@
     "muted": "Muted",
     "pinned": "Pinned",
     "chats_heading": "Chats",
-    "messages_heading": "Messages"
+    "messages_heading": "Messages",
+    "archived_heading": "Archived ({count})"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -183,7 +184,9 @@
     "unmute": "Unmute",
     "pin": "Pin",
     "unpin": "Unpin",
-    "pin_limit": "You can pin at most 5 conversations."
+    "pin_limit": "You can pin at most 5 conversations.",
+    "archive": "Archive",
+    "unarchive": "Unarchive"
   },
   "confirm_delete": {
     "title": "Delete conversation",

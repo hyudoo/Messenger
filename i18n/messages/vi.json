@@ -88,7 +88,8 @@
     "muted": "Đã tắt thông báo",
     "pinned": "Đã ghim",
     "chats_heading": "Cuộc trò chuyện",
-    "messages_heading": "Tin nhắn"
+    "messages_heading": "Tin nhắn",
+    "archived_heading": "Đã lưu trữ ({count})"
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -183,7 +184,9 @@
     "unmute": "Bật thông báo",
     "pin": "Ghim",
     "unpin": "Bỏ ghim",
-    "pin_limit": "Chỉ ghim được tối đa 5 cuộc trò chuyện."
+    "pin_limit": "Chỉ ghim được tối đa 5 cuộc trò chuyện.",
+    "archive": "Lưu trữ",
+    "unarchive": "Bỏ lưu trữ"
   },
   "confirm_delete": {
     "title": "Xoá cuộc trò chuyện",
