@@ -53,6 +53,8 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
         id: conversation.id,
         user: sender,
         callType: message.callType,
+        // a group call rings with the group's name too
+        ...(conversation.isGroup && { groupName: conversation.name }),
       });
     }
     emitToUser(user.email, "conversation:update", {

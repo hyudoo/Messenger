@@ -64,6 +64,7 @@ const IncomingCall = () => {
       user={call.user}
       roomId={call.id}
       callType={call.callType}
+      groupName={call.groupName}
       isOpen={isOpen}
       onClose={() => {
         ringingRoomId.current = undefined;

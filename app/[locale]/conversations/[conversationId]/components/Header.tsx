@@ -2,20 +2,19 @@
 
 import { HiChevronLeft } from "react-icons/hi";
 import { HiEllipsisHorizontal, HiPhone, HiVideoCamera } from "react-icons/hi2";
-import { useMemo, useState, useCallback } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Conversation } from "@prisma/client";
 import { SafeUser } from "@/app/types";
-import axios from "axios";
-import { toast } from "react-hot-toast";
 
 import useOtherUser from "@/app/hooks/useOtherUser";
 import usePresenceText from "@/app/hooks/usePresenceText";
+import useStartCall from "@/app/hooks/useStartCall";
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import ProfileDrawer from "./ProfileDrawer";
-import { Link, useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 
 interface HeaderProps {
   conversation: Conversation & {
@@ -32,7 +31,6 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedByMe, blocked }) => {
   const t = useTranslations();
-  const router = useRouter();
   const otherUser = useOtherUser(conversation);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -42,32 +40,8 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedB
     ? t("common.members", { count: conversation.userIds.length })
     : presenceText;
 
-  // const handleCall = useCallback(() => {
-  //   axios.post("/api/messages", {
-  //     isCall: true,
-  //     conversationId: conversation.id,
-  //   });
-  //   router.push(`/room/${conversation.id}`);
-  // }, [conversation, router]);
-
-  // The call message is what rings the callee (call:incoming): if it fails (rate limit, server
-  // error) nobody would ring, so say so instead of leaving the caller waiting in an empty room.
-  // The room reads the kind back from this call message (getCallType).
-  const handleCall = useCallback(
-    async (callType: "audio" | "video") => {
-      try {
-        await axios.post("/api/messages", {
-          isCall: true,
-          callType,
-          conversationId: conversation.id,
-        });
-        router.push(`/room/${conversation.id}`);
-      } catch {
-        toast.error(t("common.error"));
-      }
-    },
-    [conversation, router, t]
-  );
+  // starts a call, or joins the group call going on
+  const handleCall = useStartCall(conversation.id);
 
   return (
     <>
@@ -119,7 +93,8 @@ const Header: React.FC<HeaderProps> = ({ conversation, users, settings, blockedB
           </div>
         </div>
         <div className="flex gap-4">
-          {!conversation.isGroup && !blocked && (
+          {/* groups call too (a mesh of up to MAX_GROUP_CALL_PEERS, app/libs/call-mesh.ts) */}
+          {!blocked && (
             <>
               <button
                 type="button"

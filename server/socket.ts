@@ -9,6 +9,7 @@ import { getToken } from "next-auth/jwt";
 import prisma from "../app/libs/prismadb";
 import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
 import { moveCallSafely } from "./call-log";
+import { maxCallPeers, type CallPeer } from "../app/libs/call-mesh";
 import { getRedisUrl } from "../app/libs/redis-url";
 import { activityCache, blockCache, setIO } from "../app/libs/socket-server";
 import { blockPartnersOf } from "../app/libs/blocks";
@@ -26,75 +27,29 @@ interface SocketData {
   userId: string;
   // when the session token (JWT) expires, ms; the socket is dropped then (see scheduleExpiry)
   expiresAt?: number;
-  // when this socket joined its current call room; orders host / second peer
+  // when this socket joined its current call room; orders the peers for the room's cap
   callJoinedAt?: number;
 }
 
 type AppServer = Server<any, any, any, SocketData>;
 type AppSocket = Socket<any, any, any, SocketData>;
 
-const CALL_SIGNALS = [
+// WebRTC signalling of the mesh (app/libs/call-mesh.ts), relayed between the peers of a call room
+// as { roomId, from, userId, data }. Offer / answer / ICE go to one peer (`to`, its socket id);
+// ready and media go to the whole room, or to one peer when `to` is given.
+const CALL_DIRECT_SIGNALS = ["call:offer", "call:answer", "call:ice-candidate"] as const;
+const CALL_ROOM_SIGNALS = [
+  // "my camera / mic are ready": the peers that should offer to the sender do so
   "call:ready",
-  "call:offer",
-  "call:answer",
-  "call:ice-candidate",
-  // { mic, camera } of the sender, so the other side can show it muted / camera off
+  // { mic, camera, screen } of the sender, shown as muted / camera off / sharing
   "call:media",
 ] as const;
 
-const MAX_CALL_PEERS = 2;
-
 type RedisClient = ReturnType<typeof createClient>;
-
-// Call host with several instances: the host is the socket whose id is stored in
-// call-host:<roomId>. Unlike join stamps this does not depend on the instances'
-// clocks. The TTL only cleans up keys of finished calls; a holder that is gone
-// (call ended, instance crashed) is replaced through compare-and-swap.
-const CALL_HOST_TTL_MS = 24 * 60 * 60 * 1000;
-const callHostKey = (roomId: string) => `call-host:${roomId}`;
-const CLAIM_IF_EMPTY = `
-local holder = redis.call('GET', KEYS[1])
-if holder then return holder end
-redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
-return ARGV[1]`;
-const REPLACE_IF_HOLDER = `
-if redis.call('GET', KEYS[1]) == ARGV[1] then
-  redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
-  return 1
-end
-return 0`;
-
-const claimCallHost = async (
-  redis: RedisClient,
-  io: AppServer,
-  roomId: string,
-  socketId: string
-): Promise<boolean> => {
-  const key = callHostKey(roomId);
-  const ttl = String(CALL_HOST_TTL_MS);
-  const holder = await redis.eval(CLAIM_IF_EMPTY, {
-    keys: [key],
-    arguments: [socketId, ttl],
-  });
-  if (holder === socketId) {
-    return true;
-  }
-  // fetched after the holder wrote the key, so a holder still in the call shows up
-  const present = await io.in(callRoom(roomId)).fetchSockets();
-  if (present.some((peer) => peer.id === holder)) {
-    return false;
-  }
-  // stale holder; of several sockets replacing it only one succeeds
-  const replaced = await redis.eval(REPLACE_IF_HOLDER, {
-    keys: [key],
-    arguments: [String(holder), socketId, ttl],
-  });
-  return replaced === 1;
-};
 
 // Strictly increasing join stamps. Plain Date.now() can tie for two joins in the
 // same millisecond, and the tie-break could then rank the later peer first: both
-// would become host. Wall-clock based so stamps from other instances are roughly
+// would be admitted to a full room. Wall-clock based so stamps from other instances are roughly
 // comparable (see the call:join comment for what is left of the race).
 let lastJoinStamp = 0;
 const nextJoinStamp = () => (lastJoinStamp = Math.max(Date.now(), lastJoinStamp + 1));
@@ -268,6 +223,22 @@ const touchLastSeen = (userId: string) => {
   Promise.resolve()
     .then(() => prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }))
     .catch((error) => logError("last_seen", error));
+};
+
+// The conversation of a call room, for a member: whether it is a group (its cap). Null for a
+// stranger, a missing conversation or a malformed id.
+const callConversation = async (conversationId: unknown, userId: string) => {
+  if (typeof conversationId !== "string") {
+    return null;
+  }
+  try {
+    return await prisma.conversation.findFirst({
+      where: { id: conversationId, userIds: { has: userId } },
+      select: { isGroup: true },
+    });
+  } catch {
+    return null;
+  }
 };
 
 const isMember = async (conversationId: unknown, userId: string) => {
@@ -505,21 +476,23 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         .catch((error) => logError("typing_members", error));
     });
 
-    // Video call: at most two peers per room. Stamp, join and snapshot the room
-    // in one synchronous step, then rank by stamp: a peer only ever sees peers
-    // that joined before it, all with smaller stamps, so exactly one is host.
-    // With Redis, stamps from different instances are only as comparable as their
-    // clocks, so they only admit peers and the host is picked by claimCallHost.
+    // Joining a call: at most maxCallPeers per room (2, a group 4: a mesh, app/libs/call-mesh.ts).
+    // Stamp, join and snapshot the room in one synchronous step, then rank by stamp: a peer only
+    // ever sees peers that joined before it, all with smaller stamps, so a full room admits nobody
+    // more. With Redis, stamps from different instances are only as comparable as their clocks.
+    // The ack lists the peers already in (they connect to us once we send call:ready); there is no
+    // host, each two peers agree on who offers (isOfferer).
     socket.on(
       "call:join",
       async (
         roomId: unknown,
-        ack: (res: { ok: boolean; isHost?: boolean }) => void
+        ack: (res: { ok: boolean; peers?: CallPeer[]; reason?: "full" }) => void
       ) => {
         if (typeof ack !== "function") {
           return;
         }
-        if (!(await isMember(roomId, userId))) {
+        const conversation = await callConversation(roomId, userId);
+        if (!conversation) {
           return ack({ ok: false });
         }
         const room = callRoom(roomId as string);
@@ -529,46 +502,70 @@ export const initSocketServer = async (httpServer: HttpServer) => {
         const snapshot = io.in(room).fetchSockets();
 
         const inRoom = await snapshot;
-        const peers = inRoom
-          .map((peer) => ({ id: peer.id, joinedAt: peer.data.callJoinedAt ?? 0 }))
+        const ranked = inRoom
+          .map((peer) => ({
+            id: peer.id,
+            userId: peer.data.userId,
+            joinedAt: peer.data.callJoinedAt ?? 0,
+          }))
           .sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
-        const position = peers.findIndex((peer) => peer.id === socket.id);
+        const cap = maxCallPeers(!!conversation.isGroup);
+        const position = ranked.findIndex((peer) => peer.id === socket.id);
 
-        if (position < 0 || position >= MAX_CALL_PEERS) {
+        if (position < 0 || position >= cap) {
           socket.leave(room);
-          return ack({ ok: false });
+          return ack({ ok: false, reason: "full" });
         }
-        let isHost = position === 0;
-        if (redis) {
-          try {
-            isHost = await claimCallHost(redis, io, roomId as string, socket.id);
-          } catch (error) {
-            logError("call_host", error);
-            socket.leave(room);
-            return ack({ ok: false });
-          }
-        }
-        ack({ ok: true, isHost });
-        // the second peer is in and it's another user (not the caller's own second tab): the call was
-        // answered (call log, after the ack so it never delays it)
-        if (position === 1 && new Set(inRoom.map((peer) => peer.data.userId)).size > 1) {
+        ack({
+          ok: true,
+          peers: ranked
+            .slice(0, cap)
+            .filter((peer) => peer.id !== socket.id)
+            .map((peer) => ({ id: peer.id, userId: peer.userId })),
+        });
+        // another user is in (not just the caller's own second tab): the call was answered (call
+        // log, after the ack so it never delays it; a no-op once answered)
+        if (new Set(ranked.slice(0, cap).map((peer) => peer.userId)).size > 1) {
           void moveCallSafely(io, roomId as string, "answer");
         }
       }
     );
 
-    // WebRTC signalling is relayed as-is to the other peer in the room.
-    CALL_SIGNALS.forEach((event) => {
-      socket.on(event, (roomId: unknown, payload: unknown) => {
-        if (typeof roomId !== "string") {
-          return;
+    // Signalling between the peers of a call room (see CALL_DIRECT_SIGNALS). Only from a socket in
+    // that room; the server stamps who sent it. A target on this instance that is not in the room
+    // is dropped here; on another instance its client drops a signal of a room it is not in.
+    const relaySignal = (event: string, roomId: unknown, message: unknown, toRoom: boolean) => {
+      if (typeof roomId !== "string") {
+        return;
+      }
+      const room = callRoom(roomId);
+      if (!socket.rooms.has(room)) {
+        return;
+      }
+      const { to, data } = (typeof message === "object" && message !== null ? message : {}) as {
+        to?: unknown;
+        data?: unknown;
+      };
+      const relayed = { roomId, from: socket.id, userId, data };
+      if (typeof to === "string") {
+        const local = io.sockets.sockets.get(to);
+        if (to !== socket.id && (!local || local.rooms.has(room))) {
+          io.to(to).emit(event, relayed);
         }
-        const room = callRoom(roomId);
-        if (socket.rooms.has(room)) {
-          socket.to(room).emit(event, payload);
-        }
-      });
-    });
+      } else if (toRoom) {
+        socket.to(room).emit(event, relayed);
+      }
+    };
+    CALL_DIRECT_SIGNALS.forEach((event) =>
+      socket.on(event, (roomId: unknown, message: unknown) =>
+        relaySignal(event, roomId, message, false)
+      )
+    );
+    CALL_ROOM_SIGNALS.forEach((event) =>
+      socket.on(event, (roomId: unknown, message: unknown) =>
+        relaySignal(event, roomId, message, true)
+      )
+    );
 
     // The callee declined a ringing call. 1:1: every member's tabs hear it (the
     // caller's call screen leaves, the callee's other tabs stop ringing). Group:
@@ -623,13 +620,19 @@ export const initSocketServer = async (httpServer: HttpServer) => {
     // the connection while waiting (no call:cancel then). After a call that was
     // answered it is a no-op for the other side (nothing rings) and stops members
     // of a group who were still ringing.
-    // Call log: either peer leaving ends an answered call (the other one leaves too, see Room.tsx);
-    // a call still ringing when nobody is left was missed.
+    // Call log: an answered call ends once fewer than two users are left in it (1:1: either one
+    // leaving; a group goes on while two talk; the one left alone leaves too, see Room.tsx); a call
+    // still ringing when nobody is left was missed.
     const cancelIfLastInCall = async (roomId: string) => {
       try {
-        await moveCallSafely(io, roomId, "end");
-        const peers = await io.in(callRoom(roomId)).fetchSockets();
-        if (peers.every((peer) => peer.id === socket.id)) {
+        // on a disconnect this socket is still listed
+        const peers = (await io.in(callRoom(roomId)).fetchSockets()).filter(
+          (peer) => peer.id !== socket.id
+        );
+        if (new Set(peers.map((peer) => peer.data.userId)).size < 2) {
+          await moveCallSafely(io, roomId, "end");
+        }
+        if (peers.length === 0) {
           await notifyCancelled(roomId);
           await moveCallSafely(io, roomId, "miss");
         }
@@ -654,7 +657,7 @@ export const initSocketServer = async (httpServer: HttpServer) => {
       }
       const room = callRoom(roomId);
       if (socket.rooms.has(room)) {
-        socket.to(room).emit("call:peer-left");
+        socket.to(room).emit("call:peer-left", { roomId, from: socket.id });
         socket.leave(room);
         void cancelIfLastInCall(roomId);
       }
@@ -663,8 +666,9 @@ export const initSocketServer = async (httpServer: HttpServer) => {
     socket.on("disconnecting", () => {
       socket.rooms.forEach((room) => {
         if (room.startsWith("call:")) {
-          socket.to(room).emit("call:peer-left");
-          void cancelIfLastInCall(room.slice("call:".length));
+          const roomId = room.slice("call:".length);
+          socket.to(room).emit("call:peer-left", { roomId, from: socket.id });
+          void cancelIfLastInCall(roomId);
         }
       });
     });

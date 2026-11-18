@@ -38,7 +38,7 @@ Copy `.env.example` to `.env`.
 
 ## Architecture
 
-Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex flag, iterate with `Array.from`), Tailwind 3, Prisma 6 + MongoDB, NextAuth v4 (JWT), socket.io (optional Redis adapter), WebRTC 1:1 calls, S3 uploads, Web Push, zustand, next-intl. Path alias `@/*` = repo root.
+Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex flag, iterate with `Array.from`), Tailwind 3, Prisma 6 + MongoDB, NextAuth v4 (JWT), socket.io (optional Redis adapter), WebRTC calls (1:1, groups as a P2P mesh), S3 uploads, Web Push, zustand, next-intl. Path alias `@/*` = repo root.
 
 - `app/[locale]/`: every page. `app/api/**/route.ts`: mutations, called with `axios`.
 - `app/actions/`: plain async server functions that call Prisma, not Server Actions. `getSession` / `getCurrentUser` are `cache()`d.
@@ -66,7 +66,7 @@ Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex
 | --- | --- |
 | `chat.md` | conversation list, unread, optimistic outbox, pagination, reconnect resync, typing, reply / edit / recall, emoji, reactions, groups, deleting |
 | `realtime.md` | socket server, Redis adapter, rooms, events, presence, session expiry, shutdown |
-| `calls.md` | WebRTC calls: audio / video, ringing, host election, decline / cancel, call log, ICE / TURN |
+| `calls.md` | WebRTC calls: audio / video, group mesh, ringing, joining late, decline / cancel, call log, ICE / TURN |
 | `notifications.md` | desktop notifications, Web Push for messages and calls, `sw.js` |
 | `uploads.md` | S3 presigned uploads, pending tag, ownership, cleanup, image hosts |
 | `auth.md` | NextAuth, `proxy.ts`, passwords, rate limits |

@@ -19,6 +19,8 @@ interface IncomingCallModalProps {
   user: SafeUser;
   roomId: String;
   callType?: CallType | null;
+  // a group call: shown under the caller's name
+  groupName?: string | null;
 }
 
 const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
@@ -27,6 +29,7 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   user,
   roomId,
   callType,
+  groupName,
 }) => {
   const t = useTranslations("call");
   const tCommon = useTranslations("common");
@@ -86,6 +89,11 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
         <h3 className="mt-1 max-w-full truncate text-2xl font-semibold text-foreground">
           {user?.name}
         </h3>
+        {groupName && (
+          <p className="mt-1 max-w-full truncate text-sm font-medium text-foreground">
+            {t("in_group", { name: groupName })}
+          </p>
+        )}
         <p className="mt-1 text-sm text-muted-foreground">{t("hint")}</p>
 
         <div className="mt-8 grid grid-cols-2 gap-12">

@@ -107,6 +107,7 @@
     "call_no_answer": "No answer",
     "call_missed": "Missed call",
     "call_duration": "Duration {duration}",
+    "join_call": "Join",
     "send_quick": "Send {emoji}",
     "audio_call": "Audio call",
     "new_messages": "{count, plural, one {# new message} other {# new messages}}",
@@ -278,7 +279,12 @@
     "stop_share": "Stop sharing",
     "sharing_you": "You're sharing your screen",
     "sharing_other": "{name} is sharing their screen",
-    "share_error": "Couldn't share the screen!"
+    "share_error": "Couldn't share the screen!",
+    "in_group": "in {name}",
+    "room_full": "This call is full",
+    "peer_left": "{name} left the call",
+    "no_answer_group": "Nobody answered",
+    "participants": "{count, plural, one {# person} other {# people}}"
   },
   "emoji": {
     "open": "Choose an emoji",

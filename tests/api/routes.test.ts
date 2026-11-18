@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   removeUserFromConversationRoom: vi.fn(),
   notifyBlocksChanged: vi.fn(),
   notifyActivityPrivacyChanged: vi.fn(),
+  callRoomSize: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
   pushNewMessage: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("@/app/libs/socket-server", () => ({
   removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
   notifyBlocksChanged: mocks.notifyBlocksChanged,
   notifyActivityPrivacyChanged: mocks.notifyActivityPrivacyChanged,
+  callRoomSize: mocks.callRoomSize,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/app/libs/s3")>()),
@@ -106,6 +108,7 @@ beforeEach(() => {
   mocks.currentUser.mockResolvedValue(me);
   mocks.markUploadsUsed.mockResolvedValue(undefined);
   mocks.deleteUploadedObjects.mockResolvedValue(undefined);
+  mocks.callRoomSize.mockResolvedValue(0);
 });
 
 // the conversation lookup used for membership checks
@@ -303,6 +306,24 @@ describe("POST /api/messages", () => {
       .filter(([, event]) => event === "call:incoming")
       .map(([, , payload]) => (payload as any).callType);
     expect(rung).toEqual(["audio", "video"]);
+  });
+
+  it("joins the call going on instead of ringing again", async () => {
+    asMember();
+    mocks.callRoomSize.mockResolvedValue(2);
+    prisma.message.findFirst.mockResolvedValue({ id: "call-1", isCall: true, callStatus: "answered" });
+    const res = await send({ isCall: true });
+    expect(await res.json()).toMatchObject({ id: "call-1", joined: true });
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(mocks.emitToUser).not.toHaveBeenCalledWith(expect.anything(), "call:incoming", expect.anything());
+  });
+
+  it("starts a new call when the last one is over, even with someone left in the room", async () => {
+    asMember();
+    mocks.callRoomSize.mockResolvedValue(1);
+    prisma.message.findFirst.mockResolvedValue({ id: "call-1", isCall: true, callStatus: "ended" });
+    await send({ isCall: true });
+    expect(prisma.message.create).toHaveBeenCalled();
   });
 
   it("rejects an unknown call type", async () => {

@@ -32,6 +32,7 @@ import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
 import useSystemText from "@/app/hooks/useSystemText";
+import useStartCall from "@/app/hooks/useStartCall";
 import {
   canEditMessage,
   canForwardMessage,
@@ -61,6 +62,8 @@ interface MessageBoxProps {
   pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
   // false when the user hides their own read receipts: no "seen by" faces
   showReceipts?: boolean;
+  // a group chat: a call message whose call is going on gets a "Join" button
+  joinableCall?: boolean;
 }
 
 // The body with http(s) links clickable (opened in a new tab, without the referrer) and
@@ -114,8 +117,13 @@ const MessageText: React.FC<{
 
 // A call message: direction, how it went (callStatus, kept by server/call-log.ts) and, once
 // answered and hung up, its duration. Calls from before callStatus existed show the direction only.
-const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call, isOwn }) => {
+const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean; joinable: boolean }> = ({
+  call,
+  isOwn,
+  joinable,
+}) => {
   const t = useTranslations("chat");
+  const startCall = useStartCall(call.conversationId);
   const failed = call.callStatus === "declined" || call.callStatus === "missed";
   const duration = call.callStatus === "ended" ? callDurationSeconds(call) : null;
 
@@ -146,6 +154,21 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call
           </span>
         )}
       </div>
+      {/* a group call going on (answered, not ended): join it late (/api/messages joins the
+          running call instead of starting a new one) */}
+      {joinable && call.callStatus === "answered" && (
+        <button
+          type="button"
+          onClick={() => startCall(kind)}
+          className={clsx(
+            "ml-1 rounded-full px-3 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2",
+            isOwn
+              ? "bg-white/20 text-white hover:bg-white/30 focus-visible:ring-white/70"
+              : "bg-sky-500 text-white hover:bg-sky-600 focus-visible:ring-sky-500/50"
+          )}>
+          {t("join_call")}
+        </button>
+      )}
     </div>
   );
 };
@@ -298,6 +321,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   showHeader = true,
   pending,
   showReceipts = true,
+  joinableCall = false,
 }) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
@@ -474,7 +498,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
                 />
               </div>
             )}
-            {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
+            {data.isCall && <CallSummary call={data} isOwn={isOwn} joinable={joinableCall} />}
           </div>
           {actionable && <ReactionPicker onReact={react} mine={myReaction} />}
           {actionable && <MessageActions message={data} isOwn={isOwn} />}

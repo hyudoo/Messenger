@@ -13,9 +13,26 @@ import { searchTextOf } from "@/app/libs/search";
 import { findMentions } from "@/app/libs/mentions";
 import { isBlockedBetween } from "@/app/libs/blocks";
 import { attachLinkPreview } from "@/app/libs/message-preview";
+import { callRoomSize } from "@/app/libs/socket-server";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const OBJECT_ID = /^[a-f\d]{24}$/i;
+
+// The call already going on in the conversation: its call message, while it rings or runs and
+// somebody is in its call room. Calling then joins it (a group call one joins late, or a 1:1 call
+// both start at once) instead of ringing everyone again with a new call message, which would also
+// leave the running call's log (the latest call message, server/call-log.ts) behind.
+const ongoingCall = async (conversationId: string) => {
+  if ((await callRoomSize(conversationId)) === 0) {
+    return null;
+  }
+  const call = await prisma.message.findFirst({
+    where: { conversationId, isCall: true },
+    orderBy: { createdAt: "desc" },
+    include: MESSAGE_INCLUDE,
+  });
+  return call && (call.callStatus === "ringing" || call.callStatus === "answered") ? call : null;
+};
 
 export async function POST(request: Request) {
   try {
@@ -66,6 +83,12 @@ export async function POST(request: Request) {
     }
     if (!body && !image && !file && !isCall) {
       return new NextResponse("Empty message", { status: 400 });
+    }
+    if (isCall === true) {
+      const ongoing = await ongoingCall(conversation.id);
+      if (ongoing) {
+        return NextResponse.json({ ...ongoing, joined: true });
+      }
     }
     // a reply quotes a person's message of the same conversation that is still there
     if (replyToId !== undefined && replyToId !== null) {

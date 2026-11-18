@@ -107,6 +107,7 @@
     "call_no_answer": "Không có người trả lời",
     "call_missed": "Cuộc gọi nhỡ",
     "call_duration": "Thời lượng {duration}",
+    "join_call": "Tham gia",
     "send_quick": "Gửi {emoji}",
     "audio_call": "Gọi thoại",
     "new_messages": "{count, plural, one {# tin nhắn mới} other {# tin nhắn mới}}",
@@ -278,7 +279,12 @@
     "stop_share": "Dừng chia sẻ màn hình",
     "sharing_you": "Bạn đang chia sẻ màn hình",
     "sharing_other": "{name} đang chia sẻ màn hình",
-    "share_error": "Không chia sẻ được màn hình!"
+    "share_error": "Không chia sẻ được màn hình!",
+    "in_group": "trong nhóm {name}",
+    "room_full": "Cuộc gọi đã đủ người",
+    "peer_left": "{name} đã rời cuộc gọi",
+    "no_answer_group": "Không ai trả lời",
+    "participants": "{count} người"
   },
   "emoji": {
     "open": "Chọn biểu tượng cảm xúc",

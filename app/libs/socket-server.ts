@@ -1,6 +1,6 @@
 import type { Server } from "socket.io";
 
-import { ACTIVITY_HIDDEN_ROOM, conversationRoom, userRoom } from "./socket-rooms";
+import { ACTIVITY_HIDDEN_ROOM, callRoom, conversationRoom, userRoom } from "./socket-rooms";
 
 // The socket.io server is created by the custom server (server.ts) and shared
 // with route handlers through globalThis, since both run in the same process.
@@ -45,6 +45,13 @@ export const emitToConversation = (
   payload: unknown
 ) => {
   getIO()?.to(conversationRoom(conversationId)).emit(event, payload);
+};
+
+// How many sockets are in the conversation's call room right now (every instance with Redis): a
+// call is going on when it is not 0. 0 without a socket server.
+export const callRoomSize = async (conversationId: string): Promise<number> => {
+  const sockets = await getIO()?.in(callRoom(conversationId)).fetchSockets();
+  return sockets?.length ?? 0;
 };
 
 // Takes every socket of the user (all tabs, every instance with the Redis adapter) out of the

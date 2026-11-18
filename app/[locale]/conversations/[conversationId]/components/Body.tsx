@@ -35,6 +35,8 @@ interface BodyProps {
   firstUnreadId?: string | null;
   // false when the user hides their read receipts (then they see nobody's either)
   showReceipts?: boolean;
+  // a group: a call going on can be joined from its call message
+  isGroup?: boolean;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -102,6 +104,7 @@ const Body: React.FC<BodyProps> = ({
   firstUnreadId,
   members,
   showReceipts = true,
+  isGroup = false,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
@@ -510,6 +513,7 @@ const Body: React.FC<BodyProps> = ({
                 <MessageBox
                   isLast={i === shown.length - 1}
                   showReceipts={showReceipts}
+                  joinableCall={isGroup}
                   showHeader={startsGroup(previous, message)}
                   data={message}
                   pending={

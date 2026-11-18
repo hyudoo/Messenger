@@ -83,4 +83,6 @@ export type FullCallType = {
   user: SafeUser;
   // missing from servers older than audio calls: video
   callType?: CallType | null;
+  // a group call: the group's name (missing for 1:1 calls and re-sent calls)
+  groupName?: string | null;
 };
