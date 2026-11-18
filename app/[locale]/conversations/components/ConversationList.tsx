@@ -14,6 +14,7 @@ import useConversation from "@/app/hooks/useConversation";
 import { getSocket } from "@/app/libs/socket-client";
 import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
+import MessageSearchResults, { MIN_MESSAGE_QUERY } from "./MessageSearchResults";
 import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
 import { ConversationSettings, ConversationUpdate, FullConversationType } from "@/app/types";
@@ -70,6 +71,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
       document.title = base;
     };
   }, [totalUnread, conversationId]);
+
+  // the search box also finds messages in every conversation once the query is long enough
+  const searchingMessages = query.trim().length >= MIN_MESSAGE_QUERY;
 
   // pinned conversations first (each part keeps its order: latest activity first)
   const visibleItems = [
@@ -307,6 +311,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
           {items.length > 0 && (
             <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
           )}
+          {searchingMessages && visibleItems.length > 0 && (
+            <h3 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("chats_heading")}
+            </h3>
+          )}
           {visibleItems.map((item) => (
             <ConversationBox
               key={item.id}
@@ -315,9 +324,11 @@ const ConversationList: React.FC<ConversationListProps> = ({
               typingNames={typingNames(item)}
             />
           ))}
-          {query && visibleItems.length === 0 && (
+          {/* a longer query also searches the messages, which say when nothing matches */}
+          {query && !searchingMessages && visibleItems.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">{t("no_results")}</p>
           )}
+          {searchingMessages && <MessageSearchResults query={query.trim()} />}
         </div>
       </aside>
     </>

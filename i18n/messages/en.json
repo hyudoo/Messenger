@@ -75,7 +75,7 @@
     "last_call_declined": "{kind, select, audio {Audio call declined} other {Video call declined}}",
     "last_call_missed": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}",
-    "search": "Search conversations",
+    "search": "Search chats and messages",
     "no_results": "No conversations found.",
     "last_from": "{name}: {text}",
     "typing": "Typing…",
@@ -86,7 +86,9 @@
     "last_voice": "Sent a voice message.",
     "last_file": "Sent the file {name}.",
     "muted": "Muted",
-    "pinned": "Pinned"
+    "pinned": "Pinned",
+    "chats_heading": "Chats",
+    "messages_heading": "Messages"
   },
   "chat": {
     "placeholder": "Write a message",

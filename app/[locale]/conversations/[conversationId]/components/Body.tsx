@@ -17,7 +17,9 @@ import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { ImageViewerProvider } from "./ImageViewer";
 import ForwardDialog from "./ForwardDialog";
 import { flashMessage } from "./MessageReply";
-import { onMessageJump } from "@/app/hooks/useMessageJump";
+import useMessageJump, { onMessageJump } from "@/app/hooks/useMessageJump";
+// only the query string: navigation itself goes through @/i18n/navigation
+import { useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import {
   MAX_KEPT_MESSAGES,
@@ -184,6 +186,18 @@ const Body: React.FC<BodyProps> = ({
       }),
     [conversationId, t]
   );
+
+  // Opened from the inbox's message search (/conversations/<id>?message=<id>): show that message,
+  // then drop the parameter so a reload doesn't jump again. After the jump handler above (effects
+  // run in order), and again when another result of this same chat is picked.
+  const jumpParam = useSearchParams().get("message");
+  useEffect(() => {
+    if (!jumpParam || !/^[a-f\d]{24}$/i.test(jumpParam)) {
+      return;
+    }
+    useMessageJump.getState().request(jumpParam);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [jumpParam]);
 
   useEffect(() => {
     // "seen" only while the user can actually see the chat: not from a hidden tab, and again

@@ -10,7 +10,7 @@ import { HiArrowLeft } from "react-icons/hi2";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import useMessageJump from "@/app/hooks/useMessageJump";
-import { findFoldedMatch } from "@/app/libs/search";
+import SearchHighlight from "@/app/components/SearchHighlight";
 
 // wait this long after the last keystroke before asking the server
 const SEARCH_DELAY_MS = 300;
@@ -28,25 +28,6 @@ interface ConversationSearchProps {
   // a result was picked: the drawer closes while the chat goes to the message
   onPick: () => void;
 }
-
-// The match in a result, highlighted (ignoring case and diacritics, like the server's search).
-const Highlight: React.FC<{ text: string; query: string }> = ({ text, query }) => {
-  const match = findFoldedMatch(text, query);
-  if (!match) {
-    return <>{text}</>;
-  }
-  const [at, end] = match;
-  // a little context before the match, so it shows in a one-line preview
-  const start = Math.max(0, at - 30);
-  return (
-    <>
-      {start > 0 && "…"}
-      {text.slice(start, at)}
-      <mark className="rounded bg-sky-500/25 text-foreground">{text.slice(at, end)}</mark>
-      {text.slice(end)}
-    </>
-  );
-};
 
 // Search in the conversation (the drawer's "Search" action): text messages containing the words,
 // newest first; picking one shows it in the chat (loading older pages when needed).
@@ -134,7 +115,7 @@ const ConversationSearch: React.FC<ConversationSearchProps> = ({ conversationId,
                       </span>
                     </span>
                     <span className="block truncate text-sm text-muted-foreground">
-                      <Highlight text={result.body ?? ""} query={trimmed} />
+                      <SearchHighlight text={result.body ?? ""} query={trimmed} />
                     </span>
                   </span>
                 </button>

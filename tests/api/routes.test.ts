@@ -74,6 +74,7 @@ import { POST as answerJoinRequest } from "@/app/api/conversations/[conversation
 import { GET as getPrivacy, PATCH as setPrivacy } from "@/app/api/settings/privacy/route";
 import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
+import { GET as searchEverywhere } from "@/app/api/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
 import { POST as blockUser } from "@/app/api/users/[userId]/block/route";
@@ -1115,7 +1116,7 @@ describe("GET /api/conversations/[id]/search", () => {
     expect(await (await search(" CHÀO ")).json()).toEqual([{ id: MESSAGE, body: "Chào" }]);
     const { where, take } = prisma.message.findMany.mock.calls[1][0];
     expect(take).toBe(30);
-    expect(where.conversationId).toBe(CONVERSATION);
+    expect(where.conversationId).toEqual({ in: [CONVERSATION] });
     expect(where.id).toBeUndefined();
     expect(where.AND[2]).toEqual({
       OR: [
@@ -1124,6 +1125,58 @@ describe("GET /api/conversations/[id]/search", () => {
         { searchText: { isSet: false }, body: { contains: "CHÀO", mode: "insensitive" } },
       ],
     });
+  });
+});
+
+describe("GET /api/search (every conversation)", () => {
+  const search = (q: string) =>
+    searchEverywhere(jsonRequest(`/api/search?q=${encodeURIComponent(q)}`, null, { method: "GET" }));
+  const GROUP_ID = "abababababababababababab";
+
+  it("refuses an empty or long query", async () => {
+    expect((await search(" ")).status).toBe(400);
+    expect((await search("x".repeat(101))).status).toBe(400);
+  });
+
+  it("searches the user's conversations, without hidden messages, with each one's title", async () => {
+    prisma.conversation.findMany.mockResolvedValue([
+      { id: CONVERSATION, name: null, isGroup: false, users: [me, other] },
+      { id: GROUP_ID, name: "Team", isGroup: true, users: [me, other] },
+    ]);
+    const sender = { name: other.name, email: other.email, image: null };
+    prisma.message.findMany
+      // the user hid one message for themselves
+      .mockResolvedValueOnce([{ id: "hidden" }])
+      .mockResolvedValueOnce([
+        { id: MESSAGE, body: "chào", createdAt: new Date(0), conversationId: GROUP_ID, sender },
+        { id: "m2", body: "Chào bạn", createdAt: new Date(0), conversationId: CONVERSATION, sender },
+      ]);
+
+    const body = await (await search("chao")).json();
+
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userIds: { has: ME } } })
+    );
+    const hiddenLookup = prisma.message.findMany.mock.calls[0][0];
+    expect(hiddenLookup.where).toEqual({
+      conversationId: { in: [CONVERSATION, GROUP_ID] },
+      hiddenForIds: { has: ME },
+    });
+    const { where } = prisma.message.findMany.mock.calls[1][0];
+    expect(where.conversationId).toEqual({ in: [CONVERSATION, GROUP_ID] });
+    expect(where.id).toEqual({ notIn: ["hidden"] });
+    // a group shows its name, a 1:1 chat the other person's
+    expect(body.map((result: { conversation: unknown }) => result.conversation)).toEqual([
+      { id: GROUP_ID, isGroup: true, title: "Team" },
+      { id: CONVERSATION, isGroup: false, title: other.name },
+    ]);
+    expect(body[0]).not.toHaveProperty("conversationId");
+  });
+
+  it("finds nothing without conversations", async () => {
+    prisma.conversation.findMany.mockResolvedValue([]);
+    expect(await (await search("chao")).json()).toEqual([]);
+    expect(prisma.message.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -75,7 +75,7 @@
     "last_call_declined": "{kind, select, audio {Cuộc gọi thoại bị từ chối} other {Cuộc gọi video bị từ chối}}",
     "last_call_missed": "{kind, select, audio {Cuộc gọi thoại nhỡ} other {Cuộc gọi video nhỡ}}",
     "last_call_ended": "{kind, select, audio {Cuộc gọi thoại} other {Cuộc gọi video}} · {duration}",
-    "search": "Tìm cuộc trò chuyện",
+    "search": "Tìm cuộc trò chuyện và tin nhắn",
     "no_results": "Không tìm thấy cuộc trò chuyện nào.",
     "last_from": "{name}: {text}",
     "typing": "Đang soạn tin…",
@@ -86,7 +86,9 @@
     "last_voice": "Đã gửi một tin nhắn thoại.",
     "last_file": "Đã gửi tệp {name}.",
     "muted": "Đã tắt thông báo",
-    "pinned": "Đã ghim"
+    "pinned": "Đã ghim",
+    "chats_heading": "Cuộc trò chuyện",
+    "messages_heading": "Tin nhắn"
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
