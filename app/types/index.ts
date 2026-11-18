@@ -4,7 +4,11 @@ import { CallType, Conversation, Message, User } from "@prisma/client";
 // a user row as queries return it (app/libs/prismadb.ts omits these fields)
 export type SafeUser = Omit<
   User,
-  "hashedPassword" | "mutedConversationIds" | "pinnedConversationIds" | "blockedUserIds"
+  | "hashedPassword"
+  | "mutedConversationIds"
+  | "pinnedConversationIds"
+  | "blockedUserIds"
+  | "friendIds"
 >;
 
 // A reaction as MESSAGE_INCLUDE loads it (app/libs/message-include.ts).
@@ -48,7 +52,7 @@ export type ConversationSettings = { id: string; muted: boolean; pinned: boolean
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
 // notifications), a seen update (messages only) or a group change (users with name / ownerId /
-// adminIds / image / inviteCode: renamed, new photo, members or admins changed, someone left).
+// adminIds / image / inviteCode / joinApproval: renamed, new photo, members or admins changed, someone left).
 export type ConversationUpdate = Pick<FullConversationType, "id"> &
   Partial<
     Pick<
@@ -60,6 +64,7 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
       | "adminIds"
       | "image"
       | "inviteCode"
+      | "joinApproval"
       | "name"
       | "isGroup"
     >
@@ -69,6 +74,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
     muted?: boolean;
     // the message mentions the recipient (a group's "@Name")
     mentioned?: boolean;
+    // the recipient read it without a read receipt (it isn't in `seen`): their count goes to 0
+    read?: boolean;
   };
 
 export type ConversationWithUsers = Conversation & {
@@ -81,4 +88,6 @@ export type FullCallType = {
   user: SafeUser;
   // missing from servers older than audio calls: video
   callType?: CallType | null;
+  // a group call: the group's name (missing for 1:1 calls and re-sent calls)
+  groupName?: string | null;
 };

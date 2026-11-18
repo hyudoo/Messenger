@@ -6,6 +6,9 @@ import { getIceServers } from "@/app/libs/ice-servers";
 import { validatePassword } from "@/app/libs/password";
 import { LIMITS, clientIp, rateLimit } from "@/app/libs/rate-limit";
 import { getRedisUrl } from "@/app/libs/redis-url";
+import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { createPresignedUpload, isUploadedFileUrl } from "@/app/libs/s3";
 import { ME, OTHER, S3_BASE, resetRateLimits, uploadUrl } from "../helpers";
 
@@ -132,6 +135,33 @@ describe("getRedisUrl", () => {
     vi.stubEnv("REDIS_HOST", "localhost");
     vi.stubEnv("REDIS_URL", "rediss://cloud:6380");
     expect(getRedisUrl()).toBe("rediss://cloud:6380");
+  });
+  it("adds an ACL user name", () => {
+    vi.stubEnv("REDIS_HOST", "redis");
+    vi.stubEnv("REDIS_USERNAME", "app@one");
+    vi.stubEnv("REDIS_PASSWORD", "secret");
+    expect(getRedisUrl()).toBe("redis://app%40one:secret@redis:6379");
+  });
+
+  it("reads the password from REDIS_PASSWORD_FILE (the variable wins)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "redis-secret-"));
+    const file = join(dir, "password");
+    writeFileSync(file, "from:file\n");
+    try {
+      vi.stubEnv("REDIS_HOST", "redis");
+      vi.stubEnv("REDIS_PASSWORD_FILE", file);
+      expect(getRedisUrl()).toBe("redis://:from%3Afile@redis:6379");
+      vi.stubEnv("REDIS_PASSWORD", "env");
+      expect(getRedisUrl()).toBe("redis://:env@redis:6379");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails loudly when the password file is missing", () => {
+    vi.stubEnv("REDIS_HOST", "redis");
+    vi.stubEnv("REDIS_PASSWORD_FILE", join(tmpdir(), "no-such-redis-secret"));
+    expect(() => getRedisUrl()).toThrow(/REDIS_PASSWORD_FILE/);
   });
 });
 

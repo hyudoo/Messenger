@@ -13,9 +13,10 @@ interface IParams {
   conversationId?: string;
 }
 
-// POST { enabled }: an admin turns the group's invite link on (a new code each time, so turning it
-// on again resets it and the old link stops working) or off. The members get the code
-// (conversation:update).
+// POST { enabled?, approval? }: an admin turns the group's invite link on (a new code each time, so
+// turning it on again resets it and the old link stops working) or off, and / or makes joining by
+// it need an admin's approval (POST /api/join/<code> then files a request). Requests already made
+// stay until an admin answers them. The members get the change (conversation:update).
 export async function POST(
   request: Request,
   { params }: { params: Promise<IParams> }
@@ -33,7 +34,13 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
-    if (typeof body?.enabled !== "boolean") {
+    const enabled: unknown = body?.enabled;
+    const approval: unknown = body?.approval;
+    if (
+      (enabled === undefined && approval === undefined) ||
+      (enabled !== undefined && typeof enabled !== "boolean") ||
+      (approval !== undefined && typeof approval !== "boolean")
+    ) {
       return new NextResponse("Invalid data", { status: 400 });
     }
 
@@ -46,14 +53,22 @@ export async function POST(
     }
 
     // 16 base64url characters (INVITE_CODE)
-    const inviteCode = body.enabled ? randomBytes(12).toString("base64url") : null;
+    const inviteCode =
+      enabled === undefined
+        ? conversation.inviteCode
+        : enabled
+          ? randomBytes(12).toString("base64url")
+          : null;
     const updated = await prisma.conversation.update({
       where: { id: conversation.id },
-      data: { inviteCode },
+      data: {
+        ...(enabled !== undefined && { inviteCode }),
+        ...(approval !== undefined && { joinApproval: approval }),
+      },
       include: { users: true },
     });
-    emitGroupUpdate(updated, updated.users);
-    return NextResponse.json({ inviteCode });
+    await emitGroupUpdate(updated, updated.users);
+    return NextResponse.json({ inviteCode, joinApproval: !!updated.joinApproval });
   } catch (error) {
     logError("conversation_invite", error);
     return new NextResponse("Error", { status: 500 });

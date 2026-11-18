@@ -3,3 +3,6 @@ export const userRoom = (email: string) => `user:${email}`;
 export const conversationRoom = (conversationId: string) =>
   `conversation:${conversationId}`;
 export const callRoom = (roomId: string) => `call:${roomId}`;
+// every socket of the users who hide their activity (User.hideActivity): they get no one's
+// online / offline events
+export const ACTIVITY_HIDDEN_ROOM = "privacy:hide-activity";

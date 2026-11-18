@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import LanguageToggle from "@/app/components/toggles/LanguageToggle";
 import ThemeToggle from "@/app/components/toggles/ThemeToggle";
 import { safeNextPath } from "@/app/libs/invite-code";
+import { Link } from "@/i18n/navigation";
 import AuthForm from "./components/AuthForm";
 
 export default async function Home({
@@ -12,6 +13,7 @@ export default async function Home({
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
   const t = await getTranslations("auth");
+  const tLegal = await getTranslations("legal");
   // where to go after signing in: an invite link the visitor opened signed out (proxy.ts)
   const next = safeNextPath((await searchParams).next);
 
@@ -46,6 +48,18 @@ export default async function Home({
       </div>
 
       <AuthForm next={next} />
+
+      <p className="mt-6 px-4 text-center text-xs text-muted-foreground">
+        {tLegal("agree")}
+        <span className="mt-1 flex justify-center gap-3">
+          <Link href="/terms" className="underline hover:text-foreground">
+            {tLegal("terms_link")}
+          </Link>
+          <Link href="/privacy" className="underline hover:text-foreground">
+            {tLegal("privacy_link")}
+          </Link>
+        </span>
+      </p>
     </div>
   );
 }

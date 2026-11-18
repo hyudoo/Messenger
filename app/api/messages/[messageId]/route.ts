@@ -13,6 +13,7 @@ import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { emitToConversation, emitToUser } from "@/app/libs/socket-server";
 import { cleanUpUploads } from "@/app/libs/upload-cleanup";
+import { lastVisibleMessage } from "@/app/libs/inbox-preview";
 import { ConversationWithUsers, FullMessageType } from "@/app/types";
 
 interface IParams {
@@ -39,11 +40,13 @@ const broadcast = async (conversation: ConversationWithUsers, updated: FullMessa
   const last = await prisma.message.findFirst({
     where: { conversationId: conversation.id },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: { id: true },
+    // hiddenForIds is omitted from rows by default
+    select: { id: true, hiddenForIds: true },
   });
   if (last?.id === updated.id) {
     conversation.users.forEach((user) => {
-      if (user.email) {
+      // not the preview of those who deleted it for themselves
+      if (user.email && !(last.hiddenForIds ?? []).includes(user.id)) {
         emitToUser(user.email, "conversation:update", {
           id: conversation.id,
           messages: [updated],
@@ -138,6 +141,20 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
           conversationId: found.conversation.id,
           messageId: found.message.id,
         });
+        // it was the last message, so their inbox preview: the newest message they still see
+        // takes its place (no lastMessageAt, so the order stays)
+        const last = await prisma.message.findFirst({
+          where: { conversationId: found.conversation.id },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          select: { id: true },
+        });
+        if (last?.id === found.message.id) {
+          const preview = await lastVisibleMessage(found.conversation.id, currentUser.id);
+          emitToUser(currentUser.email, "conversation:update", {
+            id: found.conversation.id,
+            messages: preview ? [preview] : [],
+          });
+        }
       }
       return new NextResponse("Success");
     }

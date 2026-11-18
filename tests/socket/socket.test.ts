@@ -1,6 +1,5 @@
 import { createServer, type Server as HttpServer } from "http";
 import type { AddressInfo } from "net";
-import { createClient } from "redis";
 import { io as connect, type Socket as ClientSocket } from "socket.io-client";
 import type { Server } from "socket.io";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,6 +12,8 @@ const GROUP = "abababababababababababab";
 
 // user id -> the ids they blocked
 const BLOCKS: Record<string, string[]> = {};
+// user id -> their friends (User.friendIds, both sides)
+const FRIENDS: Record<string, string[]> = {};
 const ALL_IDS = () => [ME, OTHER, THIRD, STRANGER];
 
 // conversation id -> member ids
@@ -59,9 +60,18 @@ vi.mock("next-auth/jwt", () => ({
   }),
 }));
 
+// users who hide their activity (User.hideActivity)
+const HIDERS = vi.hoisted(() => new Set<string>());
+
 vi.mock("@/app/libs/prismadb", () => ({
   default: {
     conversation: {
+      // contactsOf: the user's conversations' members
+      findMany: vi.fn(async ({ where }: any) =>
+        Object.entries(MEMBERS)
+          .filter(([, members]) => members.includes(where.userIds.has))
+          .map(([, members]) => ({ userIds: members }))
+      ),
       findFirst: vi.fn(async ({ where }: any) =>
         MEMBERS[where.id]?.includes(where.userIds.has)
           ? {
@@ -115,7 +125,7 @@ vi.mock("@/app/libs/prismadb", () => ({
       findUnique: vi.fn(async ({ where }: any) => {
         if (where.email) {
           const id = ALL_IDS().find((candidate) => emailOf(candidate) === where.email);
-          return id ? { id } : null;
+          return id ? { id, hideActivity: HIDERS.has(id), friendIds: FRIENDS[id] ?? [] } : null;
         }
         return {
           conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
@@ -124,6 +134,12 @@ vi.mock("@/app/libs/prismadb", () => ({
       }),
       // app/libs/blocks.ts: who blocked a user / the users a user blocked
       findMany: vi.fn(async ({ where }: any) => {
+        // server/socket.ts: who among these emails hides their activity
+        if (where.email) {
+          return ALL_IDS()
+            .filter((id) => where.email.in.includes(emailOf(id)))
+            .map((id) => ({ email: emailOf(id), hideActivity: HIDERS.has(id) }));
+        }
         const ids = where.blockedUserIds
           ? ALL_IDS().filter((id) => (BLOCKS[id] ?? []).includes(where.blockedUserIds.has))
           : where.id.in;
@@ -134,7 +150,12 @@ vi.mock("@/app/libs/prismadb", () => ({
 }));
 
 import { closeSocketServer, initSocketServer } from "@/server/socket";
-import { emitToConversation, removeUserFromConversationRoom } from "@/app/libs/socket-server";
+import {
+  emitToConversation,
+  notifyActivityPrivacyChanged,
+  notifyContactsChanged,
+  removeUserFromConversationRoom,
+} from "@/app/libs/socket-server";
 import { callRoom, conversationRoom } from "@/app/libs/socket-rooms";
 
 // ---- harness ----
@@ -172,19 +193,24 @@ const connected = (url: string, userId: string) => {
 const next = <T = unknown>(socket: ClientSocket, event: string) =>
   new Promise<T>((resolve) => socket.once(event, resolve));
 
+type JoinResult = { ok: boolean; peers?: { id: string; userId: string }[]; reason?: string };
 const joinCall = (socket: ClientSocket, roomId: string) =>
-  new Promise<{ ok: boolean; isHost?: boolean }>((resolve) =>
-    socket.emit("call:join", roomId, resolve)
-  );
+  new Promise<JoinResult>((resolve) => socket.emit("call:join", roomId, resolve));
 
 // the servers' block caches are global: a test's closing disconnects refill them, so start clean
-beforeEach(() => globalThis.blockCache?.clear());
+beforeEach(() => {
+  globalThis.blockCache?.clear();
+  globalThis.activityCache?.clear();
+  globalThis.contactCache?.clear();
+});
 
 afterEach(async () => {
   RECENT_CALLS.length = 0;
   pushMissedCall.mockClear();
   Object.keys(TOKEN_EXP).forEach((id) => delete TOKEN_EXP[id]);
   Object.keys(BLOCKS).forEach((id) => delete BLOCKS[id]);
+  Object.keys(FRIENDS).forEach((id) => delete FRIENDS[id]);
+  HIDERS.clear();
   Object.keys(CALLS).forEach((id) => delete CALLS[id]);
   clients.splice(0).forEach((socket) => socket.close());
   await Promise.all(
@@ -247,33 +273,74 @@ describe("socket server", () => {
     expect(strangerGot).not.toHaveBeenCalled();
   });
 
-  it("runs a call: host first, a second peer, nobody else", async () => {
+  it("runs a mesh call: the peers already in, signals to one peer or the room", async () => {
     const { url } = await startServer();
-    const host = (await connected(url, ME)).socket;
-    const guest = (await connected(url, OTHER)).socket;
+    const first = (await connected(url, ME)).socket;
+    const second = (await connected(url, OTHER)).socket;
     const third = (await connected(url, THIRD)).socket;
     const stranger = (await connected(url, STRANGER)).socket;
 
     expect(await joinCall(stranger, GROUP)).toEqual({ ok: false });
-    expect(await joinCall(host, GROUP)).toEqual({ ok: true, isHost: true });
-    expect(await joinCall(guest, GROUP)).toEqual({ ok: true, isHost: false });
-    expect(await joinCall(third, GROUP)).toEqual({ ok: false });
+    expect(await joinCall(first, GROUP)).toEqual({ ok: true, peers: [] });
+    expect(await joinCall(second, GROUP)).toEqual({
+      ok: true,
+      peers: [{ id: first.id, userId: ME }],
+    });
+    expect(await joinCall(third, GROUP)).toEqual({
+      ok: true,
+      peers: [
+        { id: first.id, userId: ME },
+        { id: second.id, userId: OTHER },
+      ],
+    });
 
-    // signalling is relayed to the other peer only
-    const thirdGot = vi.fn();
-    third.on("call:offer", thirdGot);
-    const ready = next(host, "call:ready");
-    guest.emit("call:ready", GROUP);
-    await ready;
-    const offer = next(guest, "call:offer");
-    host.emit("call:offer", GROUP, { type: "offer", sdp: "x" });
-    expect(await offer).toEqual({ type: "offer", sdp: "x" });
-    expect(thirdGot).not.toHaveBeenCalled();
+    // call:ready goes to the whole room, stamped with the sender
+    const firstReady = next(first, "call:ready");
+    const secondReady = next(second, "call:ready");
+    third.emit("call:ready", GROUP);
+    const stamped = { roomId: GROUP, from: third.id, userId: THIRD };
+    expect(await firstReady).toEqual(stamped);
+    expect(await secondReady).toEqual(stamped);
 
-    // leaving ends the call for the other side
-    const left = next(host, "call:peer-left");
-    guest.emit("call:leave", GROUP);
-    await left;
+    // an offer goes to its peer only
+    const secondGot = vi.fn();
+    second.on("call:offer", secondGot);
+    const offer = next(third, "call:offer");
+    first.emit("call:offer", GROUP, { to: third.id, data: { type: "offer", sdp: "x" } });
+    expect(await offer).toEqual({
+      roomId: GROUP,
+      from: first.id,
+      userId: ME,
+      data: { type: "offer", sdp: "x" },
+    });
+
+    // nothing to a socket outside the room, nor from one
+    const strangerGot = vi.fn();
+    stranger.on("call:offer", strangerGot);
+    first.emit("call:offer", GROUP, { to: stranger.id, data: {} });
+    stranger.emit("call:offer", GROUP, { to: first.id, data: {} });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(strangerGot).not.toHaveBeenCalled();
+    expect(secondGot).not.toHaveBeenCalled();
+
+    // leaving tells the others who left
+    const left = next(first, "call:peer-left");
+    second.emit("call:leave", GROUP);
+    expect(await left).toEqual({ roomId: GROUP, from: second.id });
+  });
+
+  it("caps a call: two peers in a 1:1 chat, four in a group", async () => {
+    const { url } = await startServer();
+    const tabs = await Promise.all([ME, OTHER, ME].map((id) => connected(url, id)));
+    expect(await joinCall(tabs[0].socket, CONVERSATION)).toMatchObject({ ok: true });
+    expect(await joinCall(tabs[1].socket, CONVERSATION)).toMatchObject({ ok: true });
+    expect(await joinCall(tabs[2].socket, CONVERSATION)).toEqual({ ok: false, reason: "full" });
+
+    const group = await Promise.all([ME, OTHER, THIRD, ME, OTHER].map((id) => connected(url, id)));
+    for (const { socket } of group.slice(0, 4)) {
+      expect(await joinCall(socket, GROUP)).toMatchObject({ ok: true });
+    }
+    expect(await joinCall(group[4].socket, GROUP)).toEqual({ ok: false, reason: "full" });
   });
 
   it("tells a 1:1 caller and the callee's tabs about a decline, never strangers", async () => {
@@ -327,7 +394,7 @@ describe("socket server", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(calleeGot).not.toHaveBeenCalled();
 
-    expect(await joinCall(caller, GROUP)).toEqual({ ok: true, isHost: true });
+    expect(await joinCall(caller, GROUP)).toMatchObject({ ok: true });
     const calleeHeard = next(callee, "call:cancelled");
     const thirdHeard = next(third, "call:cancelled");
     caller.emit("call:cancel", GROUP);
@@ -344,7 +411,7 @@ describe("socket server", () => {
     const caller = (await connected(url, ME)).socket;
     const callee = (await connected(url, OTHER)).socket;
 
-    expect(await joinCall(caller, CONVERSATION)).toEqual({ ok: true, isHost: true });
+    expect(await joinCall(caller, CONVERSATION)).toMatchObject({ ok: true });
     const cancelled = next(callee, "call:cancelled");
     caller.close(); // no call:cancel, no call:leave
 
@@ -529,6 +596,25 @@ describe("socket server", () => {
       expect(CALLS[CONVERSATION].callAnsweredAt).toBeUndefined();
     });
 
+    it("keeps a group call going while two people are in it", async () => {
+      CALLS[GROUP] = { id: "call-g", senderId: ME, callStatus: "ringing" };
+      const { url } = await startServer();
+      const [a, b, c] = await Promise.all([ME, OTHER, THIRD].map((id) => connected(url, id)));
+      await joinCall(a.socket, GROUP);
+      await joinCall(b.socket, GROUP);
+      await joinCall(c.socket, GROUP);
+      await vi.waitFor(() => expect(CALLS[GROUP].callStatus).toBe("answered"));
+
+      // two still talking
+      b.socket.emit("call:leave", GROUP);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(CALLS[GROUP].callStatus).toBe("answered");
+
+      // one left alone: over
+      c.socket.close();
+      await vi.waitFor(() => expect(CALLS[GROUP].callStatus).toBe("ended"));
+    });
+
     it("never moves a call back: a late no-answer after the callee joined keeps it answered", async () => {
       ringing();
       const { url } = await startServer();
@@ -544,15 +630,15 @@ describe("socket server", () => {
     });
   });
 
-  it("picks exactly one host when both peers join at the same time", async () => {
+  it("admits both peers when they join at the same time", async () => {
     const { url } = await startServer();
     const a = (await connected(url, ME)).socket;
     const b = (await connected(url, OTHER)).socket;
 
     const results = await Promise.all([joinCall(a, CONVERSATION), joinCall(b, CONVERSATION)]);
 
+    // each finds the other through call:ready if not in its list
     expect(results.every((result) => result.ok)).toBe(true);
-    expect(results.filter((result) => result.isHost)).toHaveLength(1);
   });
 });
 
@@ -626,45 +712,64 @@ describe.skipIf(!process.env.TEST_REDIS_URL)("socket server on two instances (Re
     const guest = (await connected(two.url, OTHER)).socket;
     const third = (await connected(two.url, THIRD)).socket;
 
-    expect(await joinCall(host, GROUP)).toEqual({ ok: true, isHost: true });
-    expect(await joinCall(guest, GROUP)).toEqual({ ok: true, isHost: false });
-    expect(await joinCall(third, GROUP)).toEqual({ ok: false });
+    const stranger = (await connected(two.url, STRANGER)).socket;
 
+    expect(await joinCall(host, GROUP)).toEqual({ ok: true, peers: [] });
+    expect(await joinCall(guest, GROUP)).toEqual({ ok: true, peers: [{ id: host.id, userId: ME }] });
+    expect(await joinCall(third, GROUP)).toMatchObject({ ok: true });
+    expect(await joinCall(stranger, GROUP)).toEqual({ ok: false });
+
+    // to one peer on the other instance
     const offer = next(guest, "call:offer");
-    host.emit("call:offer", GROUP, { type: "offer", sdp: "y" });
-    expect(await offer).toEqual({ type: "offer", sdp: "y" });
+    host.emit("call:offer", GROUP, { to: guest.id, data: { type: "offer", sdp: "y" } });
+    expect(await offer).toEqual({
+      roomId: GROUP,
+      from: host.id,
+      userId: ME,
+      data: { type: "offer", sdp: "y" },
+    });
+    // to the room, across instances
+    const ready = next(host, "call:ready");
+    third.emit("call:ready", GROUP);
+    expect(await ready).toMatchObject({ from: third.id, userId: THIRD });
   });
 
-  it("picks exactly one host when peers on two instances join at the same time", async () => {
+  it("clears the block cache on the other instance (blocks:changed)", async () => {
     const [one, two] = await twoInstances();
-    for (let round = 0; round < 5; round++) {
+    // OTHER (on instance two) blocked ME: the cached filter hides ME from them
+    BLOCKS[OTHER] = [ME];
+    const b = await connected(two.url, OTHER);
+    await connected(one.url, ME);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(globalThis.blockCache?.has(emailOf(OTHER))).toBe(true);
+
+    // unblocked on instance one. Both instances share globalThis in this process, and an
+    // instance doesn't receive its own serverSideEmit, so only instance two's handler can clear it
+    delete BLOCKS[OTHER];
+    one.io.serverSideEmit("blocks:changed", [emailOf(OTHER), emailOf(ME)]);
+    await vi.waitFor(() => expect(globalThis.blockCache?.has(emailOf(OTHER))).toBe(false));
+
+    // the refreshed list on instance two shows ME again
+    const list = next<string[]>(b.socket, "presence:list");
+    b.socket.emit("presence:sync");
+    expect(await list).toContain(emailOf(ME));
+  });
+
+  it("admits both peers when they join on two instances at the same time", async () => {
+    const [one, two] = await twoInstances();
+    for (let round = 0; round < 3; round++) {
       const a = (await connected(one.url, ME)).socket;
       const b = (await connected(two.url, OTHER)).socket;
 
       const results = await Promise.all([joinCall(a, CONVERSATION), joinCall(b, CONVERSATION)]);
 
       expect(results.every((result) => result.ok)).toBe(true);
-      expect(results.filter((result) => result.isHost)).toHaveLength(1);
       a.close();
       b.close();
       await vi.waitFor(async () =>
         expect(await one.io.in(callRoom(CONVERSATION)).fetchSockets()).toHaveLength(0)
       );
     }
-  });
-
-  it("takes over the host key from a socket that is no longer in the call", async () => {
-    const [one, two] = await twoInstances();
-    const redis = createClient({ url: process.env.TEST_REDIS_URL });
-    await redis.connect();
-    // e.g. left behind by an instance that crashed during a call
-    await redis.set(`call-host:${GROUP}`, "gone-socket");
-    await redis.quit();
-
-    const host = (await connected(one.url, ME)).socket;
-    const guest = (await connected(two.url, OTHER)).socket;
-    expect(await joinCall(host, GROUP)).toEqual({ ok: true, isHost: true });
-    expect(await joinCall(guest, GROUP)).toEqual({ ok: true, isHost: false });
   });
 });
 
@@ -699,6 +804,44 @@ describe("socket server lifecycle", () => {
     expect(await disconnected).toBe("transport close");
     const error = await next<Error>(client(url, ME), "connect_error");
     expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe("presence scope (contacts)", () => {
+  it("shares presence only with friends and people in a shared conversation", async () => {
+    const { url } = await startServer();
+    // ME shares a conversation with OTHER; STRANGER shares none with anyone
+    const a = (await connected(url, ME)).socket;
+    const aOnline = vi.fn();
+    a.on("presence:online", aOnline);
+
+    const stranger = await connected(url, STRANGER);
+    // only themselves
+    expect(stranger.online).toEqual([emailOf(STRANGER)]);
+    const b = await connected(url, OTHER);
+    expect(b.online).toContain(emailOf(ME));
+    expect(b.online).not.toContain(emailOf(STRANGER));
+    await vi.waitFor(() => expect(aOnline).toHaveBeenCalledWith(emailOf(OTHER)));
+    expect(aOnline).not.toHaveBeenCalledWith(emailOf(STRANGER));
+
+    // ME and STRANGER become friends: both tabs are told, and the lists now have each other
+    FRIENDS[ME] = [STRANGER];
+    FRIENDS[STRANGER] = [ME];
+    const told = next<{ friends: boolean }>(stranger.socket, "contacts:update");
+    notifyContactsChanged([emailOf(ME), emailOf(STRANGER)], true);
+    expect(await told).toEqual({ friends: true });
+    const list = next<string[]>(stranger.socket, "presence:list");
+    stranger.socket.emit("presence:sync");
+    expect((await list).sort()).toEqual([emailOf(ME), emailOf(STRANGER)].sort());
+
+    // and STRANGER going offline now reaches ME, not OTHER
+    const aOffline = next<string>(a, "presence:offline");
+    const bOffline = vi.fn();
+    b.socket.on("presence:offline", bOffline);
+    stranger.socket.close();
+    expect(await aOffline).toBe(emailOf(STRANGER));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(bOffline).not.toHaveBeenCalled();
   });
 });
 
@@ -818,5 +961,46 @@ describe("typing and session expiry", () => {
     const { socket } = await connected(url, ME);
     // a transport close: a real client reconnects and is authenticated again
     expect(await next<string>(socket, "disconnect")).toBe("transport close");
+  });
+});
+
+describe("hidden activity", () => {
+  it("leaves a user who hides their activity out of presence, and them out of everyone's", async () => {
+    HIDERS.add(ME);
+    const { url } = await startServer();
+    const c = (await connected(url, THIRD)).socket;
+    const cOnline = vi.fn();
+    c.on("presence:online", cOnline);
+
+    const a = await connected(url, ME);
+    // ME sees nobody, and nobody hears ME come online
+    expect(a.online).toEqual([]);
+    const aOnline = vi.fn();
+    a.socket.on("presence:online", aOnline);
+    const b = await connected(url, OTHER);
+    expect(b.online).toContain(emailOf(THIRD));
+    expect(b.online).not.toContain(emailOf(ME));
+    await vi.waitFor(() => expect(cOnline).toHaveBeenCalledWith(emailOf(OTHER)));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(cOnline).not.toHaveBeenCalledWith(emailOf(ME));
+    expect(aOnline).not.toHaveBeenCalled();
+  });
+
+  it("announces the user offline when they turn it on, and online again when they turn it off", async () => {
+    const { url } = await startServer();
+    await connected(url, ME);
+    const c = (await connected(url, THIRD)).socket;
+    const offline = vi.fn();
+    const online = vi.fn();
+    c.on("presence:offline", offline);
+    c.on("presence:online", online);
+
+    HIDERS.add(ME);
+    notifyActivityPrivacyChanged(emailOf(ME), true);
+    await vi.waitFor(() => expect(offline).toHaveBeenCalledWith(emailOf(ME)));
+
+    HIDERS.delete(ME);
+    notifyActivityPrivacyChanged(emailOf(ME), false);
+    await vi.waitFor(() => expect(online).toHaveBeenCalledWith(emailOf(ME)));
   });
 });

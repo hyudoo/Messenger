@@ -2,7 +2,8 @@
 
 import axios from "axios";
 import clsx from "clsx";
-import { useState, useSyncExternalStore } from "react";
+import Image from "next/image";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "react-hot-toast";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -30,6 +31,7 @@ import {
 import { invitePath } from "@/app/libs/invite-code";
 import { matchesSearch } from "@/app/libs/search";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
+import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "@/i18n/navigation";
 
 // The open chat's header and drawer come from the server component: refreshed here right
@@ -106,8 +108,88 @@ interface GroupInviteProps {
   myId?: string;
 }
 
+type JoinRequester = Pick<SafeUser, "id" | "name" | "email" | "image">;
+
+// People waiting to join by the link (admins only): a face and name each, Approve / Decline.
+// The list is the admins' only (omitted from conversation rows): loaded here, and again whenever
+// it changes (join-requests:update, sent to the admins' tabs).
+const JoinRequests: React.FC<{ conversation: ConversationWithUsers }> = ({ conversation }) => {
+  const t = useTranslations("group");
+  const { busy, run } = useGroupRequest();
+  const [users, setUsers] = useState<JoinRequester[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      axios
+        .get<JoinRequester[]>(`/api/conversations/${conversation.id}/join-requests`)
+        .then(({ data }) => !cancelled && setUsers(data))
+        .catch(() => undefined);
+    const changed = (payload: { conversationId?: string }) => {
+      if (payload?.conversationId === conversation.id) {
+        void load();
+      }
+    };
+    const socket = getSocket();
+    void load();
+    socket.on("join-requests:update", changed);
+    // events missed while disconnected
+    socket.on("connect", load);
+    return () => {
+      cancelled = true;
+      socket.off("join-requests:update", changed);
+      socket.off("connect", load);
+    };
+  }, [conversation.id]);
+
+  if (users.length === 0) {
+    return null;
+  }
+  const answer = (userId: string, approve: boolean) =>
+    run(() =>
+      axios.post(`/api/conversations/${conversation.id}/join-requests/${userId}`, { approve })
+    );
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <p className="mb-2 text-xs font-medium text-muted-foreground">
+        {t("join_requests", { count: users.length })}
+      </p>
+      <ul className="flex flex-col gap-2">
+        {users.map((user) => (
+          <li key={user.id} className="flex items-center gap-2">
+            <Image
+              src={user.image || "/images/placeholder.jpg"}
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 rounded-full object-cover"
+            />
+            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{user.name}</span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => answer(user.id, true)}
+              className="shrink-0 rounded-md bg-sky-500 px-2 py-1 text-xs font-semibold text-white transition hover:bg-sky-600 disabled:opacity-50">
+              {t("approve")}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => answer(user.id, false)}
+              className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+              {t("decline")}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
 // The invite link: every member sees and copies it while it is on; admins turn it on, reset it
-// (the old link stops working) or turn it off.
+// (the old link stops working) or turn it off, choose whether they approve new members, and
+// answer the requests.
 export const GroupInvite: React.FC<GroupInviteProps> = ({ conversation, myId }) => {
   const t = useTranslations("group");
   const locale = useLocale();
@@ -122,6 +204,8 @@ export const GroupInvite: React.FC<GroupInviteProps> = ({ conversation, myId }) 
   const link = code ? `${origin}/${locale}${invitePath(code)}` : "";
   const setEnabled = (enabled: boolean) =>
     run(() => axios.post(`/api/conversations/${conversation.id}/invite`, { enabled }));
+  const setApproval = (approval: boolean) =>
+    run(() => axios.post(`/api/conversations/${conversation.id}/invite`, { approval }));
 
   const copy = async () => {
     try {
@@ -156,6 +240,18 @@ export const GroupInvite: React.FC<GroupInviteProps> = ({ conversation, myId }) 
             </button>
           </div>
           {isAdmin && (
+            <label className="mt-2 flex items-center gap-2 text-xs text-foreground">
+              <input
+                type="checkbox"
+                checked={!!conversation.joinApproval}
+                disabled={busy}
+                onChange={(event) => setApproval(event.target.checked)}
+                className="h-4 w-4 rounded border-border text-sky-500 focus:ring-sky-500"
+              />
+              {t("invite_approval")}
+            </label>
+          )}
+          {isAdmin && (
             <div className="mt-2 flex justify-end gap-2 text-xs">
               <button
                 type="button"
@@ -186,6 +282,7 @@ export const GroupInvite: React.FC<GroupInviteProps> = ({ conversation, myId }) 
           </button>
         </div>
       )}
+      {isAdmin && <JoinRequests conversation={conversation} />}
     </section>
   );
 };

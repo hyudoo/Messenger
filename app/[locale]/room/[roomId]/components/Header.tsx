@@ -17,12 +17,15 @@ interface HeaderProps {
   // call status, or the call duration once connected
   status: React.ReactNode;
   remoteMuted: boolean;
+  // a group call with others in it: how many people are in (us included)
+  participants?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
   conversation,
   status,
   remoteMuted,
+  participants,
 }) => {
   const t = useTranslations("call");
   const otherUser = useOtherUser(conversation);
@@ -49,6 +52,9 @@ const Header: React.FC<HeaderProps> = ({
         </div>
         <div className="text-sm tabular-nums text-white/70" aria-live="polite">
           {status}
+          {participants !== undefined && (
+            <span className="text-white/50"> · {t("participants", { count: participants })}</span>
+          )}
         </div>
       </div>
     </div>

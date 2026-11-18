@@ -42,3 +42,10 @@ note/
 
 # Playwright MCP screenshots / snapshots
 .playwright-mcp/
+
+# E2E tests (playwright test): build folder, saved sessions / seeded ids, reports
+/.next-e2e/
+/e2e/.state/
+/test-results/
+/playwright-report/
+/e2e-output/

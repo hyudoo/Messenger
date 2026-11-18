@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   emitToConversation: vi.fn(),
   removeUserFromConversationRoom: vi.fn(),
   notifyBlocksChanged: vi.fn(),
+  notifyContactsChanged: vi.fn(),
+  notifyActivityPrivacyChanged: vi.fn(),
+  callRoomSize: vi.fn(),
   markUploadsUsed: vi.fn(),
   deleteUploadedObjects: vi.fn(),
   pushNewMessage: vi.fn(),
@@ -38,6 +41,9 @@ vi.mock("@/app/libs/socket-server", () => ({
   emitToConversation: mocks.emitToConversation,
   removeUserFromConversationRoom: mocks.removeUserFromConversationRoom,
   notifyBlocksChanged: mocks.notifyBlocksChanged,
+  notifyActivityPrivacyChanged: mocks.notifyActivityPrivacyChanged,
+  notifyContactsChanged: mocks.notifyContactsChanged,
+  callRoomSize: mocks.callRoomSize,
 }));
 vi.mock("@/app/libs/s3", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/app/libs/s3")>()),
@@ -65,12 +71,23 @@ import {
   PATCH as setAdmin,
 } from "@/app/api/conversations/[conversationId]/members/[userId]/route";
 import { POST as setInvite } from "@/app/api/conversations/[conversationId]/invite/route";
-import { POST as joinByLink } from "@/app/api/join/[code]/route";
+import { DELETE as cancelJoinRequest, POST as joinByLink } from "@/app/api/join/[code]/route";
+import { POST as answerJoinRequest } from "@/app/api/conversations/[conversationId]/join-requests/[userId]/route";
+import { GET as getPrivacy, PATCH as setPrivacy } from "@/app/api/settings/privacy/route";
 import { PATCH as updateSettingsOf } from "@/app/api/conversations/[conversationId]/settings/route";
 import { GET as searchMessages } from "@/app/api/conversations/[conversationId]/search/route";
+import { GET as searchEverywhere } from "@/app/api/search/route";
 import { POST as forwardMessage } from "@/app/api/messages/[messageId]/forward/route";
 import { GET as downloadFile } from "@/app/api/messages/[messageId]/download/route";
 import { POST as blockUser } from "@/app/api/users/[userId]/block/route";
+import { POST as requestFriend } from "@/app/api/friends/requests/route";
+import {
+  DELETE as cancelFriendRequest,
+  POST as answerFriendRequest,
+} from "@/app/api/friends/requests/[requestId]/route";
+import { DELETE as unfriendUser } from "@/app/api/friends/[userId]/route";
+import { GET as searchPeople } from "@/app/api/users/search/route";
+
 import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
 import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
 import { POST as markSeen } from "@/app/api/conversations/[conversationId]/seen/route";
@@ -103,6 +120,7 @@ beforeEach(() => {
   mocks.currentUser.mockResolvedValue(me);
   mocks.markUploadsUsed.mockResolvedValue(undefined);
   mocks.deleteUploadedObjects.mockResolvedValue(undefined);
+  mocks.callRoomSize.mockResolvedValue(0);
 });
 
 // the conversation lookup used for membership checks
@@ -300,6 +318,24 @@ describe("POST /api/messages", () => {
       .filter(([, event]) => event === "call:incoming")
       .map(([, , payload]) => (payload as any).callType);
     expect(rung).toEqual(["audio", "video"]);
+  });
+
+  it("joins the call going on instead of ringing again", async () => {
+    asMember();
+    mocks.callRoomSize.mockResolvedValue(2);
+    prisma.message.findFirst.mockResolvedValue({ id: "call-1", isCall: true, callStatus: "answered" });
+    const res = await send({ isCall: true });
+    expect(await res.json()).toMatchObject({ id: "call-1", joined: true });
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(mocks.emitToUser).not.toHaveBeenCalledWith(expect.anything(), "call:incoming", expect.anything());
+  });
+
+  it("starts a new call when the last one is over, even with someone left in the room", async () => {
+    asMember();
+    mocks.callRoomSize.mockResolvedValue(1);
+    prisma.message.findFirst.mockResolvedValue({ id: "call-1", isCall: true, callStatus: "ended" });
+    await send({ isCall: true });
+    expect(prisma.message.create).toHaveBeenCalled();
   });
 
   it("rejects an unknown call type", async () => {
@@ -1083,11 +1119,15 @@ describe("GET /api/conversations/[id]/search", () => {
 
   it("searches the folded text (no case or diacritics), newest first", async () => {
     asMember();
-    prisma.message.findMany.mockResolvedValue([{ id: MESSAGE, body: "Chào" }]);
+    // the first lookup: the messages the user hid for themselves (none)
+    prisma.message.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ id: MESSAGE, body: "Chào" }]);
     expect(await (await search(" CHÀO ")).json()).toEqual([{ id: MESSAGE, body: "Chào" }]);
-    const { where, take } = prisma.message.findMany.mock.calls[0][0];
+    const { where, take } = prisma.message.findMany.mock.calls[1][0];
     expect(take).toBe(30);
-    expect(where.conversationId).toBe(CONVERSATION);
+    expect(where.conversationId).toEqual({ in: [CONVERSATION] });
+    expect(where.id).toBeUndefined();
     expect(where.AND[2]).toEqual({
       OR: [
         { searchText: { contains: "chao" } },
@@ -1095,6 +1135,58 @@ describe("GET /api/conversations/[id]/search", () => {
         { searchText: { isSet: false }, body: { contains: "CHÀO", mode: "insensitive" } },
       ],
     });
+  });
+});
+
+describe("GET /api/search (every conversation)", () => {
+  const search = (q: string) =>
+    searchEverywhere(jsonRequest(`/api/search?q=${encodeURIComponent(q)}`, null, { method: "GET" }));
+  const GROUP_ID = "abababababababababababab";
+
+  it("refuses an empty or long query", async () => {
+    expect((await search(" ")).status).toBe(400);
+    expect((await search("x".repeat(101))).status).toBe(400);
+  });
+
+  it("searches the user's conversations, without hidden messages, with each one's title", async () => {
+    prisma.conversation.findMany.mockResolvedValue([
+      { id: CONVERSATION, name: null, isGroup: false, users: [me, other] },
+      { id: GROUP_ID, name: "Team", isGroup: true, users: [me, other] },
+    ]);
+    const sender = { name: other.name, email: other.email, image: null };
+    prisma.message.findMany
+      // the user hid one message for themselves
+      .mockResolvedValueOnce([{ id: "hidden" }])
+      .mockResolvedValueOnce([
+        { id: MESSAGE, body: "chào", createdAt: new Date(0), conversationId: GROUP_ID, sender },
+        { id: "m2", body: "Chào bạn", createdAt: new Date(0), conversationId: CONVERSATION, sender },
+      ]);
+
+    const body = await (await search("chao")).json();
+
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userIds: { has: ME } } })
+    );
+    const hiddenLookup = prisma.message.findMany.mock.calls[0][0];
+    expect(hiddenLookup.where).toEqual({
+      conversationId: { in: [CONVERSATION, GROUP_ID] },
+      hiddenForIds: { has: ME },
+    });
+    const { where } = prisma.message.findMany.mock.calls[1][0];
+    expect(where.conversationId).toEqual({ in: [CONVERSATION, GROUP_ID] });
+    expect(where.id).toEqual({ notIn: ["hidden"] });
+    // a group shows its name, a 1:1 chat the other person's
+    expect(body.map((result: { conversation: unknown }) => result.conversation)).toEqual([
+      { id: GROUP_ID, isGroup: true, title: "Team" },
+      { id: CONVERSATION, isGroup: false, title: other.name },
+    ]);
+    expect(body[0]).not.toHaveProperty("conversationId");
+  });
+
+  it("finds nothing without conversations", async () => {
+    prisma.conversation.findMany.mockResolvedValue([]);
+    expect(await (await search("chao")).json()).toEqual([]);
+    expect(prisma.message.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -1333,16 +1425,35 @@ describe("deleting a message for oneself", () => {
     expect((await hide()).status).toBe(400);
   });
 
-  it("leaves hidden messages out of the pages", async () => {
+  it("leaves hidden messages out of the pages, by id", async () => {
+    asMember();
+    // the viewer's hidden ones are looked up first (a positive `has`: NOT has would also drop
+    // every message without the list, i.e. nearly all on MongoDB)
+    prisma.message.findMany.mockResolvedValueOnce([{ id: "hidden" }]).mockResolvedValue([]);
+    await olderMessages(
+      jsonRequest(`/api/conversations/${CONVERSATION}/messages?before=${MESSAGE}`, null, { method: "GET" }),
+      params({ conversationId: CONVERSATION })
+    );
+    expect(prisma.message.findMany).toHaveBeenNthCalledWith(1, {
+      where: { conversationId: CONVERSATION, hiddenForIds: { has: ME } },
+      select: { id: true },
+    });
+    expect(prisma.message.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { conversationId: CONVERSATION, id: { notIn: ["hidden"] } },
+      })
+    );
+  });
+
+  it("filters nothing when the viewer hid nothing", async () => {
     asMember();
     await olderMessages(
       jsonRequest(`/api/conversations/${CONVERSATION}/messages?before=${MESSAGE}`, null, { method: "GET" }),
       params({ conversationId: CONVERSATION })
     );
-    expect(prisma.message.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { conversationId: CONVERSATION, NOT: { hiddenForIds: { has: ME } } },
-      })
+    expect(prisma.message.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { conversationId: CONVERSATION } })
     );
   });
 });
@@ -1534,8 +1645,9 @@ describe("unread counts in the conversation list", () => {
       { id: "eeeeeeeeeeeeeeeeeeeeeeee", messages: [last(OTHER, [OTHER, ME])] },
       { id: "ffffffffffffffffffffffff", messages: [last(ME, [ME])] },
     ]);
-    // newest first: two unread from OTHER, then one ME has seen
-    prisma.message.findMany.mockResolvedValue([
+    // first which last messages ME deleted for themselves (none), then the one scan, newest
+    // first: two unread from OTHER, then one ME has seen
+    prisma.message.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
       { senderId: OTHER, seenIds: [OTHER] },
       { senderId: OTHER, seenIds: [OTHER] },
       { senderId: OTHER, seenIds: [OTHER, ME] },
@@ -1544,9 +1656,30 @@ describe("unread counts in the conversation list", () => {
     const body = await (await listConversations()).json();
 
     expect(body.map((item: { unreadCount: number }) => item.unreadCount)).toEqual([2, 0, 0]);
-    expect(prisma.message.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.message.findMany).toHaveBeenCalledTimes(2);
     expect(prisma.message.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { conversationId: CONVERSATION }, take: 100 })
+    );
+  });
+
+  it("previews the newest message the user didn't delete for themselves", async () => {
+    const hidden = "abababababababababababab";
+    prisma.conversation.findMany.mockResolvedValue([
+      { id: CONVERSATION, messages: [{ id: hidden, senderId: ME, seenIds: [ME] }] },
+    ]);
+    // the hidden last message, then (lastVisibleMessage) every hidden one in that chat
+    prisma.message.findMany
+      .mockResolvedValueOnce([{ id: hidden }])
+      .mockResolvedValueOnce([{ id: hidden }]);
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE, body: "older", senderId: ME, seenIds: [ME] });
+
+    const body = await (await listConversations()).json();
+
+    expect(body[0].messages.map((message: { id: string }) => message.id)).toEqual([MESSAGE]);
+    expect(prisma.message.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { conversationId: CONVERSATION, id: { notIn: [hidden] } },
+      })
     );
   });
 });
@@ -1845,13 +1978,22 @@ describe("group photo, admins, invite links", () => {
     );
   });
 
-  it("removes the photo without an event", async () => {
+  it("removes the photo and posts the event", async () => {
     prisma.conversation.findFirst.mockResolvedValue({ ...group(OTHER), image: uploadUrl(OTHER) });
     prisma.conversation.update.mockResolvedValue(group(OTHER));
     expect((await patch({ image: null })).status).toBe(200);
     expect(prisma.conversation.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { image: null } })
     );
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ systemType: "photo_removed" }) })
+    );
+  });
+
+  it("posts nothing when removing a photo the group didn't have", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(OTHER));
+    prisma.conversation.update.mockResolvedValue(group(OTHER));
+    expect((await patch({ image: null })).status).toBe(200);
     expect(prisma.message.create).not.toHaveBeenCalled();
   });
 
@@ -1974,7 +2116,7 @@ describe("group photo, admins, invite links", () => {
       );
       const second = await (await invite(true)).json();
       expect(second.inviteCode).not.toBe(inviteCode);
-      expect(await (await invite(false)).json()).toEqual({ inviteCode: null });
+      expect(await (await invite(false)).json()).toEqual({ inviteCode: null, joinApproval: false });
     });
 
     it("refuses malformed and unknown codes without a lookup for the malformed", async () => {
@@ -2021,5 +2163,327 @@ describe("group photo, admins, invite links", () => {
       expect((await join(CODE)).status).toBe(200);
       expect(prisma.conversation.update).not.toHaveBeenCalled();
     });
+
+    describe("admin approval", () => {
+      const answer = (userId: string, approve: unknown) =>
+        answerJoinRequest(
+          jsonRequest(`/api/conversations/${CONVERSATION}/join-requests/${userId}`, { approve }),
+          params({ conversationId: CONVERSATION, userId })
+        );
+      // Conversation.joinRequestIds is omitted from rows: read with its own select
+      const waitingFor = (ids: string[]) =>
+        prisma.conversation.findUnique.mockResolvedValue({ joinRequestIds: ids });
+      const approvalGroup = { ...group(OTHER, [other, third]), joinApproval: true };
+
+      it("files a request instead of joining, once, and tells only the admins", async () => {
+        prisma.conversation.findFirst.mockResolvedValue(approvalGroup);
+        waitingFor([]);
+        prisma.conversation.update.mockResolvedValue({ id: CONVERSATION });
+
+        expect(await (await join(CODE)).json()).toEqual({ requested: true });
+        expect(prisma.conversation.update).toHaveBeenCalledWith({
+          where: { id: CONVERSATION },
+          data: { joinRequestIds: { push: ME } },
+          select: { id: true },
+        });
+        // OTHER owns the group; THIRD is a plain member
+        expect(mocks.emitToUser).toHaveBeenCalledWith(other.email, "join-requests:update", {
+          conversationId: CONVERSATION,
+        });
+        expect(mocks.emitToUser).not.toHaveBeenCalledWith(
+          third.email,
+          "join-requests:update",
+          expect.anything()
+        );
+        expect(prisma.message.create).not.toHaveBeenCalled();
+
+        // asking again changes nothing
+        prisma.conversation.update.mockClear();
+        waitingFor([ME]);
+        expect(await (await join(CODE)).json()).toEqual({ requested: true });
+        expect(prisma.conversation.update).not.toHaveBeenCalled();
+      });
+
+      it("lets the user take their request back", async () => {
+        const cancel = () =>
+          cancelJoinRequest(
+            jsonRequest(`/api/join/${CODE}`, null, { method: "DELETE" }),
+            params({ code: CODE })
+          );
+        prisma.conversation.findFirst.mockResolvedValue(approvalGroup);
+        waitingFor([THIRD]);
+        expect((await cancel()).status).toBe(404);
+
+        waitingFor([THIRD, ME]);
+        prisma.conversation.update.mockResolvedValue({ id: CONVERSATION });
+        expect((await cancel()).status).toBe(204);
+        expect(prisma.conversation.update).toHaveBeenCalledWith({
+          where: { id: CONVERSATION },
+          data: { joinRequestIds: { set: [THIRD] } },
+          select: { id: true },
+        });
+        expect(mocks.emitToUser).toHaveBeenCalledWith(other.email, "join-requests:update", {
+          conversationId: CONVERSATION,
+        });
+      });
+
+      it("lets only admins answer, and only existing requests", async () => {
+        waitingFor([THIRD]);
+        prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, []));
+        expect((await answer(THIRD, "yes")).status).toBe(400);
+        expect((await answer(THIRD, true)).status).toBe(403);
+
+        prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME], [me, other]));
+        expect((await answer("eeeeeeeeeeeeeeeeeeeeeeee", true)).status).toBe(404);
+      });
+
+      it("approves: joins them and clears the request", async () => {
+        prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME], [me, other]));
+        waitingFor([THIRD]);
+        prisma.user.findUnique.mockResolvedValue(third);
+        prisma.conversation.update.mockResolvedValue(group(OTHER, [me, other, third]));
+        prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+        expect(await (await answer(THIRD, true)).json()).toEqual({ approved: true });
+        expect(prisma.conversation.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { users: { connect: { id: THIRD } }, joinRequestIds: { set: [] } },
+          })
+        );
+        expect(mocks.emitToUser).toHaveBeenCalledWith(
+          third.email,
+          "conversation:new",
+          expect.objectContaining({ id: CONVERSATION })
+        );
+        // no member gets the list itself
+        expect(mocks.emitToUser).not.toHaveBeenCalledWith(
+          expect.anything(),
+          "conversation:update",
+          expect.objectContaining({ joinRequestIds: expect.anything() })
+        );
+      });
+
+      it("declines: drops the request and tells them", async () => {
+        prisma.conversation.findFirst.mockResolvedValue(withAdmins(OTHER, [ME], [me, other]));
+        waitingFor([THIRD]);
+        prisma.user.findUnique.mockResolvedValue(third);
+        prisma.conversation.update.mockResolvedValue({ id: CONVERSATION });
+
+        expect(await (await answer(THIRD, false)).json()).toEqual({ approved: false });
+        expect(prisma.conversation.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { joinRequestIds: { set: [] } } })
+        );
+        expect(mocks.emitToUser).toHaveBeenCalledWith(third.email, "join:declined", {
+          conversationId: CONVERSATION,
+        });
+        expect(prisma.message.create).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe("friends", () => {
+  const REQUEST = "eeeeeeeeeeeeeeeeeeeeeeee";
+  const ask = (userId: unknown) => requestFriend(jsonRequest("/api/friends/requests", { userId }));
+  const answer = (accept: unknown) =>
+    answerFriendRequest(
+      jsonRequest(`/api/friends/requests/${REQUEST}`, { accept }),
+      params({ requestId: REQUEST })
+    );
+  // what the caller's / the other's friendIds hold (findUnique with a select on friendIds)
+  const friendsOf = (lists: Record<string, string[]>) =>
+    prisma.user.findUnique.mockImplementation(async ({ where, select }: any) =>
+      select?.friendIds ? { friendIds: lists[where.id] ?? [] } : { id: where.id, email: user(where.id).email }
+    );
+
+  it("refuses itself, unknown people, and block partners", async () => {
+    expect((await ask(ME)).status).toBe(400);
+    expect((await ask("nope")).status).toBe(400);
+    prisma.user.findUnique.mockResolvedValue(null);
+    expect((await ask(OTHER)).status).toBe(404);
+
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(1);
+    expect((await ask(OTHER)).status).toBe(403);
+    expect(prisma.friendRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("sends a request, once, and tells both sides", async () => {
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(0);
+    prisma.friendRequest.findUnique.mockResolvedValue(null);
+    prisma.friendRequest.count.mockResolvedValue(0);
+    prisma.friendRequest.create.mockResolvedValue({ id: REQUEST });
+
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "requested" });
+    expect(prisma.friendRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { fromId: ME, toId: OTHER } })
+    );
+    expect(mocks.notifyContactsChanged).toHaveBeenCalledWith([me.email, other.email], true);
+
+    // asked already: nothing new
+    prisma.friendRequest.create.mockClear();
+    prisma.friendRequest.findUnique.mockImplementation(async ({ where }: any) =>
+      where.fromId_toId.fromId === ME ? { id: REQUEST } : null
+    );
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "pending" });
+    expect(prisma.friendRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts theirs instead when they asked first: friends on both sides", async () => {
+    friendsOf({});
+    prisma.user.count.mockResolvedValue(0);
+    prisma.friendRequest.findUnique.mockImplementation(async ({ where }: any) =>
+      where.fromId_toId.fromId === OTHER ? { id: REQUEST } : null
+    );
+
+    expect(await (await ask(OTHER)).json()).toEqual({ status: "accepted" });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ME }, data: { friendIds: { set: [OTHER] } } })
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [ME] } } })
+    );
+    expect(prisma.friendRequest.deleteMany).toHaveBeenCalled();
+  });
+
+  it("lets only the recipient answer, and only the sender cancel", async () => {
+    const request = (fromId: string, toId: string) => ({
+      id: REQUEST,
+      fromId,
+      toId,
+      from: { email: user(fromId).email },
+      to: { email: user(toId).email },
+    });
+    // sent by ME: ME can't answer it, but can cancel it
+    prisma.friendRequest.findUnique.mockResolvedValue(request(ME, OTHER));
+    expect((await answer(true)).status).toBe(404);
+    const cancelled = await cancelFriendRequest(
+      jsonRequest(`/api/friends/requests/${REQUEST}`, null, { method: "DELETE" }),
+      params({ requestId: REQUEST })
+    );
+    expect(cancelled.status).toBe(204);
+    expect(prisma.friendRequest.delete).toHaveBeenCalledWith({ where: { id: REQUEST } });
+
+    // sent to ME: declining drops it, accepting makes friends
+    prisma.friendRequest.findUnique.mockResolvedValue(request(OTHER, ME));
+    expect((await answer("yes")).status).toBe(400);
+    expect(await (await answer(false)).json()).toEqual({ accepted: false });
+    friendsOf({});
+    expect(await (await answer(true)).json()).toEqual({ accepted: true });
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [ME] } } })
+    );
+    expect(mocks.notifyContactsChanged).toHaveBeenCalledWith([other.email, me.email], true);
+  });
+
+  it("unfriends both sides, only a friend", async () => {
+    const unfriend = (userId: string) =>
+      unfriendUser(jsonRequest(`/api/friends/${userId}`, null, { method: "DELETE" }), params({ userId }));
+    friendsOf({});
+    expect((await unfriend(OTHER)).status).toBe(404);
+
+    friendsOf({ [ME]: [OTHER, THIRD], [OTHER]: [ME] });
+    expect((await unfriend(OTHER)).status).toBe(204);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ME }, data: { friendIds: { set: [THIRD] } } })
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: OTHER }, data: { friendIds: { set: [] } } })
+    );
+  });
+
+  it("finds people by exact email or by name, without emails, never the caller or block partners", async () => {
+    const find = (q: string) =>
+      searchPeople(jsonRequest(`/api/users/search?q=${encodeURIComponent(q)}`, null, { method: "GET" }));
+    expect((await find("a")).status).toBe(400);
+
+    // THIRD blocked ME
+    prisma.user.findUnique.mockResolvedValue({ blockedUserIds: [], friendIds: [] });
+    prisma.user.findMany.mockImplementation(async ({ where }: any) =>
+      where.blockedUserIds ? [{ id: THIRD, email: third.email }] : [{ id: OTHER, name: other.name, image: null }]
+    );
+    prisma.friendRequest.findMany.mockResolvedValue([{ fromId: OTHER, toId: ME }]);
+
+    expect(await (await find("user")).json()).toEqual([
+      { id: OTHER, name: other.name, image: null, relation: "incoming" },
+    ]);
+    const byName = prisma.user.findMany.mock.calls.find(([args]: any) => args.select?.name)![0];
+    expect(byName.where).toEqual({
+      id: { notIn: [ME, THIRD] },
+      name: { contains: "user", mode: "insensitive" },
+    });
+    expect(byName.select).toEqual({ id: true, name: true, image: true });
+
+    prisma.user.findMany.mockClear();
+    await find(other.email!);
+    const byEmail = prisma.user.findMany.mock.calls.find(([args]: any) => args.select?.name)![0];
+    expect(byEmail.where.email).toEqual({ equals: other.email, mode: "insensitive" });
+  });
+});
+
+describe("privacy", () => {
+  const patch = (body: unknown) =>
+    setPrivacy(jsonRequest("/api/settings/privacy", body, { method: "PATCH" }));
+  const seen = () =>
+    markSeen(
+      jsonRequest(`/api/conversations/${CONVERSATION}/seen`, {}),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("returns the settings and the blocked people", async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ hideActivity: true, hideReadReceipts: null })
+      .mockResolvedValueOnce({ blockedUserIds: [OTHER] });
+    prisma.user.findMany.mockResolvedValue([{ id: OTHER, name: "B", email: other.email, image: null }]);
+    expect(await (await getPrivacy()).json()).toEqual({
+      hideActivity: true,
+      hideReadReceipts: false,
+      blocked: [{ id: OTHER, name: "B", email: other.email, image: null }],
+    });
+  });
+
+  it("validates, saves and re-announces only a changed active status", async () => {
+    expect((await patch({ hideActivity: "yes" })).status).toBe(400);
+    prisma.user.findUnique.mockResolvedValue({ hideActivity: false, hideReadReceipts: false });
+    prisma.user.update.mockResolvedValue({ hideActivity: true, hideReadReceipts: false });
+    expect(await (await patch({ hideActivity: true })).json()).toEqual({
+      hideActivity: true,
+      hideReadReceipts: false,
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: ME },
+      data: { hideActivity: true },
+      select: { hideActivity: true, hideReadReceipts: true },
+    });
+    expect(mocks.notifyActivityPrivacyChanged).toHaveBeenCalledWith(me.email, true);
+
+    mocks.notifyActivityPrivacyChanged.mockClear();
+    prisma.user.update.mockResolvedValue({ hideActivity: false, hideReadReceipts: true });
+    await patch({ hideReadReceipts: true });
+    expect(mocks.notifyActivityPrivacyChanged).not.toHaveBeenCalled();
+  });
+
+  it("keeps a read without a receipt private: no seen, no update to the room", async () => {
+    asMember();
+    prisma.user.findUnique.mockResolvedValue({ hideActivity: false, hideReadReceipts: true });
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE, seenIds: [OTHER], privateSeenIds: [] });
+    prisma.message.update.mockResolvedValue({ id: MESSAGE, seen: [other] });
+
+    expect((await seen()).status).toBe(200);
+    expect(prisma.message.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { privateSeenIds: { push: ME } } })
+    );
+    expect(mocks.emitToConversation).not.toHaveBeenCalled();
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      me.email,
+      "conversation:update",
+      expect.objectContaining({ id: CONVERSATION, read: true })
+    );
+
+    prisma.message.update.mockClear();
+    prisma.message.findFirst.mockResolvedValue({ id: MESSAGE, seenIds: [], privateSeenIds: [ME] });
+    await seen();
+    expect(prisma.message.update).not.toHaveBeenCalled();
   });
 });

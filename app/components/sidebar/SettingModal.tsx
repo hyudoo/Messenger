@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing } from "@/i18n/routing";
 import { SafeUser } from "@/app/types";
 import ImageUploadButton from "../ImageUploadButton";
+import PrivacySettings from "./PrivacySettings";
 import Input from "../inputs/Input";
 import Modal from "../modals/Modal";
 import Button from "../Button";
@@ -275,6 +276,8 @@ const SettingModal: React.FC<SettingModalProps> = ({
               )}
             </div>
           </div>
+
+          {isOpen && <PrivacySettings />}
         </div>
 
         <div

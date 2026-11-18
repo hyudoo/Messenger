@@ -2,22 +2,48 @@
 
 import { SafeUser } from "@/app/types";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import SearchInput from "@/app/components/inputs/SearchInput";
+import type { FriendRequestItem } from "@/app/actions/getFriendRequests";
+import { getSocket } from "@/app/libs/socket-client";
 import { matchesSearch } from "@/app/libs/search";
+import { useRouter } from "@/i18n/navigation";
 
+import FriendRequests from "./FriendRequests";
+import PeopleSearch from "./PeopleSearch";
 import UserBox from "./UserBox";
 
 interface UserListProps {
+  // the user's friends (getUsers)
   items: SafeUser[];
+  incoming: FriendRequestItem[];
+  outgoing: FriendRequestItem[];
 }
 
-const UserList: React.FC<UserListProps> = ({ items }) => {
+// The contacts page: friend requests, then the friends (filtered by the search box), then, for a
+// long enough query, "Find people" (anyone by exact email or by name). Reloaded when friends or
+// requests change on either side (contacts:update with `friends`).
+const UserList: React.FC<UserListProps> = ({ items, incoming, outgoing }) => {
   const t = useTranslations("users");
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const visible = items.filter((item) => matchesSearch(query, item.name, item.email));
+  const trimmed = query.trim();
+  const visible = items.filter((item) => matchesSearch(trimmed, item.name, item.email));
+
+  useEffect(() => {
+    const socket = getSocket();
+    const changed = (payload: { friends?: boolean }) => {
+      if (payload?.friends) {
+        router.refresh();
+      }
+    };
+    socket.on("contacts:update", changed);
+    return () => {
+      socket.off("contacts:update", changed);
+    };
+  }, [router]);
 
   return (
     <aside
@@ -46,15 +72,20 @@ const UserList: React.FC<UserListProps> = ({ items }) => {
             {t("title")}
           </div>
         </div>
-        {items.length > 0 && (
-          <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
+        <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
+        {!trimmed && <FriendRequests incoming={incoming} outgoing={outgoing} />}
+        {(visible.length > 0 || !trimmed) && (
+          <h3 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("friends_heading", { count: items.length })}
+          </h3>
         )}
         {visible.map((item) => (
           <UserBox key={item.id} data={item} />
         ))}
-        {query && visible.length === 0 && (
-          <p className="py-6 text-center text-sm text-muted-foreground">{t("no_results")}</p>
+        {!trimmed && items.length === 0 && (
+          <p className="px-3 py-4 text-sm text-muted-foreground">{t("no_friends")}</p>
         )}
+        <PeopleSearch query={trimmed} />
       </div>
     </aside>
   );

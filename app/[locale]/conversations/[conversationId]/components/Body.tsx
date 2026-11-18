@@ -17,8 +17,15 @@ import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { ImageViewerProvider } from "./ImageViewer";
 import ForwardDialog from "./ForwardDialog";
 import { flashMessage } from "./MessageReply";
-import { onMessageJump } from "@/app/hooks/useMessageJump";
+import useMessageJump, { onMessageJump } from "@/app/hooks/useMessageJump";
+// only the query string: navigation itself goes through @/i18n/navigation
+import { useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
+import {
+  MAX_KEPT_MESSAGES,
+  keepNewest,
+  scrollIntoViewSettled,
+} from "@/app/libs/message-window";
 
 interface BodyProps {
   initialMessages: FullMessageType[];
@@ -28,6 +35,10 @@ interface BodyProps {
   // the first message the user hadn't read when opening the chat: a "new messages" divider goes
   // before it, and the chat opens there instead of at the bottom
   firstUnreadId?: string | null;
+  // false when the user hides their read receipts (then they see nobody's either)
+  showReceipts?: boolean;
+  // a group: a call going on can be joined from its call message
+  isGroup?: boolean;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -94,6 +105,8 @@ const Body: React.FC<BodyProps> = ({
   initialHasMore,
   firstUnreadId,
   members,
+  showReceipts = true,
+  isGroup = false,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
@@ -174,6 +187,18 @@ const Body: React.FC<BodyProps> = ({
     [conversationId, t]
   );
 
+  // Opened from the inbox's message search (/conversations/<id>?message=<id>): show that message,
+  // then drop the parameter so a reload doesn't jump again. After the jump handler above (effects
+  // run in order), and again when another result of this same chat is picked.
+  const jumpParam = useSearchParams().get("message");
+  useEffect(() => {
+    if (!jumpParam || !/^[a-f\d]{24}$/i.test(jumpParam)) {
+      return;
+    }
+    useMessageJump.getState().request(jumpParam);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [jumpParam]);
+
   useEffect(() => {
     // "seen" only while the user can actually see the chat: not from a hidden tab, and again
     // once the tab comes back
@@ -192,13 +217,22 @@ const Body: React.FC<BodyProps> = ({
         return;
       }
       const ownSent = incoming.some((message) => message.sender?.email === myEmailRef.current);
-      if (nearBottomRef.current || ownSent) {
+      const following = nearBottomRef.current || ownSent;
+      if (following) {
         scrollToBottomRef.current = true;
       } else {
         const known = new Set(messagesRef.current.map((message) => message.id));
         setUnseenCount((count) => count + incoming.filter((m) => !known.has(m.id)).length);
       }
-      setMessages((current) => appendNew(current, incoming));
+      // at the bottom of a long chat the oldest messages go (scrolling up loads them again);
+      // never while the user reads further up
+      setMessages((current) => {
+        const next = appendNew(current, incoming);
+        return following ? keepNewest(next) : next;
+      });
+      if (following && messagesRef.current.length + incoming.length > MAX_KEPT_MESSAGES) {
+        setHasMore(true);
+      }
       markSeen();
     };
 
@@ -348,10 +382,9 @@ const Body: React.FC<BodyProps> = ({
       // opening the chat with unread messages: start at the first of them (the browser stops at
       // the bottom when they fit on the screen)
       const divider = isFirstLayoutRef.current ? unreadDividerRef.current : null;
-      if (divider) {
-        divider.scrollIntoView({ block: "start" });
-      } else {
-        bottomRef.current?.scrollIntoView();
+      const target = divider ?? bottomRef.current;
+      if (target) {
+        scrollIntoViewSettled(target, divider ? { block: "start" } : undefined);
       }
     }
     scrollToBottomRef.current = false;
@@ -379,8 +412,8 @@ const Body: React.FC<BodyProps> = ({
   const outboxCount = outboxHere.length;
   const previousOutboxCount = useRef(outboxCount);
   useLayoutEffect(() => {
-    if (outboxCount > previousOutboxCount.current) {
-      bottomRef.current?.scrollIntoView();
+    if (outboxCount > previousOutboxCount.current && bottomRef.current) {
+      scrollIntoViewSettled(bottomRef.current);
     }
     previousOutboxCount.current = outboxCount;
   }, [outboxCount]);
@@ -458,6 +491,9 @@ const Body: React.FC<BodyProps> = ({
           ref={containerRef}
           onScroll={handleScroll}
           className="h-full overflow-y-auto">
+          {/* Each row has content-visibility: auto, so the browser skips the layout and painting
+              of rows off the screen (long chats); contain-intrinsic-size "auto" remembers a row's
+              last real height, the 72px is only a guess for rows never shown. */}
           {hasMore && (
             <div className="flex justify-center pt-4">
               {/* fallback for when the first page doesn't fill the screen (no scroll) */}
@@ -473,7 +509,9 @@ const Body: React.FC<BodyProps> = ({
           {shown.map(({ message, item }, i) => {
             const previous = shown[i - 1]?.message;
             return (
-              <div key={item?.clientId ?? message.id}>
+              <div
+                key={item?.clientId ?? message.id}
+                className="[contain-intrinsic-size:auto_72px] [content-visibility:auto]">
                 {startsNewDay(previous, message) && <DayDivider date={message.createdAt} />}
                 {message.id === firstUnreadId && (
                   <div
@@ -488,6 +526,8 @@ const Body: React.FC<BodyProps> = ({
                 )}
                 <MessageBox
                   isLast={i === shown.length - 1}
+                  showReceipts={showReceipts}
+                  joinableCall={isGroup}
                   showHeader={startsGroup(previous, message)}
                   data={message}
                   pending={

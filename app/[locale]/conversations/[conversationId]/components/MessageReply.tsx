@@ -6,6 +6,7 @@ import { HiArrowUturnLeft } from "react-icons/hi2";
 
 import { ReplyPreview } from "@/app/types";
 import useMessageJump from "@/app/hooks/useMessageJump";
+import { scrollIntoViewSettled } from "@/app/libs/message-window";
 
 type Snippetable = Pick<ReplyPreview, "body" | "image" | "isCall" | "deletedAt"> & {
   attachment?: ReplyPreview["attachment"];
@@ -45,7 +46,9 @@ export const flashMessage = (id: string) => {
   if (!element) {
     return false;
   }
-  element.scrollIntoView({ behavior: "smooth", block: "center" });
+  // not smooth: the rows on the way may be skipped ones (content-visibility) whose real height
+  // only shows once rendered, so the position is corrected on the next frame
+  scrollIntoViewSettled(element, { block: "center" });
   element.classList.add("message-flash");
   setTimeout(() => element.classList.remove("message-flash"), 1600);
   return true;

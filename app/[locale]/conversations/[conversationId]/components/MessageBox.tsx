@@ -2,10 +2,11 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { Fragment, useState } from "react";
+import { Fragment, memo, useState } from "react";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
-import { FullMessageType } from "@/app/types";
+import { FullMessageType, MessageReaction } from "@/app/types";
+import { toggleReaction } from "@/app/libs/reaction-toggle";
 import { useTranslations } from "next-intl";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import {
@@ -32,6 +33,7 @@ import { ReactionChips, ReactionPicker } from "./MessageReactions";
 import { ReplyQuote, messageElementId } from "./MessageReply";
 import useComposer from "@/app/hooks/useComposer";
 import useSystemText from "@/app/hooks/useSystemText";
+import useStartCall from "@/app/hooks/useStartCall";
 import {
   canEditMessage,
   canForwardMessage,
@@ -59,6 +61,10 @@ interface MessageBoxProps {
   showHeader?: boolean;
   // a message from the outbox that the server hasn't confirmed yet (app/hooks/useOutbox.ts)
   pending?: { status: "sending" | "failed"; tooFast?: boolean; onRetry: () => void; onDiscard: () => void };
+  // false when the user hides their own read receipts: no "seen by" faces
+  showReceipts?: boolean;
+  // a group chat: a call message whose call is going on gets a "Join" button
+  joinableCall?: boolean;
 }
 
 // The body with http(s) links clickable (opened in a new tab, without the referrer) and
@@ -112,8 +118,13 @@ const MessageText: React.FC<{
 
 // A call message: direction, how it went (callStatus, kept by server/call-log.ts) and, once
 // answered and hung up, its duration. Calls from before callStatus existed show the direction only.
-const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call, isOwn }) => {
+const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean; joinable: boolean }> = ({
+  call,
+  isOwn,
+  joinable,
+}) => {
   const t = useTranslations("chat");
+  const startCall = useStartCall(call.conversationId);
   const failed = call.callStatus === "declined" || call.callStatus === "missed";
   const duration = call.callStatus === "ended" ? callDurationSeconds(call) : null;
 
@@ -144,6 +155,21 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean }> = ({ call
           </span>
         )}
       </div>
+      {/* a group call going on (answered, not ended): join it late (/api/messages joins the
+          running call instead of starting a new one) */}
+      {joinable && call.callStatus === "answered" && (
+        <button
+          type="button"
+          onClick={() => startCall(kind)}
+          className={clsx(
+            "ml-1 rounded-full px-3 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2",
+            isOwn
+              ? "bg-white/20 text-white hover:bg-white/30 focus-visible:ring-white/70"
+              : "bg-sky-500 text-white hover:bg-sky-600 focus-visible:ring-sky-500/50"
+          )}>
+          {t("join_call")}
+        </button>
+      )}
     </div>
   );
 };
@@ -290,7 +316,14 @@ const SeenAvatars: React.FC<{ users: FullMessageType["seen"] }> = ({ users }) =>
   );
 };
 
-const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true, pending }) => {
+const MessageBox: React.FC<MessageBoxProps> = ({
+  data,
+  isLast,
+  showHeader = true,
+  pending,
+  showReceipts = true,
+  joinableCall = false,
+}) => {
   const t = useTranslations();
   const dateLocale = useDateLocale();
   const session = useSession();
@@ -303,18 +336,34 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
   const isOwn = myEmail === data?.sender?.email;
 
   const recalled = !!data.deletedAt;
+  // Optimistic reactions: the chips change at once. The override holds only while `data.reactions`
+  // is still the list it was made from; the server's messages:update (a new list) replaces it,
+  // and a failed request drops it.
+  const [optimistic, setOptimistic] = useState<{
+    from: FullMessageType["reactions"];
+    value: MessageReaction[];
+  } | null>(null);
+  const serverReactions =
+    optimistic && optimistic.from === data.reactions ? optimistic.value : data.reactions;
   // none on a recalled message or a call (calls from before the rule may still have some)
-  const reactions = canReactToMessage(data) ? (data.reactions ?? []) : [];
+  const reactions = canReactToMessage(data) ? (serverReactions ?? []) : [];
   const myReaction = reactions.find((reaction) => myEmail && reaction.user.email === myEmail)?.emoji;
   // the conversation room sends the updated message back (messages:update)
   const react = (emoji: string) => {
+    if (myEmail) {
+      setOptimistic({
+        from: data.reactions,
+        value: toggleReaction(reactions, { email: myEmail, name: session.data?.user?.name ?? null }, emoji),
+      });
+    }
     axios
       .post(`/api/messages/${data.id}/reactions`, { emoji })
-      .catch((error) =>
+      .catch((error) => {
+        setOptimistic(null);
         toast.error(
           error?.response?.status === 429 ? t("chat.send_too_fast") : t("reactions.failed")
-        )
-      );
+        );
+      });
   };
 
   // nothing to react to (or act on) before the server has the message, once recalled, or
@@ -450,7 +499,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
               />
             )}
             {data.linkPreview && !recalled && (
-              <LinkPreviewCard preview={data.linkPreview} isOwn={isOwn} />
+              <LinkPreviewCard messageId={data.id} preview={data.linkPreview} isOwn={isOwn} />
             )}
             {data.attachment?.kind === "voice" && (
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />
@@ -466,7 +515,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
                 />
               </div>
             )}
-            {data.isCall && <CallSummary call={data} isOwn={isOwn} />}
+            {data.isCall && <CallSummary call={data} isOwn={isOwn} joinable={joinableCall} />}
           </div>
           {actionable && <ReactionPicker onReact={react} mine={myReaction} />}
           {actionable && <MessageActions message={data} isOwn={isOwn} />}
@@ -521,10 +570,13 @@ const MessageBox: React.FC<MessageBoxProps> = ({ data, isLast, showHeader = true
         {reactions.length > 0 && (
           <ReactionChips reactions={reactions} myEmail={myEmail} onReact={react} />
         )}
-        {isLast && seenBy.length > 0 && <SeenAvatars users={seenBy} />}
+        {isLast && showReceipts && seenBy.length > 0 && <SeenAvatars users={seenBy} />}
       </div>
     </div>
   );
 };
 
-export default MessageBox;
+// Memoized: Body re-renders on typing / new-message counts, and a long chat has many rows. A
+// message's props only change when it does (a new object from messages:update) or when it
+// stops / starts being the last one.
+export default memo(MessageBox);

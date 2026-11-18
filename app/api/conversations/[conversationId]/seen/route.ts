@@ -7,6 +7,7 @@ import prisma from "@/app/libs/prismadb";
 import { MESSAGE_INCLUDE } from "@/app/libs/message-include";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
+import { privacyOf } from "@/app/libs/privacy";
 
 interface IParams {
   conversationId?: string;
@@ -40,11 +41,31 @@ export async function POST(
     const lastMessage = await prisma.message.findFirst({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: "desc" },
-      select: { id: true, seenIds: true },
+      select: { id: true, seenIds: true, privateSeenIds: true },
     });
 
     // nothing to mark, or already seen by this user
-    if (!lastMessage || lastMessage.seenIds.includes(currentUser.id)) {
+    if (
+      !lastMessage ||
+      lastMessage.seenIds.includes(currentUser.id) ||
+      (lastMessage.privateSeenIds ?? []).includes(currentUser.id)
+    ) {
+      return new NextResponse("Success");
+    }
+
+    // Read receipts hidden: the read is kept where only the unread count looks (privateSeenIds),
+    // and only the user's own tabs hear of it (their inbox clears the count: read).
+    if ((await privacyOf(currentUser.id)).hideReadReceipts) {
+      const message = await prisma.message.update({
+        where: { id: lastMessage.id },
+        include: MESSAGE_INCLUDE,
+        data: { privateSeenIds: { push: currentUser.id } },
+      });
+      emitToUser(currentUser.email, "conversation:update", {
+        id: conversation.id,
+        messages: [message],
+        read: true,
+      });
       return new NextResponse("Success");
     }
 

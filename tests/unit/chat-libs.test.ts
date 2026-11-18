@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { splitLinks } from "@/app/libs/linkify";
+import { KEPT_AFTER_TRIM, MAX_KEPT_MESSAGES, keepNewest } from "@/app/libs/message-window";
 import {
   findFoldedMatch,
   matchesSearch,
@@ -8,7 +9,7 @@ import {
   searchTextOf,
 } from "@/app/libs/search";
 import { GROUP_WINDOW_MS, startsGroup, startsNewDay } from "@/app/libs/message-groups";
-import { countUnread, findFirstUnread, formatUnread } from "@/app/libs/unread";
+import { countUnread, findFirstUnread, formatUnread, hasRead } from "@/app/libs/unread";
 import { findMentions, mentionQueryAt, splitMentions } from "@/app/libs/mentions";
 import {
   canEditGroup,
@@ -328,5 +329,33 @@ describe("invite codes", () => {
     expect(safeNextPath("https://evil.example")).toBeNull();
     expect(safeNextPath("/conversations")).toBeNull();
     expect(safeNextPath(["/join/AbCdEfGhIjKlMn_-"])).toBeNull();
+  });
+});
+
+describe("private reads", () => {
+  it("count a read kept without a receipt as the read marker", () => {
+    expect(hasRead({ senderId: "x", seenIds: [], privateSeenIds: ["me"] }, "me")).toBe(true);
+    expect(hasRead({ senderId: "x", seenIds: [] }, "me")).toBe(false);
+    const newestFirst = [
+      { senderId: "x", seenIds: [] },
+      { senderId: "x", seenIds: [], privateSeenIds: ["me"] },
+      { senderId: "x", seenIds: [] },
+    ];
+    expect(countUnread(newestFirst, "me")).toBe(1);
+  });
+});
+
+describe("keepNewest (long chats)", () => {
+  it("keeps the same array up to the maximum", () => {
+    const messages = Array.from({ length: MAX_KEPT_MESSAGES }, (_, i) => i);
+    expect(keepNewest(messages)).toBe(messages);
+  });
+
+  it("keeps only the newest past the maximum, in order", () => {
+    const messages = Array.from({ length: MAX_KEPT_MESSAGES + 1 }, (_, i) => i);
+    const kept = keepNewest(messages);
+    expect(kept).toHaveLength(KEPT_AFTER_TRIM);
+    expect(kept[0]).toBe(MAX_KEPT_MESSAGES + 1 - KEPT_AFTER_TRIM);
+    expect(kept[kept.length - 1]).toBe(MAX_KEPT_MESSAGES);
   });
 });

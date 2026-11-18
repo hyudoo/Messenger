@@ -1,24 +1,30 @@
 import prisma from "./prismadb";
 import { deleteConversation } from "./conversation-delete";
 import { postSystemMessage } from "./system-message";
-import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
+import { emitToUser, notifyContactsChanged, removeUserFromConversationRoom } from "./socket-server";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
+import { lastSeenViewsOf } from "./privacy";
+import { joinRequestIdsOf, notifyJoinRequestsChanged } from "./join-requests";
 
 // Sends a group's new member list (and name / owner / admins / photo / invite code) to its
 // members' tabs: the inbox updates the item and an open chat refreshes its header and drawer
 // (ConversationList).
-export const emitGroupUpdate = (conversation: ConversationWithUsers, to: SafeUser[]) => {
+// Each gets the members as they may see them (lastSeenViewsOf: no last active time of those who
+// hide it or of block partners).
+export const emitGroupUpdate = async (conversation: ConversationWithUsers, to: SafeUser[]) => {
+  const usersFor = await lastSeenViewsOf(conversation.users);
   to.forEach((user) => {
     if (user.email) {
       emitToUser(user.email, "conversation:update", {
         id: conversation.id,
         name: conversation.name,
-        users: conversation.users,
+        users: usersFor(user.id),
         userIds: conversation.userIds,
         ownerId: conversation.ownerId,
         adminIds: conversation.adminIds ?? [],
         image: conversation.image ?? null,
         inviteCode: conversation.inviteCode ?? null,
+        joinApproval: !!conversation.joinApproval,
       });
     }
   });
@@ -62,7 +68,9 @@ export const removeGroupMember = async (
     emitToUser(member.email, "conversation:remove", { id: conversation.id });
     removeUserFromConversationRoom(member.email, conversation.id);
   }
-  emitGroupUpdate(updated, updated.users);
+  await emitGroupUpdate(updated, updated.users);
+  // presence: the one gone may no longer share a conversation with the others
+  notifyContactsChanged(conversation.users.map((user) => user.email));
   await postSystemMessage(
     actorId === memberId
       ? { conversation: updated, actorId, type: "left" }
@@ -75,12 +83,22 @@ export const removeGroupMember = async (
 // new list and a "joined" event; the user's tabs get the conversation for their inbox, the event
 // being its read marker (so the history from before doesn't count as unread).
 export const joinGroup = async (conversation: ConversationWithUsers, user: SafeUser) => {
+  // an approved request (or one left from before approval was turned off) is done
+  const waiting = await joinRequestIdsOf(conversation.id);
+  const requested = waiting.includes(user.id);
   const updated = await prisma.conversation.update({
     where: { id: conversation.id },
-    data: { users: { connect: { id: user.id } } },
+    data: {
+      users: { connect: { id: user.id } },
+      ...(requested && { joinRequestIds: { set: waiting.filter((id) => id !== user.id) } }),
+    },
     include: { users: true },
   });
-  emitGroupUpdate(updated, conversation.users);
+  if (requested) {
+    notifyJoinRequestsChanged(updated);
+  }
+  await emitGroupUpdate(updated, conversation.users);
+  notifyContactsChanged(updated.users.map((member) => member.email));
   const event = await postSystemMessage({
     conversation: updated,
     actorId: user.id,
@@ -89,6 +107,7 @@ export const joinGroup = async (conversation: ConversationWithUsers, user: SafeU
   if (user.email) {
     emitToUser(user.email, "conversation:new", {
       ...updated,
+      users: (await lastSeenViewsOf(updated.users))(user.id),
       messages: event ? [event] : [],
       unreadCount: 0,
     });

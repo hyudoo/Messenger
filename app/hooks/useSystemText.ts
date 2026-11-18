@@ -44,6 +44,8 @@ const useSystemText = () => {
         return t("pinned", { actor });
       case "photo":
         return t("photo", { actor });
+      case "photo_removed":
+        return t("photo_removed", { actor });
       case "promoted":
         return t("promoted", { actor, users });
       case "demoted":

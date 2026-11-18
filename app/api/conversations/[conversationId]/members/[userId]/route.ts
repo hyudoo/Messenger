@@ -69,7 +69,7 @@ export async function PATCH(
       data: { adminIds: { set: adminIds } },
       include: { users: true },
     });
-    emitGroupUpdate(updated, updated.users);
+    await emitGroupUpdate(updated, updated.users);
     await postSystemMessage({
       conversation: updated,
       actorId: currentUser.id,

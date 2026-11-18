@@ -33,7 +33,7 @@
   },
   "nav": {
     "chat": "Chat",
-    "users": "People",
+    "users": "Contacts",
     "logout": "Log out",
     "settings": "Settings"
   },
@@ -75,7 +75,7 @@
     "last_call_declined": "{kind, select, audio {Audio call declined} other {Video call declined}}",
     "last_call_missed": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "last_call_ended": "{kind, select, audio {Audio call} other {Video call}} · {duration}",
-    "search": "Search conversations",
+    "search": "Search chats and messages",
     "no_results": "No conversations found.",
     "last_from": "{name}: {text}",
     "typing": "Typing…",
@@ -86,7 +86,9 @@
     "last_voice": "Sent a voice message.",
     "last_file": "Sent the file {name}.",
     "muted": "Muted",
-    "pinned": "Pinned"
+    "pinned": "Pinned",
+    "chats_heading": "Chats",
+    "messages_heading": "Messages"
   },
   "chat": {
     "placeholder": "Write a message",
@@ -107,6 +109,7 @@
     "call_no_answer": "No answer",
     "call_missed": "Missed call",
     "call_duration": "Duration {duration}",
+    "join_call": "Join",
     "send_quick": "Send {emoji}",
     "audio_call": "Audio call",
     "new_messages": "{count, plural, one {# new message} other {# new messages}}",
@@ -219,12 +222,39 @@
     "invite_off": "Turn off",
     "invite_copy": "Copy",
     "invite_copied": "Invite link copied!",
-    "invite_copy_failed": "Couldn't copy the link!"
+    "invite_copy_failed": "Couldn't copy the link!",
+    "invite_approval": "Admins approve new members",
+    "join_requests": "{count, plural, one {# person wants to join} other {# people want to join}}",
+    "approve": "Approve",
+    "decline": "Decline",
+    "no_friends": "Members are picked from your friends. Add friends on the Contacts page first."
   },
   "users": {
-    "title": "People",
-    "search": "Search by name or email",
-    "no_results": "Nobody found."
+    "title": "Contacts",
+    "search": "Search friends, or find people by name or email",
+    "no_results": "Nobody found.",
+    "friends_heading": "{count, plural, =0 {Friends} other {Friends (#)}}",
+    "no_friends": "No friends yet. Find people by name or email above.",
+    "requests_heading": "{count, plural, one {# friend request} other {# friend requests}}",
+    "sent_heading": "Sent requests",
+    "people_heading": "People",
+    "searching": "Searching…",
+    "no_people": "Nobody found.",
+    "add_friend": "Add friend",
+    "requested": "Requested",
+    "accept": "Accept",
+    "decline": "Decline",
+    "cancel": "Cancel",
+    "unfriend": "Unfriend",
+    "unfriend_confirm": "Click again to unfriend",
+    "open_chat": "Send a message",
+    "now_friends": "You and {name} are now friends!",
+    "cannot_add": "You can't add this person.",
+    "too_many": "You have too many requests waiting.",
+    "too_fast": "You're going too fast, wait a moment and try again!",
+    "failed": "Couldn't update, try again!",
+    "friends_badge": "Friends",
+    "accept_request": "Accept request"
   },
   "settings": {
     "profile_title": "Profile",
@@ -278,7 +308,12 @@
     "stop_share": "Stop sharing",
     "sharing_you": "You're sharing your screen",
     "sharing_other": "{name} is sharing their screen",
-    "share_error": "Couldn't share the screen!"
+    "share_error": "Couldn't share the screen!",
+    "in_group": "in {name}",
+    "room_full": "This call is full",
+    "peer_left": "{name} left the call",
+    "no_answer_group": "Nobody answered",
+    "participants": "{count, plural, one {# person} other {# people}}"
   },
   "emoji": {
     "open": "Choose an emoji",
@@ -298,6 +333,7 @@
     "someone": "Someone",
     "pinned": "{actor} pinned a message",
     "photo": "{actor} changed the group photo",
+    "photo_removed": "{actor} removed the group photo",
     "promoted": "{actor} made {users} an admin",
     "demoted": "{actor} removed {users} as admin",
     "joined": "{actor} joined the group via the invite link"
@@ -333,7 +369,9 @@
     "missed_call": "{kind, select, audio {Missed audio call} other {Missed video call}}",
     "voice": "Sent a voice message.",
     "file": "Sent the file {name}.",
-    "mentioned_you": "Mentioned you: {text}"
+    "mentioned_you": "Mentioned you: {text}",
+    "call_answer": "Answer",
+    "call_decline": "Decline"
   },
   "viewer": {
     "close": "Close",
@@ -385,6 +423,187 @@
     "invalid_title": "This invite link no longer works",
     "invalid": "It was turned off or reset. Ask a member of the group for a new one.",
     "failed": "Couldn't join the group!",
-    "too_fast": "You're going too fast, wait a moment and try again!"
+    "too_fast": "You're going too fast, wait a moment and try again!",
+    "ask": "Ask to join",
+    "approval_hint": "An admin has to approve new members.",
+    "requested": "Request sent. The chat opens here once an admin approves it.",
+    "declined": "An admin declined your request.",
+    "requests_full": "Too many people are waiting to join this group, try again later!",
+    "cancel_request": "Cancel request",
+    "cancel_failed": "Couldn't cancel the request!"
+  },
+  "privacy": {
+    "title": "Privacy",
+    "description": "Applies at once. If you stop sharing, you won't see other people's either.",
+    "activity": "Active status",
+    "activity_hint": "Let people see when you're online or were last active.",
+    "receipts": "Read receipts",
+    "receipts_hint": "Let people see that you've read their messages.",
+    "blocked_title": "Blocked people ({count})",
+    "blocked_none": "You haven't blocked anyone.",
+    "unblock": "Unblock",
+    "loading": "Loading...",
+    "load_failed": "Couldn't load your privacy settings!",
+    "failed": "Couldn't save the change!"
+  },
+  "legal": {
+    "back": "Back",
+    "updated": "Last updated: November 18, 2026",
+    "privacy_link": "Privacy Policy",
+    "terms_link": "Terms of Service",
+    "agree": "By continuing, you agree to the Terms of Service and the Privacy Policy.",
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This policy explains what information Messenger collects when you use it, how that information is used and stored, and the choices you have.",
+      "sections": [
+        {
+          "title": "1. Information we collect",
+          "paragraphs": [
+            "Account information: your name, email address and profile photo. If you sign up with an email and password, we store only a one-way hash of the password, never the password itself. If you sign in with GitHub or Google, we receive your name, email address and profile photo from that provider.",
+            "Content you send: messages, images, files, voice messages, reactions, pinned messages, and the groups you create or join.",
+            "Contacts: your friends, friend requests and the people you block.",
+            "Technical information: your IP address (used for rate limiting and security), the time you were last active, and, if you turn on notifications, the push subscription your browser gives us. Your color mode and language choice are kept in your browser."
+          ]
+        },
+        {
+          "title": "2. How we use it",
+          "paragraphs": [
+            "We use this information only to run the service: to sign you in, deliver messages and calls in real time, show your profile to the people you talk to, let you search your own conversations, send the notifications you asked for, and protect the service against abuse.",
+            "We do not sell your information and we do not use your messages for advertising."
+          ]
+        },
+        {
+          "title": "3. Voice and video calls",
+          "paragraphs": [
+            "Calls connect directly between participants' browsers (WebRTC) and are encrypted in transit. When a direct connection is not possible, the encrypted media may pass through a relay (TURN) server. We do not record calls.",
+            "We keep a call log in the conversation: who called, when, the type of call and how long it lasted."
+          ]
+        },
+        {
+          "title": "4. Where your data is stored",
+          "paragraphs": [
+            "Account data and messages are stored in our database. Images, files and voice messages are stored in Amazon Web Services (S3) storage and are reachable by anyone who has their link, so share links with care."
+          ]
+        },
+        {
+          "title": "5. Who can see your information",
+          "paragraphs": [
+            "Other users can see your name, email address and profile photo when they search for you or share a conversation with you. Messages are visible to the members of the conversation they were sent in.",
+            "We share data with service providers only as needed to run the service: hosting and storage (Amazon Web Services), sign-in (GitHub, Google) and your browser's push notification service. We may disclose information if required by law."
+          ]
+        },
+        {
+          "title": "6. Your choices",
+          "paragraphs": [
+            "In Settings you can hide your active status and your read receipts (you then won't see other people's either), turn notifications on or off, and change your profile. You can block people, recall messages you sent, and leave or delete conversations."
+          ]
+        },
+        {
+          "title": "7. How long we keep it",
+          "paragraphs": [
+            "We keep your information while your account exists. When you recall a message or delete a conversation, its images and files are removed from storage once nothing else uses them. Uploads that were never sent are deleted automatically.",
+            "To have your account and data deleted, contact us (see below)."
+          ]
+        },
+        {
+          "title": "8. Security",
+          "paragraphs": [
+            "Connections use HTTPS, passwords are hashed, and sign-in and uploads are rate limited. No system is perfectly secure, so please use a strong password that you don't use anywhere else."
+          ]
+        },
+        {
+          "title": "9. Children",
+          "paragraphs": [
+            "Messenger is not intended for children under 13, and we do not knowingly collect information from them."
+          ]
+        },
+        {
+          "title": "10. Changes to this policy",
+          "paragraphs": [
+            "We may update this policy. When we do, we will change the date at the top of this page. Continuing to use Messenger after a change means you accept the updated policy."
+          ]
+        },
+        {
+          "title": "11. Contact",
+          "paragraphs": [
+            "If you have questions about this policy or want to access or delete your data, contact the operator of this Messenger service."
+          ]
+        }
+      ]
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "These terms govern your use of Messenger. By creating an account or using the service, you agree to them. If you do not agree, please do not use Messenger.",
+      "sections": [
+        {
+          "title": "1. Your account",
+          "paragraphs": [
+            "You must be at least 13 years old to use Messenger. Provide accurate information, keep your password secret, and tell us if you think someone else has used your account. You are responsible for what happens under your account."
+          ]
+        },
+        {
+          "title": "2. Acceptable use",
+          "paragraphs": [
+            "Do not use Messenger to send content that is illegal, harassing, hateful, threatening or sexually exploitative, to send spam, malware or phishing links, to impersonate other people, or to share content you have no right to share.",
+            "Do not try to break, overload or get around the security or limits of the service, access other people's accounts or conversations, or collect data from the service with automated tools."
+          ]
+        },
+        {
+          "title": "3. Your content",
+          "paragraphs": [
+            "You keep ownership of the messages, images, files and voice messages you send. You give us permission to store, process and deliver that content only as needed to run the service for you and the people you talk to.",
+            "You are responsible for the content you send. Recalling a message removes it from the conversation, but people may already have seen, saved or forwarded it."
+          ]
+        },
+        {
+          "title": "4. Groups",
+          "paragraphs": [
+            "Group admins can change the group, approve or decline join requests, and remove members. Anyone with an invite link may be able to ask to join a group, so share invite links with care."
+          ]
+        },
+        {
+          "title": "5. Calls and notifications",
+          "paragraphs": [
+            "Call quality depends on your network and device. Messenger is not a replacement for a telephone service and cannot be used to contact emergency services."
+          ]
+        },
+        {
+          "title": "6. Suspension and termination",
+          "paragraphs": [
+            "We may remove content or suspend or close accounts that break these terms or put other users or the service at risk. You may stop using Messenger at any time."
+          ]
+        },
+        {
+          "title": "7. The service is provided as is",
+          "paragraphs": [
+            "We work to keep Messenger available and secure, but it is provided \"as is\" and \"as available\", without warranties of any kind. Features may change, and the service may be interrupted or lose data. Keep your own copies of anything important."
+          ]
+        },
+        {
+          "title": "8. Limitation of liability",
+          "paragraphs": [
+            "To the extent permitted by law, we are not liable for indirect, incidental or consequential damages, or for loss of data, arising from your use of Messenger or from content sent by other users."
+          ]
+        },
+        {
+          "title": "9. Privacy",
+          "paragraphs": [
+            "How we handle your information is described in the Privacy Policy, which is part of these terms."
+          ]
+        },
+        {
+          "title": "10. Changes to these terms",
+          "paragraphs": [
+            "We may update these terms. When we do, we will change the date at the top of this page. Continuing to use Messenger after a change means you accept the updated terms."
+          ]
+        },
+        {
+          "title": "11. Contact",
+          "paragraphs": [
+            "If you have questions about these terms, contact the operator of this Messenger service."
+          ]
+        }
+      ]
+    }
   }
 }

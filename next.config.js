@@ -29,8 +29,7 @@ const imageSources = [
   "https://lh3.googleusercontent.com",
   // emoji-picker-react draws its emoji from the emoji-datasource images on jsDelivr
   "https://cdn.jsdelivr.net",
-  // link previews show the linked site's own image (app/libs/link-preview.ts: https only)
-  "https:",
+  // link preview images come through /api/messages/[id]/preview-image ('self')
 ];
 
 // Enforced: only directives that cannot break the app (no framing = no clickjacking, no plugins,
@@ -77,6 +76,8 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // the E2E server builds into its own folder (e2e/serve.ts), so it can run next to `npm run dev`
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   serverExternalPackages: ["bcrypt"],
   // Next's own header is noise and tells attackers the framework
   poweredByHeader: false,

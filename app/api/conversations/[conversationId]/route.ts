@@ -9,8 +9,9 @@ import {
 } from "@/app/libs/conversation-permissions";
 import { deleteConversation } from "@/app/libs/conversation-delete";
 import { emitGroupUpdate } from "@/app/libs/conversation-members";
+import { lastSeenViewsOf } from "@/app/libs/privacy";
 import { postSystemMessage } from "@/app/libs/system-message";
-import { emitToUser } from "@/app/libs/socket-server";
+import { emitToUser, notifyContactsChanged } from "@/app/libs/socket-server";
 import { isUploadedFileUrl, markUploadsUsed } from "@/app/libs/s3";
 import { cleanUpUploads } from "@/app/libs/upload-cleanup";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
@@ -106,7 +107,10 @@ export async function PATCH(
     });
 
     const added = updated.users.filter((user) => addIds.includes(user.id));
-    emitGroupUpdate(
+    if (added.length > 0) {
+      notifyContactsChanged(updated.users.map((user) => user.email));
+    }
+    await emitGroupUpdate(
       updated,
       updated.users.filter((user) => !addIds.includes(user.id))
     );
@@ -118,9 +122,13 @@ export async function PATCH(
     if (image !== undefined) {
       // the replaced photo, if nothing else uses it
       cleanUpUploads([conversation.image]);
-      // removing it needs no event: the group's avatar just goes back to its members'
-      if (image) {
-        await postSystemMessage({ conversation: updated, actorId: currentUser.id, type: "photo" });
+      // removing a photo the group didn't have changes nothing, so no event
+      if (image || conversation.image) {
+        await postSystemMessage({
+          conversation: updated,
+          actorId: currentUser.id,
+          type: image ? "photo" : "photo_removed",
+        });
       }
     }
     if (added.length > 0) {
@@ -133,9 +141,15 @@ export async function PATCH(
       });
       // their inbox item: the last message ("X added you"), nothing unread yet
       const messages = event ? [event] : [];
+      const usersFor = await lastSeenViewsOf(updated.users);
       added.forEach((user) => {
         if (user.email) {
-          emitToUser(user.email, "conversation:new", { ...updated, messages, unreadCount: 0 });
+          emitToUser(user.email, "conversation:new", {
+            ...updated,
+            users: usersFor(user.id),
+            messages,
+            unreadCount: 0,
+          });
         }
       });
     }

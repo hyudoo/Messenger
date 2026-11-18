@@ -26,6 +26,14 @@ model User {
   pinnedConversationIds String[] @db.ObjectId
   // people this user blocked (POST /api/users/[userId]/block; app/libs/blocks.ts). Private too
   blockedUserIds        String[] @db.ObjectId
+  // privacy settings (PATCH /api/settings/privacy; app/libs/privacy.ts). Private too.
+  // hideActivity: nobody sees when the user is online / was last active, and they see nobody's.
+  // hideReadReceipts: their reads are kept in Message.privateSeenIds (never sent to anyone)
+  // instead of `seen`, and they see nobody's read receipts.
+  hideActivity          Boolean?
+  hideReadReceipts      Boolean?
+  // friends (app/libs/friends.ts), kept on both sides. Private too
+  friendIds             String[] @db.ObjectId
   updatedAt      DateTime  @updatedAt
 
   conversationIds String[]       @db.ObjectId
@@ -38,6 +46,25 @@ model User {
   messages          Message[]
   reactions         Reaction[]
   pushSubscriptions WebPushSubscription[]
+
+  sentFriendRequests     FriendRequest[] @relation("FriendRequestFrom")
+  receivedFriendRequests FriendRequest[] @relation("FriendRequestTo")
+}
+
+// A friend request waiting for its recipient (app/libs/friends.ts): accepted (both become friends,
+// User.friendIds) or declined, it is deleted; its sender may cancel it. One per pair and direction;
+// a request towards someone who already asked us accepts theirs instead.
+model FriendRequest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+
+  fromId String @db.ObjectId
+  from   User   @relation("FriendRequestFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId   String @db.ObjectId
+  to     User   @relation("FriendRequestTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
 }
 
 // A browser's Web Push subscription (app/libs/web-push.ts). One row per browser endpoint: signing
@@ -93,6 +120,11 @@ model Conversation {
   // Groups only: the code of the invite link /join/<code>, while one is on (admins create / reset /
   // turn it off). Random, so no unique index (Mongo would also count every missing one as a duplicate)
   inviteCode    String?
+  // Groups only: joining by the invite link needs an admin's approval (admins turn it on / off)
+  joinApproval  Boolean?
+  // Groups only: people who asked to join by the link while approval was on, oldest first
+  // (POST /api/join/<code>); an admin approves or declines each
+  joinRequestIds String[] @db.ObjectId
   // messages pinned to the top of the chat, latest first (POST /api/messages/[id]/pin)
   pinnedMessageIds String[] @db.ObjectId
 
@@ -128,6 +160,9 @@ model Message {
   // users who deleted the message for themselves only (DELETE ...?scope=me). Never sent to
   // clients (app/libs/prismadb.ts omits it)
   hiddenForIds String[] @db.ObjectId
+  // who read it without telling anyone (User.hideReadReceipts): counts for their unread / read
+  // marker like seenIds, but is omitted from every message row (app/libs/prismadb.ts)
+  privateSeenIds String[] @db.ObjectId
   // the body without case or Vietnamese diacritics (searchTextOf), what search matches against;
   // older messages get it from scripts/backfill-search-text.ts
   searchText String?
@@ -191,6 +226,8 @@ enum SystemType {
   left
   pinned
   photo
+  // the group photo was removed (no picture: AvatarGroup goes back to the members' faces)
+  photo_removed
   promoted
   demoted
   joined

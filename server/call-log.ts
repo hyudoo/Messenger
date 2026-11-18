@@ -106,3 +106,34 @@ export const moveCallSafely = (io: AnyServer, conversationId: string, move: Call
     logError("call_log", error);
     return false;
   });
+
+// The callee declined a ringing call (the socket's call:decline, or the "Decline" button of the
+// call's push notification through POST /api/calls/[id]/decline). 1:1: logged as declined, and every
+// member's tabs hear it (the caller's call screen leaves, the callee's other tabs stop ringing).
+// Group: the others may still answer, so only the decliner's own tabs hear it. Returns false when
+// the user isn't a member.
+export const declineCall = async (
+  io: AnyServer,
+  conversationId: string,
+  user: { id: string; email: string }
+): Promise<boolean> => {
+  const conversation = await prisma.conversation
+    .findFirst({
+      where: { id: conversationId, userIds: { has: user.id } },
+      select: { isGroup: true, users: { select: { email: true } } },
+    })
+    .catch(() => null); // malformed ObjectId
+  if (!conversation) {
+    return false;
+  }
+  // logged before call:declined goes out: the caller's call screen leaves on it, and that leave
+  // must find the call already declined (not still ringing, which would log it as missed)
+  if (!conversation.isGroup) {
+    await moveCallSafely(io, conversationId, "decline");
+  }
+  const emails = conversation.isGroup
+    ? [user.email]
+    : conversation.users.flatMap((member) => (member.email ? [member.email] : []));
+  io.to(emails.map(userRoom)).emit("call:declined", { roomId: conversationId, by: user.email });
+  return true;
+};

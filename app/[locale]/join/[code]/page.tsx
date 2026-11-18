@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { findInvitedGroup } from "@/app/actions/getInvite";
+import { joinRequestIdsOf } from "@/app/libs/join-requests";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { Link, redirect } from "@/i18n/navigation";
 import JoinButton from "./JoinButton";
@@ -10,13 +11,19 @@ interface IParams {
   code: string;
 }
 
-// An invite link (/join/<code>): the group's photo, name and size, and a button to join it.
+// An invite link (/join/<code>): the group's photo, name and size, and a button to join it (or to
+// ask to, when an admin must approve; then it waits for the answer).
 // proxy.ts sends signed-out visitors to the login page and back here. Members go straight to the
 // chat; a reset or turned-off link says so.
 const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
   const { code } = await params;
   const t = await getTranslations("join");
   const [currentUser, group] = await Promise.all([getCurrentUser(), findInvitedGroup(code)]);
+  // whether the user already asked (the list is omitted from conversation rows)
+  const requested =
+    !!group?.joinApproval &&
+    !!currentUser &&
+    (await joinRequestIdsOf(group.id)).includes(currentUser.id);
 
   if (group && currentUser && group.userIds.includes(currentUser.id)) {
     return redirect({ href: `/conversations/${group.id}`, locale: await getLocale() });
@@ -35,7 +42,12 @@ const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
             <p className="mt-1 text-sm text-muted-foreground">
               {t("members", { count: group.userIds.length })}
             </p>
-            <JoinButton code={code} />
+            <JoinButton
+              code={code}
+              groupId={group.id}
+              approval={!!group.joinApproval}
+              requested={requested}
+            />
           </>
         ) : (
           <>

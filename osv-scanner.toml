@@ -10,3 +10,8 @@ reason = "deepmerge-ts <8.0.0 stack exhaustion on recursive object graphs. Only 
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2027-02-16
 reason = "minimatch 10.x globparts DoS. Pulled in by typescript-eslint (via eslint-config-next), matching only patterns we write; dev only, waits on an upstream bump."
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2027-02-18
+reason = "picomatch <=4.0.7 ReDoS on repeated extglobs; no fixed release exists yet (4.0.7 is the latest, 18/11/2026). Pulled in by tooling (vitest / vite, eslint's fast-glob, tailwindcss's chokidar at build time) and next-intl's file watcher (@parcel/watcher); all match globs from our own config or file paths, never user input. npm audit's suggested fixes are major downgrades."

@@ -8,6 +8,7 @@ interface DesktopItemProps {
   href: string;
   onClick?: () => void;
   active?: boolean;
+  badge?: number;
 }
 
 const itemClass = (active?: boolean) =>
@@ -28,6 +29,16 @@ const itemClass = (active?: boolean) =>
     active && "bg-muted text-foreground"
   );
 
+// the count on an item (friend requests waiting), "9+" past 9
+const Badge: React.FC<{ count?: number }> = ({ count }) =>
+  count ? (
+    <span
+      aria-hidden="true"
+      className="absolute -right-1 -top-1 min-w-[1.125rem] rounded-full bg-rose-500 px-1 text-center text-[10px] font-semibold leading-[1.125rem] text-white">
+      {count > 9 ? "9+" : count}
+    </span>
+  ) : null;
+
 // Items with onClick (log out) are buttons: a locale-aware Link to "#" would
 // navigate to /vi#.
 const DesktopItem: React.FC<DesktopItemProps> = ({
@@ -36,11 +47,15 @@ const DesktopItem: React.FC<DesktopItemProps> = ({
   href,
   onClick,
   active,
+  badge,
 }) => {
   const content = (
     <>
-      <Icon className="h-6 w-6 shrink-0" aria-hidden="true" />
-      <span className="sr-only">{label}</span>
+      <span className="relative">
+        <Icon className="h-6 w-6 shrink-0" aria-hidden="true" />
+        <Badge count={badge} />
+      </span>
+      <span className="sr-only">{badge ? `${label} (${badge})` : label}</span>
     </>
   );
 

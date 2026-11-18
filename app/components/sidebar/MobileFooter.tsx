@@ -36,6 +36,7 @@ const MobileFooter = () => {
           active={route.active}
           icon={route.icon}
           onClick={route.onclick}
+          badge={route.badge}
         />
       ))}
       <div className="flex shrink-0 gap-1 px-3">
