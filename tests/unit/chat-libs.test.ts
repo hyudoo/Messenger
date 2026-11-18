@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { splitLinks } from "@/app/libs/linkify";
+import { KEPT_AFTER_TRIM, MAX_KEPT_MESSAGES, keepNewest } from "@/app/libs/message-window";
 import {
   findFoldedMatch,
   matchesSearch,
@@ -341,5 +342,20 @@ describe("private reads", () => {
       { senderId: "x", seenIds: [] },
     ];
     expect(countUnread(newestFirst, "me")).toBe(1);
+  });
+});
+
+describe("keepNewest (long chats)", () => {
+  it("keeps the same array up to the maximum", () => {
+    const messages = Array.from({ length: MAX_KEPT_MESSAGES }, (_, i) => i);
+    expect(keepNewest(messages)).toBe(messages);
+  });
+
+  it("keeps only the newest past the maximum, in order", () => {
+    const messages = Array.from({ length: MAX_KEPT_MESSAGES + 1 }, (_, i) => i);
+    const kept = keepNewest(messages);
+    expect(kept).toHaveLength(KEPT_AFTER_TRIM);
+    expect(kept[0]).toBe(MAX_KEPT_MESSAGES + 1 - KEPT_AFTER_TRIM);
+    expect(kept[kept.length - 1]).toBe(MAX_KEPT_MESSAGES);
   });
 });

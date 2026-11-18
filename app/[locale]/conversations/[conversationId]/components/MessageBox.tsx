@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Image from "next/image";
-import { Fragment, useState } from "react";
+import { Fragment, memo, useState } from "react";
 import { format } from "date-fns";
 import { useSession } from "next-auth/react";
 import { FullMessageType } from "@/app/types";
@@ -535,4 +535,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   );
 };
 
-export default MessageBox;
+// Memoized: Body re-renders on typing / new-message counts, and a long chat has many rows. A
+// message's props only change when it does (a new object from messages:update) or when it
+// stops / starts being the last one.
+export default memo(MessageBox);
