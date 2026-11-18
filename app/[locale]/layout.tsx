@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { Inter } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
@@ -28,8 +29,22 @@ export async function generateMetadata({ params }: LocaleParams) {
     locale: hasLocale(routing.locales, locale) ? locale : routing.defaultLocale,
     namespace: "meta",
   });
-  return { title: "Messenger", description: t("description") };
+  return {
+    title: "Messenger",
+    description: t("description"),
+    // installed as an app (app/manifest.ts): the home screen icon and the iOS standalone window
+    icons: { apple: "/icons/apple-touch-icon.png" },
+    appleWebApp: { capable: true, title: "Messenger", statusBarStyle: "default" },
+  };
 }
+
+// the browser / installed app's title bar follows the color mode
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#171717" },
+  ],
+};
 
 // The root layout: every page lives under /[locale].
 export default async function LocaleLayout({

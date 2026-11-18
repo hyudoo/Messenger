@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { findInvitedGroup } from "@/app/actions/getInvite";
+import { joinRequestIdsOf } from "@/app/libs/join-requests";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import { Link, redirect } from "@/i18n/navigation";
 import JoinButton from "./JoinButton";
@@ -18,6 +19,11 @@ const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
   const { code } = await params;
   const t = await getTranslations("join");
   const [currentUser, group] = await Promise.all([getCurrentUser(), findInvitedGroup(code)]);
+  // whether the user already asked (the list is omitted from conversation rows)
+  const requested =
+    !!group?.joinApproval &&
+    !!currentUser &&
+    (await joinRequestIdsOf(group.id)).includes(currentUser.id);
 
   if (group && currentUser && group.userIds.includes(currentUser.id)) {
     return redirect({ href: `/conversations/${group.id}`, locale: await getLocale() });
@@ -40,7 +46,7 @@ const JoinPage = async ({ params }: { params: Promise<IParams> }) => {
               code={code}
               groupId={group.id}
               approval={!!group.joinApproval}
-              requested={!!currentUser && (group.joinRequestIds ?? []).includes(currentUser.id)}
+              requested={requested}
             />
           </>
         ) : (

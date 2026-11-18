@@ -18,6 +18,8 @@ const createClient = () =>
       // who hid a message for themselves, who read it privately, and the folded search text:
       // server-side only
       message: { hiddenForIds: true, privateSeenIds: true, searchText: true },
+      // who asked to join a group by its link: for its admins only (app/libs/join-requests.ts)
+      conversation: { joinRequestIds: true },
     },
   });
 

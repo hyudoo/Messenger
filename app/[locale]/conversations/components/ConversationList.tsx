@@ -125,7 +125,6 @@ const ConversationList: React.FC<ConversationListProps> = ({
             inviteCode:
               conversation.inviteCode === undefined ? target.inviteCode : conversation.inviteCode,
             joinApproval: conversation.joinApproval ?? target.joinApproval,
-            joinRequestIds: conversation.joinRequestIds ?? target.joinRequestIds,
             name: conversation.name ?? target.name,
           }),
           ...(conversation.lastMessageAt && {

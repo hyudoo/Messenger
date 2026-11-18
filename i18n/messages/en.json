@@ -403,7 +403,9 @@
     "approval_hint": "An admin has to approve new members.",
     "requested": "Request sent. The chat opens here once an admin approves it.",
     "declined": "An admin declined your request.",
-    "requests_full": "Too many people are waiting to join this group, try again later!"
+    "requests_full": "Too many people are waiting to join this group, try again later!",
+    "cancel_request": "Cancel request",
+    "cancel_failed": "Couldn't cancel the request!"
   },
   "privacy": {
     "title": "Privacy",

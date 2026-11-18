@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { canManageInvite } from "@/app/libs/conversation-permissions";
-import { emitGroupUpdate, joinGroup } from "@/app/libs/conversation-members";
+import { joinGroup } from "@/app/libs/conversation-members";
+import { joinRequestIdsOf, notifyJoinRequestsChanged } from "@/app/libs/join-requests";
 import prisma from "@/app/libs/prismadb";
 import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { emitToUser } from "@/app/libs/socket-server";
@@ -17,7 +18,7 @@ interface IParams {
 // POST { approve }: an admin answers a request to join by the invite link. Approving adds them like
 // joining does (joinGroup: a "joined" event, their tabs get conversation:new, which takes a waiting
 // join page into the chat); declining drops the request and tells their tabs (join:declined).
-// Either way the members get the shorter list (conversation:update).
+// Either way the admins' tabs reload their list (join-requests:update).
 export async function POST(request: Request, { params }: { params: Promise<IParams> }) {
   try {
     const { conversationId, userId } = await params;
@@ -43,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
     if (!canManageInvite(conversation, currentUser.id)) {
       return new NextResponse("Only group admins can answer join requests", { status: 403 });
     }
-    const waiting = conversation.joinRequestIds ?? [];
+    const waiting = await joinRequestIdsOf(conversation.id);
     const requester =
       userId && waiting.includes(userId)
         ? await prisma.user.findUnique({ where: { id: userId } })
@@ -58,12 +59,12 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
       return NextResponse.json({ approved: true });
     }
 
-    const updated = await prisma.conversation.update({
+    await prisma.conversation.update({
       where: { id: conversation.id },
       data: { joinRequestIds: { set: waiting.filter((id) => id !== userId) } },
-      include: { users: true },
+      select: { id: true },
     });
-    await emitGroupUpdate(updated, updated.users);
+    notifyJoinRequestsChanged(conversation);
     if (!body.approve && requester?.email) {
       emitToUser(requester.email, "join:declined", { conversationId: conversation.id });
     }

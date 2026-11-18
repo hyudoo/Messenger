@@ -31,6 +31,7 @@ import {
 import { invitePath } from "@/app/libs/invite-code";
 import { matchesSearch } from "@/app/libs/search";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
+import { getSocket } from "@/app/libs/socket-client";
 import { useRouter } from "@/i18n/navigation";
 
 // The open chat's header and drawer come from the server component: refreshed here right
@@ -110,34 +111,38 @@ interface GroupInviteProps {
 type JoinRequester = Pick<SafeUser, "id" | "name" | "email" | "image">;
 
 // People waiting to join by the link (admins only): a face and name each, Approve / Decline.
-// Loaded again whenever the waiting list changes (conversation:update refreshes the page's data).
+// The list is the admins' only (omitted from conversation rows): loaded here, and again whenever
+// it changes (join-requests:update, sent to the admins' tabs).
 const JoinRequests: React.FC<{ conversation: ConversationWithUsers }> = ({ conversation }) => {
   const t = useTranslations("group");
   const { busy, run } = useGroupRequest();
-  const ids = (conversation.joinRequestIds ?? []).join(",");
-  const [loaded, setLoaded] = useState<{ ids: string; users: JoinRequester[] }>({
-    ids: "",
-    users: [],
-  });
+  const [users, setUsers] = useState<JoinRequester[]>([]);
 
   useEffect(() => {
-    if (!ids) {
-      return;
-    }
     let cancelled = false;
-    axios
-      .get<JoinRequester[]>(`/api/conversations/${conversation.id}/join-requests`)
-      .then(({ data }) => !cancelled && setLoaded({ ids, users: data }))
-      .catch(() => undefined);
+    const load = () =>
+      axios
+        .get<JoinRequester[]>(`/api/conversations/${conversation.id}/join-requests`)
+        .then(({ data }) => !cancelled && setUsers(data))
+        .catch(() => undefined);
+    const changed = (payload: { conversationId?: string }) => {
+      if (payload?.conversationId === conversation.id) {
+        void load();
+      }
+    };
+    const socket = getSocket();
+    void load();
+    socket.on("join-requests:update", changed);
+    // events missed while disconnected
+    socket.on("connect", load);
     return () => {
       cancelled = true;
+      socket.off("join-requests:update", changed);
+      socket.off("connect", load);
     };
-  }, [conversation.id, ids]);
+  }, [conversation.id]);
 
-  // nothing waiting, or a list from before the last change (until the new one arrives)
-  const waiting = ids ? new Set(ids.split(",")) : new Set<string>();
-  const users = loaded.users.filter((user) => waiting.has(user.id));
-  if (waiting.size === 0) {
+  if (users.length === 0) {
     return null;
   }
   const answer = (userId: string, approve: boolean) =>
@@ -148,7 +153,7 @@ const JoinRequests: React.FC<{ conversation: ConversationWithUsers }> = ({ conve
   return (
     <div className="mt-3 border-t pt-3">
       <p className="mb-2 text-xs font-medium text-muted-foreground">
-        {t("join_requests", { count: waiting.size })}
+        {t("join_requests", { count: users.length })}
       </p>
       <ul className="flex flex-col gap-2">
         {users.map((user) => (

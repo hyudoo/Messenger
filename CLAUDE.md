@@ -30,7 +30,7 @@ Copy `.env.example` to `.env`.
   - AWS: `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, optional `NEXT_PUBLIC_S3_PUBLIC_URL`;
   - GitHub and Google OAuth credentials.
 - **Optional:**
-  - Redis for several instances: `REDIS_URL`, or `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` (`getRedisUrl()` in `app/libs/redis-url.ts`; `REDIS_URL` wins).
+  - Redis for several instances: `REDIS_URL`, or `REDIS_HOST` / `REDIS_PORT` / `REDIS_USERNAME` / `REDIS_PASSWORD` (or `REDIS_PASSWORD_FILE`, a Docker / Kubernetes secret) (`getRedisUrl()` in `app/libs/redis-url.ts`; `REDIS_URL` wins).
   - `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS`: TURN for calls.
   - `TRUST_PROXY=true`: behind a proxy that sets `X-Real-IP`.
   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: Web Push. Generate with `npx web-push generate-vapid-keys`; read at run time; keep the pair stable.

@@ -4,6 +4,7 @@ import { postSystemMessage } from "./system-message";
 import { emitToUser, removeUserFromConversationRoom } from "./socket-server";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
 import { lastSeenViewsOf } from "./privacy";
+import { joinRequestIdsOf, notifyJoinRequestsChanged } from "./join-requests";
 
 // Sends a group's new member list (and name / owner / admins / photo / invite code) to its
 // members' tabs: the inbox updates the item and an open chat refreshes its header and drawer
@@ -24,7 +25,6 @@ export const emitGroupUpdate = async (conversation: ConversationWithUsers, to: S
         image: conversation.image ?? null,
         inviteCode: conversation.inviteCode ?? null,
         joinApproval: !!conversation.joinApproval,
-        joinRequestIds: conversation.joinRequestIds ?? [],
       });
     }
   });
@@ -81,17 +81,20 @@ export const removeGroupMember = async (
 // new list and a "joined" event; the user's tabs get the conversation for their inbox, the event
 // being its read marker (so the history from before doesn't count as unread).
 export const joinGroup = async (conversation: ConversationWithUsers, user: SafeUser) => {
+  // an approved request (or one left from before approval was turned off) is done
+  const waiting = await joinRequestIdsOf(conversation.id);
+  const requested = waiting.includes(user.id);
   const updated = await prisma.conversation.update({
     where: { id: conversation.id },
     data: {
       users: { connect: { id: user.id } },
-      // an approved request (or one left from before approval was turned off) is done
-      ...(conversation.joinRequestIds?.includes(user.id) && {
-        joinRequestIds: { set: conversation.joinRequestIds.filter((id) => id !== user.id) },
-      }),
+      ...(requested && { joinRequestIds: { set: waiting.filter((id) => id !== user.id) } }),
     },
     include: { users: true },
   });
+  if (requested) {
+    notifyJoinRequestsChanged(updated);
+  }
   await emitGroupUpdate(updated, conversation.users);
   const event = await postSystemMessage({
     conversation: updated,

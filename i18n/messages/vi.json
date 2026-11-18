@@ -403,7 +403,9 @@
     "approval_hint": "Quản trị viên cần duyệt thành viên mới.",
     "requested": "Đã gửi yêu cầu. Khi quản trị viên duyệt, đoạn chat sẽ mở ở đây.",
     "declined": "Quản trị viên đã từ chối yêu cầu của bạn.",
-    "requests_full": "Có quá nhiều người đang chờ vào nhóm này, hãy thử lại sau!"
+    "requests_full": "Có quá nhiều người đang chờ vào nhóm này, hãy thử lại sau!",
+    "cancel_request": "Huỷ yêu cầu",
+    "cancel_failed": "Không huỷ được yêu cầu!"
   },
   "privacy": {
     "title": "Quyền riêng tư",

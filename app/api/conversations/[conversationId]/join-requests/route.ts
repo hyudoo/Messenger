@@ -4,6 +4,7 @@ import getConversationForUser from "@/app/actions/getConversationForUser";
 import getCurrentUser from "@/app/actions/getCurrentUser";
 import { canManageInvite } from "@/app/libs/conversation-permissions";
 import prisma from "@/app/libs/prismadb";
+import { joinRequestIdsOf } from "@/app/libs/join-requests";
 import { logError } from "@/app/libs/log";
 
 interface IParams {
@@ -27,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<IParam
       return new NextResponse("Only group admins can see join requests", { status: 403 });
     }
 
-    const ids = conversation.joinRequestIds ?? [];
+    const ids = await joinRequestIdsOf(conversation.id);
     const users =
       ids.length > 0
         ? await prisma.user.findMany({

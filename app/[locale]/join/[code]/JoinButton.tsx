@@ -78,11 +78,39 @@ const JoinButton: React.FC<JoinButtonProps> = ({ code, groupId, approval, reques
     }
   };
 
+  // takes the request back (DELETE /api/join/<code>); the button asks again
+  const cancel = async () => {
+    setBusy(true);
+    try {
+      await axios.delete(`/api/join/${encodeURIComponent(code)}`);
+      setState("idle");
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      // 404: already answered or the link changed; the page reload shows which
+      if (status === 404) {
+        router.refresh();
+      } else {
+        toast.error(status === 429 ? t("too_fast") : t("cancel_failed"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (state === "waiting") {
     return (
-      <p role="status" className="mt-6 rounded-md bg-muted px-4 py-3 text-sm text-foreground">
-        {t("requested")}
-      </p>
+      <>
+        <p role="status" className="mt-6 rounded-md bg-muted px-4 py-3 text-sm text-foreground">
+          {t("requested")}
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={cancel}
+          className="mt-3 w-full rounded-md px-4 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+          {t("cancel_request")}
+        </button>
+      </>
     );
   }
 
