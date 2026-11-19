@@ -16,7 +16,6 @@ import useComposer from "@/app/hooks/useComposer";
 import useConversation from "@/app/hooks/useConversation";
 import useOutbox, { OutboxPayload } from "@/app/hooks/useOutbox";
 import useDrafts from "@/app/hooks/useDrafts";
-import { QUICK_EMOJI } from "@/app/libs/emoji";
 import { getSocket } from "@/app/libs/socket-client";
 import {
   AUDIO_TYPES,
@@ -57,9 +56,11 @@ interface FormProps {
   // the conversation's members (a group's "@" picker)
   members: SafeUser[];
   isGroup: boolean;
+  // what the quick button sends here (Conversation.quickEmoji, else 👍)
+  quickEmoji: string;
 }
 
-const Form: React.FC<FormProps> = ({ members, isGroup }) => {
+const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji }) => {
   // groups: the "New poll" dialog
   const [pollOpen, setPollOpen] = useState(false);
   const t = useTranslations("chat");
@@ -204,11 +205,11 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
     inputRef.current?.focus();
   };
 
-  // empty input: the send button sends a 👍 straight away
+  // empty input: the send button sends the conversation's quick emoji straight away
   const sendQuickEmoji = () => {
     send(
       conversationId,
-      { message: QUICK_EMOJI, ...(replyTo && { replyToId: replyTo.id }) },
+      { message: quickEmoji, ...(replyTo && { replyToId: replyTo.id }) },
       replyTo ? toPreview(replyTo) : undefined
     );
     if (replyTo) {
@@ -346,7 +347,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
   return (
     <div className="relative w-full border-t bg-background" {...dropProps}>
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-sky-500 bg-background/90 text-sm font-medium text-sky-500">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-chat bg-background/90 text-sm font-medium text-chat">
           {t("drop_files")}
         </div>
       )}
@@ -405,7 +406,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               onClick={() => imageInputRef.current?.click()}
               aria-label={t("attach_image")}
               title={t("attach_image")}
-              className="text-sky-500 transition hover:text-sky-600">
+              className="text-chat transition hover:text-chat/80">
               <HiPhoto size={30} aria-hidden />
             </button>
             <button
@@ -413,7 +414,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               onClick={() => fileInputRef.current?.click()}
               aria-label={t("attach_file")}
               title={t("attach_file")}
-              className="text-sky-500 transition hover:text-sky-600">
+              className="text-chat transition hover:text-chat/80">
               <HiPaperClip size={24} aria-hidden />
             </button>
             <MicButton onClick={recorder.start} />
@@ -423,7 +424,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                 onClick={() => setPollOpen(true)}
                 aria-label={t("new_poll")}
                 title={t("new_poll")}
-                className="text-sky-500 transition hover:text-sky-600">
+                className="text-chat transition hover:text-chat/80">
                 <HiChartBar size={24} aria-hidden />
               </button>
             )}
@@ -469,8 +470,8 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               <button
                 type="button"
                 onClick={sendQuickEmoji}
-                aria-label={t("send_quick", { emoji: QUICK_EMOJI })}
-                title={t("send_quick", { emoji: QUICK_EMOJI })}
+                aria-label={t("send_quick", { emoji: quickEmoji })}
+                title={t("send_quick", { emoji: quickEmoji })}
                 className="
                   flex
                   h-[34px]
@@ -484,7 +485,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                   hover:scale-110
                   active:scale-95
                   ">
-                {QUICK_EMOJI}
+                {quickEmoji}
               </button>
             ) : (
               <button
@@ -495,9 +496,9 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                 className="
                   rounded-full
                   p-2
-                  bg-sky-500
+                  bg-chat
                   cursor-pointer
-                  hover:bg-sky-600
+                  hover:bg-chat/90
                   disabled:opacity-50
                   transition
                   ">

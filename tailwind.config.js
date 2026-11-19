@@ -22,6 +22,9 @@ module.exports = {
         "muted-foreground": token("muted-foreground"),
         border: token("border"),
         input: token("input"),
+        // the open conversation's color (Conversation.themeColor, app/libs/chat-theme.ts): the
+        // --chat-accent variable set around the chat; sky-500 outside one
+        chat: "rgb(var(--chat-accent, 14 165 233) / <alpha-value>)",
       },
       // plain `border` / `border-t` / `divide-*` use the theme border color
       borderColor: { DEFAULT: token("border") },

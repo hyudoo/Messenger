@@ -353,7 +353,9 @@
     "demoted": "{actor} removed {users} as admin",
     "joined": "{actor} joined the group via the invite link",
     "nickname_set": "{actor} set the nickname for {users} to “{name}”",
-    "nickname_removed": "{actor} removed the nickname of {users}"
+    "nickname_removed": "{actor} removed the nickname of {users}",
+    "theme": "{actor} changed the theme to {color}",
+    "quick_emoji": "{actor} set the quick reaction to {emoji}"
   },
   "presence": {
     "just_now": "Active just now",
@@ -737,6 +739,27 @@
     "body": "Thanks for signing up for Messenger. Open this link within {hours} hours to verify your email and start using your account:",
     "button": "Verify email",
     "ignore": "If you didn't sign up, you can ignore this email: the account can't be used until it's verified."
+  },
+  "chat_theme": {
+    "title": "Theme",
+    "color": "Color",
+    "pick_color": "Use {color}",
+    "emoji": "Quick reaction",
+    "pick_emoji": "Use {emoji}",
+    "more_emoji": "Other emoji",
+    "hint": "Everyone in the conversation sees the color and quick reaction.",
+    "colors": {
+      "sky": "Sky",
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "violet": "Violet",
+      "pink": "Pink",
+      "rose": "Rose",
+      "orange": "Orange",
+      "emerald": "Emerald",
+      "teal": "Teal",
+      "slate": "Slate"
+    }
   },
   "delete_account": {
     "title": "Delete account",

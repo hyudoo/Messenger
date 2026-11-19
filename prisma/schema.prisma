@@ -145,6 +145,11 @@ model Conversation {
   // what the members call each other here (PATCH /api/conversations/[id]/nicknames; any member
   // sets anyone's), shown instead of their names in this conversation (app/libs/nicknames.ts)
   nicknames ConversationNickname[]
+  // its look, set by any member for everyone (PATCH /api/conversations/[id]/appearance,
+  // app/libs/chat-theme.ts): the color of the members' own bubbles and the composer (a CHAT_THEMES
+  // key; none: the default), and the emoji the empty composer sends (none: 👍)
+  themeColor String?
+  quickEmoji String?
 
   messages Message[]
 
@@ -252,6 +257,10 @@ enum SystemType {
   photo_removed
   // a nickname set (systemName) or removed (no systemName) for systemUsers[0]
   nickname
+  // the conversation's color changed (systemName: the CHAT_THEMES key; none: back to the default)
+  theme
+  // the quick emoji changed (systemName: the emoji; none: back to 👍)
+  quick_emoji
   promoted
   demoted
   joined

@@ -63,7 +63,7 @@ export type ConversationSettings = { id: string; muted: boolean; pinned: boolean
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
 // notifications), a seen update (messages only) or a group change (users with name / ownerId /
-// adminIds / image / inviteCode / joinApproval / nicknames: renamed, new photo, members or admins changed, someone left).
+// adminIds / image / inviteCode / joinApproval / nicknames / themeColor / quickEmoji: renamed, new photo, members or admins changed, someone left).
 export type ConversationUpdate = Pick<FullConversationType, "id"> &
   Partial<
     Pick<
@@ -77,6 +77,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
       | "inviteCode"
       | "joinApproval"
       | "nicknames"
+      | "themeColor"
+      | "quickEmoji"
       | "name"
       | "isGroup"
     >

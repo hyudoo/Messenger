@@ -146,7 +146,7 @@ export const MicButton: React.FC<MicButtonProps> = ({ onClick, disabled }) => {
       disabled={disabled}
       aria-label={t("record_voice")}
       title={t("record_voice")}
-      className="text-sky-500 transition hover:text-sky-600 disabled:opacity-50">
+      className="text-chat transition hover:text-chat/80 disabled:opacity-50">
       <HiMicrophone size={26} aria-hidden />
     </button>
   );
@@ -170,7 +170,7 @@ export const RecordingBar: React.FC<RecordingBarProps> = ({ elapsed, onCancel, o
         className="rounded-full p-2 text-rose-500 transition hover:bg-muted">
         <HiTrash size={22} aria-hidden />
       </button>
-      <div className="flex h-10 flex-1 items-center gap-2 rounded-full bg-sky-500 px-4 text-white" role="status">
+      <div className="flex h-10 flex-1 items-center gap-2 rounded-full bg-chat px-4 text-white" role="status">
         <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white" aria-hidden />
         <span className="text-sm">{t("recording")}</span>
         <span className="ml-auto text-sm tabular-nums">
@@ -182,7 +182,7 @@ export const RecordingBar: React.FC<RecordingBarProps> = ({ elapsed, onCancel, o
         onClick={onSend}
         aria-label={t("send_voice")}
         title={t("send_voice")}
-        className="rounded-full bg-sky-500 p-2 text-white transition hover:bg-sky-600">
+        className="rounded-full bg-chat p-2 text-white transition hover:bg-chat/90">
         <HiPaperAirplane size={18} aria-hidden />
       </button>
     </div>

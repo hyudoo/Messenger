@@ -9,6 +9,7 @@ import { findFirstUnread } from "@/app/libs/unread";
 import { privacyOf } from "@/app/libs/privacy";
 import { relationsWith } from "@/app/libs/friends";
 import prisma from "@/app/libs/prismadb";
+import { chatThemeStyle, quickEmojiOf } from "@/app/libs/chat-theme";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
@@ -85,7 +86,8 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
 
   return (
     <div className="lg:pl-80 h-full">
-      <div className="h-full flex flex-col">
+      {/* the conversation's color (bg-chat / text-chat) for everything below */}
+      <div className="h-full flex flex-col" style={chatThemeStyle(conversation.themeColor)}>
         <Header
           conversation={conversation}
           users={users}
@@ -110,7 +112,11 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
         {blocked && other ? (
           <BlockedNotice other={other} byMe={block.byMe} />
         ) : (
-          <Form members={conversation.users} isGroup={!!conversation.isGroup} />
+          <Form
+            members={conversation.users}
+            isGroup={!!conversation.isGroup}
+            quickEmoji={quickEmojiOf(conversation.quickEmoji)}
+          />
         )}
       </div>
     </div>

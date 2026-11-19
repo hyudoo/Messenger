@@ -91,6 +91,7 @@ import { POST as createPoll } from "@/app/api/conversations/[conversationId]/pol
 import { POST as votePoll } from "@/app/api/polls/[pollId]/votes/route";
 import { POST as closePoll } from "@/app/api/polls/[pollId]/close/route";
 import { PATCH as setNickname } from "@/app/api/conversations/[conversationId]/nicknames/route";
+import { PATCH as setAppearance } from "@/app/api/conversations/[conversationId]/appearance/route";
 
 import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
 import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
@@ -2631,6 +2632,68 @@ describe("nicknames", () => {
     expect((await nick({ userId: OTHER, nickname: "x".repeat(41) })).status).toBe(400);
     prisma.conversation.findFirst.mockResolvedValue(null);
     expect((await nick({ userId: OTHER, nickname: "X" })).status).toBe(404);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("conversation appearance", () => {
+  const patch = (body: unknown) =>
+    setAppearance(
+      jsonRequest(`/api/conversations/${CONVERSATION}/appearance`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("sets the color and quick emoji, tells everyone and posts one event per change", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(THIRD), themeColor: null, quickEmoji: null });
+    prisma.conversation.update.mockImplementation(async ({ data }: any) => ({ ...group(THIRD), ...data }));
+    prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+    const response = await patch({ themeColor: "violet", quickEmoji: "❤️" });
+    expect(await response.json()).toEqual({ themeColor: "violet", quickEmoji: "❤️" });
+    expect(prisma.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { themeColor: "violet", quickEmoji: "❤️" } })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      third.email,
+      "conversation:update",
+      expect.objectContaining({ themeColor: "violet", quickEmoji: "❤️" })
+    );
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ systemType: "theme", systemName: "violet", senderId: ME }),
+      })
+    );
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ systemType: "quick_emoji", systemName: "❤️", senderId: ME }),
+      })
+    );
+  });
+
+  it("goes back to the defaults (stored as null), and does nothing when unchanged", async () => {
+    const stored = { ...group(THIRD), themeColor: "rose", quickEmoji: "🔥" };
+    prisma.conversation.findFirst.mockResolvedValue(stored);
+    prisma.conversation.update.mockImplementation(async ({ data }: any) => ({ ...stored, ...data }));
+    prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+    expect((await patch({ themeColor: "rose", quickEmoji: "🔥" })).status).toBe(200);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+
+    expect(await (await patch({ themeColor: "sky" })).json()).toEqual({ themeColor: null, quickEmoji: "🔥" });
+    expect(prisma.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { themeColor: null } })
+    );
+    expect(prisma.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses unknown colors, anything but one emoji, empty bodies and strangers", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(THIRD), themeColor: null, quickEmoji: null });
+    expect((await patch({ themeColor: "#ff0000" })).status).toBe(400);
+    expect((await patch({ quickEmoji: "hi" })).status).toBe(400);
+    expect((await patch({ quickEmoji: "👍👍" })).status).toBe(400);
+    expect((await patch({})).status).toBe(400);
+    prisma.conversation.findFirst.mockResolvedValue(null);
+    expect((await patch({ themeColor: "violet" })).status).toBe(404);
     expect(prisma.conversation.update).not.toHaveBeenCalled();
   });
 });

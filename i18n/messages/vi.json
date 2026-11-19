@@ -353,7 +353,9 @@
     "demoted": "{actor} đã bỏ quyền quản trị viên của {users}",
     "joined": "{actor} đã tham gia nhóm qua link mời",
     "nickname_set": "{actor} đã đặt biệt danh cho {users} là “{name}”",
-    "nickname_removed": "{actor} đã xoá biệt danh của {users}"
+    "nickname_removed": "{actor} đã xoá biệt danh của {users}",
+    "theme": "{actor} đã đổi màu chủ đề thành {color}",
+    "quick_emoji": "{actor} đã đặt biểu tượng cảm xúc nhanh là {emoji}"
   },
   "presence": {
     "just_now": "Vừa mới hoạt động",
@@ -737,6 +739,27 @@
     "body": "Cảm ơn bạn đã đăng ký Messenger. Mở link này trong vòng {hours} giờ để xác minh email và bắt đầu dùng tài khoản:",
     "button": "Xác minh email",
     "ignore": "Nếu bạn không đăng ký, hãy bỏ qua email này: tài khoản sẽ không dùng được nếu chưa xác minh."
+  },
+  "chat_theme": {
+    "title": "Chủ đề",
+    "color": "Màu",
+    "pick_color": "Dùng màu {color}",
+    "emoji": "Biểu tượng cảm xúc nhanh",
+    "pick_emoji": "Dùng {emoji}",
+    "more_emoji": "Emoji khác",
+    "hint": "Mọi người trong cuộc trò chuyện đều thấy màu và biểu tượng cảm xúc nhanh.",
+    "colors": {
+      "sky": "Xanh trời",
+      "blue": "Xanh dương",
+      "indigo": "Chàm",
+      "violet": "Tím",
+      "pink": "Hồng",
+      "rose": "Đỏ hồng",
+      "orange": "Cam",
+      "emerald": "Xanh lục bảo",
+      "teal": "Xanh mòng két",
+      "slate": "Xám đá"
+    }
   },
   "delete_account": {
     "title": "Xoá tài khoản",

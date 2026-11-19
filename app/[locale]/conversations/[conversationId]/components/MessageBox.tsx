@@ -145,14 +145,14 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean; joinable: b
       <div
         className={clsx(
           "p-1 rounded-full",
-          failed ? "bg-rose-500" : isOwn ? "bg-sky-600" : "bg-muted-foreground"
+          failed ? "bg-rose-500" : isOwn ? "bg-black/20" : "bg-muted-foreground"
         )}>
         <Icon size={10} className="text-white" aria-hidden />
       </div>
       <div className="flex flex-col">
         <span>{label}</span>
         {duration !== null && (
-          <span className={clsx("text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+          <span className={clsx("text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
             {t("call_duration", { duration: formatCallDuration(duration) })}
           </span>
         )}
@@ -413,7 +413,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
         "text-sm w-fit max-w-full overflow-hidden transition-opacity",
         pending?.status === "sending" && "opacity-60",
         pending?.status === "failed" && "ring-2 ring-rose-500",
-        isOwn ? "bg-sky-500 text-white" : "bg-muted",
+        isOwn ? "bg-chat text-white" : "bg-muted",
         // rounded-2xl, not rounded-full: a pill shape breaks once a message wraps
         data.image ? "rounded-md p-0" : "rounded-2xl py-2 px-3"
       );

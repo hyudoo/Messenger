@@ -87,7 +87,7 @@ const Header: React.FC<HeaderProps> = ({
             className="
                 lg:hidden
                 block
-                text-sky-500
+                text-chat
                 transition
                 cursor-pointer
                 ">
@@ -114,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({
                 aria-label={t("chat.audio_call")}
                 title={t("chat.audio_call")}
                 onClick={() => handleCall("audio")}
-                className="text-sky-500 transition hover:text-sky-600">
+                className="text-chat transition hover:text-chat/80">
                 <HiPhone size={28} />
               </button>
               <button
@@ -122,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({
                 aria-label={t("chat.video_call")}
                 title={t("chat.video_call")}
                 onClick={() => handleCall("video")}
-                className="text-sky-500 transition hover:text-sky-600">
+                className="text-chat transition hover:text-chat/80">
                 <HiVideoCamera size={32} />
               </button>
             </>
@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({
             title={t("chat.details")}
             aria-haspopup="dialog"
             onClick={() => setDrawerOpen(true)}
-            className="rounded-full text-sky-500 transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+            className="rounded-full text-chat transition hover:text-chat/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-chat">
             <HiEllipsisHorizontal size={32} aria-hidden />
           </button>
         </div>

@@ -36,7 +36,14 @@ import { useRouter } from "@/i18n/navigation";
 import type { Relation } from "@/app/libs/friends";
 import { HiArchiveBox, HiNoSymbol, HiUserGroup, HiUserPlus } from "react-icons/hi2";
 import { ConversationSettings } from "@/app/types";
-import { GroupInvite, GroupMembers, GroupName, GroupPhoto, Nicknames } from "./GroupSettings";
+import {
+  ChatAppearance,
+  GroupInvite,
+  GroupMembers,
+  GroupName,
+  GroupPhoto,
+  Nicknames,
+} from "./GroupSettings";
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -379,10 +386,12 @@ const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
                             <div className="w-full">
                               <GroupInvite conversation={data} myId={myId} />
                               <GroupMembers conversation={data} myId={myId} users={users} />
+                              <ChatAppearance conversation={data} />
                               <Nicknames conversation={data} myId={myId} />
                             </div>
                           ) : (
                             <div className="w-full">
+                            <ChatAppearance conversation={data} />
                             <Nicknames conversation={data} myId={myId} />
                             <dl className="w-full space-y-6 px-4 sm:px-6">
                               <div>

@@ -137,6 +137,10 @@ const ConversationList: React.FC<ConversationListProps> = ({
               conversation.inviteCode === undefined ? target.inviteCode : conversation.inviteCode,
             joinApproval: conversation.joinApproval ?? target.joinApproval,
             nicknames: conversation.nicknames ?? target.nicknames,
+            themeColor:
+              conversation.themeColor === undefined ? target.themeColor : conversation.themeColor,
+            quickEmoji:
+              conversation.quickEmoji === undefined ? target.quickEmoji : conversation.quickEmoji,
             name: conversation.name ?? target.name,
           }),
           // something new: an archived conversation comes back (the server unarchives it too)
