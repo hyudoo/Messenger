@@ -3,9 +3,10 @@
 import axios from "axios";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
+import { syncPush } from "@/app/libs/notifications";
 import { validatePassword } from "@/app/libs/password";
 import Button from "../Button";
 
@@ -23,8 +24,10 @@ const EMPTY: Record<Field, string> = { currentPassword: "", newPassword: "", con
 // The settings modal's security part: changing the password and "sign out other devices". Both end
 // every other session (app/libs/sessions.ts); this device gets a new cookie and stays signed in.
 // It sits inside the settings <form>, so it has no form of its own: Enter is handled here.
+// The server forgets every browser's push subscription then, so this one subscribes again.
 const SecuritySettings: React.FC = () => {
   const t = useTranslations("security");
+  const locale = useLocale();
   const tRules = useTranslations("auth.password_rules");
   const [values, setValues] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +60,7 @@ const SecuritySettings: React.FC = () => {
         newPassword: values.newPassword,
       });
       setValues(EMPTY);
+      void syncPush(locale);
       toast.success(t("changed"));
     } catch (failure) {
       const code = axios.isAxiosError(failure) ? failure.response?.data : null;
@@ -81,6 +85,7 @@ const SecuritySettings: React.FC = () => {
     setBusy(true);
     try {
       await axios.delete("/api/settings/sessions");
+      void syncPush(locale);
       toast.success(t("signed_out_others"));
       setConfirmingSignOut(false);
     } catch (failure) {

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { getSession, signOut, useSession } from "next-auth/react";
 import { useLocale } from "next-intl";
 
+import { removePushSubscription } from "../libs/push-client";
 import { getSocket } from "../libs/socket-client";
 import useActiveList from "./useActiveList";
 
@@ -34,6 +35,9 @@ const useActiveChannel = () => {
       }
       const session = await getSession().catch(() => undefined);
       if (session === null) {
+        // the server already forgot this browser's push subscription (revokeSessions); drop it
+        // here too, like a sign-out from the menu
+        await removePushSubscription();
         void signOut({ callbackUrl: `/${locale}` });
       } else {
         clearTimeout(retry);

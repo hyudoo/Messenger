@@ -15,8 +15,10 @@ import { notifySessionsRevoked } from "./socket-server";
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 
 // Ends every session of the user (see app/libs/session-version.ts): bumps their session version,
-// with `data` written in the same update (e.g. the new password hash), and drops their sockets on
-// every instance. Returns the user and the new version, for reissueSession.
+// with `data` written in the same update (e.g. the new password hash), forgets every browser's
+// Web Push subscription (a signed-out device must stop getting their messages; the device that
+// asked subscribes again, SecuritySettings) and drops their sockets on every instance. Returns
+// the user and the new version, for reissueSession.
 export const revokeSessions = async (
   userId: string,
   data: Prisma.UserUpdateInput = {}
@@ -30,6 +32,7 @@ export const revokeSessions = async (
     select: { id: true, email: true, name: true, image: true },
   });
   rememberSessionVersion(userId, version);
+  await prisma.webPushSubscription.deleteMany({ where: { userId } });
   if (user.email) {
     notifySessionsRevoked(userId, user.email);
   }

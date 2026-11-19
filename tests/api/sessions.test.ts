@@ -71,6 +71,8 @@ describe("POST /api/password/change", () => {
     expect(await bcrypt.compare(NEW_PASSWORD, data.hashedPassword)).toBe(true);
     expect(prisma.passwordReset.deleteMany).toHaveBeenCalledWith({ where: { userId: ME } });
     expect(mocks.notifySessionsRevoked).toHaveBeenCalledWith(ME, me.email);
+    // signed-out browsers stop getting push (this one subscribes again from the settings)
+    expect(prisma.webPushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: ME } });
 
     // this device's new cookie carries the new version; an old token is refused
     const token = await issuedToken(response);
@@ -84,6 +86,7 @@ describe("POST /api/password/change", () => {
     expect(response.status).toBe(400);
     expect(await response.text()).toBe("wrong_password");
     expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.webPushSubscription.deleteMany).not.toHaveBeenCalled();
     expect(mocks.notifySessionsRevoked).not.toHaveBeenCalled();
   });
 
@@ -117,6 +120,7 @@ describe("DELETE /api/settings/sessions", () => {
     expect(data).toEqual({ sessionVersion: 3 });
     expect((await issuedToken(response))?.sv).toBe(3);
     expect(mocks.notifySessionsRevoked).toHaveBeenCalledWith(ME, me.email);
+    expect(prisma.webPushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: ME } });
   });
 });
 
