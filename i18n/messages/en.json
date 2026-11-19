@@ -68,12 +68,7 @@
     "register_unavailable": "Signing up with an email isn't available right now; sign in with Google / GitHub."
   },
   "home": {
-    "tagline": "A web messenger for chatting with friends in real time, with voice and video calls.",
-    "feature_chat": "Real-time messages, photos, files and voice notes",
-    "feature_calls": "Voice and video calls, screen sharing",
-    "feature_groups": "Group chats, group calls and invite links",
-    "feature_privacy": "Privacy controls: hide activity and read receipts, block",
-    "google_data": "Signing in with Google or GitHub only uses your name, email address and profile photo, to create your account and show you to the people you chat with. See the Privacy Policy below."
+    "tagline": "A web messenger for chatting with friends in real time, with voice and video calls."
   },
   "conversations": {
     "title": "Inbox",

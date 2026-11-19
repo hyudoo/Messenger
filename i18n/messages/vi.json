@@ -68,12 +68,7 @@
     "register_unavailable": "Hiện chưa thể đăng ký bằng email, hãy đăng nhập bằng Google / GitHub."
   },
   "home": {
-    "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video.",
-    "feature_chat": "Nhắn tin tức thì, gửi ảnh, tệp và tin nhắn thoại",
-    "feature_calls": "Gọi thoại, gọi video, chia sẻ màn hình",
-    "feature_groups": "Nhóm chat, gọi nhóm và link mời",
-    "feature_privacy": "Quyền riêng tư: ẩn trạng thái hoạt động, đã xem, chặn",
-    "google_data": "Khi đăng nhập bằng Google hoặc GitHub, ứng dụng chỉ dùng tên, địa chỉ email và ảnh đại diện của bạn để tạo tài khoản và hiển thị cho người bạn trò chuyện. Xem Chính sách quyền riêng tư bên dưới."
+    "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video."
   },
   "conversations": {
     "title": "Hộp thư",

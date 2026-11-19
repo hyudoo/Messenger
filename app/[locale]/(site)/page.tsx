@@ -6,20 +6,6 @@ import ThemeToggle from "@/app/components/toggles/ThemeToggle";
 import { safeNextPath } from "@/app/libs/invite-code";
 import { Link } from "@/i18n/navigation";
 import AuthForm from "./components/AuthForm";
-import {
-  HiChatBubbleLeftRight,
-  HiLockClosed,
-  HiUserGroup,
-  HiVideoCamera,
-} from "react-icons/hi2";
-
-// the home page's feature list (keys in the "home" messages)
-const FEATURES = [
-  { key: "feature_chat", icon: HiChatBubbleLeftRight },
-  { key: "feature_calls", icon: HiVideoCamera },
-  { key: "feature_groups", icon: HiUserGroup },
-  { key: "feature_privacy", icon: HiLockClosed },
-] as const;
 
 export default async function Home({
   searchParams,
@@ -68,15 +54,6 @@ export default async function Home({
             Messenger
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">{tHome("tagline")}</p>
-          <ul className="mx-auto mt-4 grid max-w-sm grid-cols-2 gap-2 text-left text-xs text-foreground">
-            {FEATURES.map(({ key, icon: Icon }) => (
-              <li key={key} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2">
-                <Icon size={16} className="shrink-0 text-sky-500" aria-hidden />
-                {tHome(key)}
-              </li>
-            ))}
-          </ul>
-          <p className="mx-auto mt-3 max-w-sm text-xs text-muted-foreground">{tHome("google_data")}</p>
         </section>
         <h2 className="mt-8 text-center text-3xl font-bold tracking-tight text-foreground">
           {t("title")}
