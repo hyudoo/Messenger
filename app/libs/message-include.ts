@@ -37,4 +37,15 @@ export const MESSAGE_INCLUDE = {
     orderBy: { createdAt: "asc" },
   },
   replyTo: { select: REPLY_PREVIEW_SELECT },
+  // a group poll with its votes (app/libs/poll-rules.ts); voters are named from the members
+  poll: {
+    select: {
+      id: true,
+      question: true,
+      options: true,
+      multiple: true,
+      closedAt: true,
+      votes: { select: { optionId: true, userId: true }, orderBy: { createdAt: "asc" } },
+    },
+  },
 } satisfies Prisma.MessageInclude;

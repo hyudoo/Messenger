@@ -28,7 +28,11 @@ const loadForMember = async (messageId: string | undefined, userId: string) => {
   if (!messageId || !OBJECT_ID.test(messageId)) {
     return null;
   }
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  // with its poll, if any: a poll is never edited (canEditMessage), and recalling one deletes it
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { poll: { select: { id: true } } },
+  });
   const conversation = message && (await getConversationForUser(message.conversationId, userId));
   return message && conversation ? { message, conversation } : null;
 };
@@ -163,8 +167,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
       return new NextResponse("This message can't be recalled", { status: 403 });
     }
 
-    const [, updated] = await prisma.$transaction([
+    const [, , updated] = await prisma.$transaction([
       prisma.reaction.deleteMany({ where: { messageId: found.message.id } }),
+      // a recalled poll goes with its votes (cascade)
+      prisma.poll.deleteMany({ where: { messageId: found.message.id } }),
       prisma.message.update({
         where: { id: found.message.id },
         data: {

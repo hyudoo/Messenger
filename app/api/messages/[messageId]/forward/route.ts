@@ -35,7 +35,11 @@ export async function POST(request: Request, { params }: { params: Promise<IPara
     const { conversationId } = await request.json().catch(() => ({}));
     const original =
       messageId && OBJECT_ID.test(messageId)
-        ? await prisma.message.findUnique({ where: { id: messageId } })
+        ? await prisma.message.findUnique({
+            where: { id: messageId },
+            // a poll is never forwarded (canForwardMessage)
+            include: { poll: { select: { id: true } } },
+          })
         : null;
     // "missing" and "not a member" look the same, for the source and the target
     const [source, target] = await Promise.all([

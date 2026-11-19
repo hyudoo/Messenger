@@ -15,6 +15,7 @@ import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { ImageViewerProvider } from "./ImageViewer";
+import { ChatMembersProvider } from "./PollCard";
 import ForwardDialog from "./ForwardDialog";
 import { flashMessage } from "./MessageReply";
 import useMessageJump, { onMessageJump } from "@/app/hooks/useMessageJump";
@@ -485,6 +486,7 @@ const Body: React.FC<BodyProps> = ({
     .map((message) => message.image!);
 
   return (
+    <ChatMembersProvider value={members}>
     <ImageViewerProvider images={images}>
       <div className="relative flex-1 min-h-0">
         <div
@@ -584,6 +586,7 @@ const Body: React.FC<BodyProps> = ({
       </div>
       <ForwardDialog />
     </ImageViewerProvider>
+    </ChatMembersProvider>
   );
 };
 

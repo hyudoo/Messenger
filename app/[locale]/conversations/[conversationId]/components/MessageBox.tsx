@@ -52,6 +52,7 @@ import {
 } from "react-icons/hi2";
 import { useForward } from "./ForwardDialog";
 import MessageMenuSheet from "./MessageMenuSheet";
+import PollCard from "./PollCard";
 import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
 interface MessageBoxProps {
@@ -505,7 +506,10 @@ const MessageBox: React.FC<MessageBoxProps> = ({
               <VoicePlayer attachment={data.attachment} isOwn={isOwn} />
             )}
             {/* keeps line breaks; anywhere: long URLs / words wrap instead of overflowing */}
-            {data.body && (
+            {data.poll && !recalled && (
+              <PollCard poll={data.poll} isOwn={isOwn} myEmail={myEmail} senderId={data.senderId} />
+            )}
+            {data.body && !data.poll && (
               <div className="whitespace-pre-wrap [overflow-wrap:anywhere]">
                 <MessageText
                   text={data.body}

@@ -65,6 +65,14 @@
       "no_special": "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
     }
   },
+  "home": {
+    "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video.",
+    "feature_chat": "Nhắn tin tức thì, gửi ảnh, tệp và tin nhắn thoại",
+    "feature_calls": "Gọi thoại, gọi video, chia sẻ màn hình",
+    "feature_groups": "Nhóm chat, gọi nhóm và link mời",
+    "feature_privacy": "Quyền riêng tư: ẩn trạng thái hoạt động, đã xem, chặn",
+    "google_data": "Khi đăng nhập bằng Google hoặc GitHub, ứng dụng chỉ dùng tên, địa chỉ email và ảnh đại diện của bạn để tạo tài khoản và hiển thị cho người bạn trò chuyện. Xem Chính sách quyền riêng tư bên dưới."
+  },
   "conversations": {
     "title": "Hộp thư",
     "new_group": "Tạo nhóm chat",
@@ -171,7 +179,8 @@
     "pin_failed": "Không ghim được tin nhắn!",
     "pin_limit": "Chỉ ghim được tối đa 20 tin nhắn.",
     "delete_for_me": "Xoá ở phía bạn",
-    "delete_for_me_failed": "Không xoá được tin nhắn!"
+    "delete_for_me_failed": "Không xoá được tin nhắn!",
+    "new_poll": "Tạo bình chọn"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -608,5 +617,29 @@
         }
       ]
     }
+  },
+  "poll": {
+    "new_title": "Tạo bình chọn",
+    "question": "Câu hỏi",
+    "question_placeholder": "Đặt câu hỏi…",
+    "options": "Các lựa chọn",
+    "option_label": "Lựa chọn {number}",
+    "remove_option": "Xoá lựa chọn {number}",
+    "add_option": "Thêm lựa chọn",
+    "allow_multiple": "Cho chọn nhiều đáp án",
+    "hint": "Từ {min} đến {max} lựa chọn khác nhau.",
+    "cancel": "Huỷ",
+    "create": "Tạo bình chọn",
+    "create_failed": "Không tạo được bình chọn!",
+    "label_single": "Bình chọn",
+    "label_multiple": "Bình chọn · nhiều đáp án",
+    "closed": "Đã đóng",
+    "close": "Đóng bình chọn",
+    "close_failed": "Không đóng được bình chọn!",
+    "voters": "{count, plural, =0 {Chưa có ai bình chọn} other {# người đã bình chọn}}",
+    "someone": "Ai đó",
+    "vote_failed": "Không lưu được lựa chọn của bạn!",
+    "closed_error": "Bình chọn này đã đóng.",
+    "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
   }
 }

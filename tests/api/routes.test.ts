@@ -87,6 +87,9 @@ import {
 } from "@/app/api/friends/requests/[requestId]/route";
 import { DELETE as unfriendUser } from "@/app/api/friends/[userId]/route";
 import { GET as searchPeople } from "@/app/api/users/search/route";
+import { POST as createPoll } from "@/app/api/conversations/[conversationId]/polls/route";
+import { POST as votePoll } from "@/app/api/polls/[pollId]/votes/route";
+import { POST as closePoll } from "@/app/api/polls/[pollId]/close/route";
 
 import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
 import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
@@ -2462,6 +2465,107 @@ describe("friends", () => {
     await find(other.email!);
     const byEmail = prisma.user.findMany.mock.calls.find(([args]: any) => args.select?.name)![0];
     expect(byEmail.where.email).toEqual({ equals: other.email, mode: "insensitive" });
+  });
+});
+
+describe("polls", () => {
+  const POLL = "abababababababababababab";
+  const post = (body: unknown) =>
+    createPoll(
+      jsonRequest(`/api/conversations/${CONVERSATION}/polls`, body),
+      params({ conversationId: CONVERSATION })
+    );
+  const vote = (optionIds: unknown) =>
+    votePoll(jsonRequest(`/api/polls/${POLL}/votes`, { optionIds }), params({ pollId: POLL }));
+  const close = () => closePoll(jsonRequest(`/api/polls/${POLL}/close`, {}), params({ pollId: POLL }));
+  // a poll in a group owned by THIRD, asked by `senderId`
+  const stored = (extra: Record<string, unknown> = {}, senderId = OTHER) => ({
+    id: POLL,
+    options: [
+      { id: "a", text: "Pho" },
+      { id: "b", text: "Pizza" },
+    ],
+    multiple: false,
+    closedAt: null,
+    message: { id: MESSAGE, conversationId: CONVERSATION, senderId, deletedAt: null },
+    ...extra,
+  });
+
+  it("is for groups only and needs a valid poll", async () => {
+    asMember();
+    expect((await post({ question: "Lunch?", options: ["Pho", "Pizza"] })).status).toBe(400);
+    prisma.conversation.findFirst.mockResolvedValue(group(THIRD));
+    expect((await post({ question: "Lunch?", options: ["Pho"] })).status).toBe(400);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+
+  it("posts a message whose body is the question, with its poll, delivered like a message", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(THIRD));
+    prisma.message.create.mockImplementation(async ({ data }: any) => ({
+      id: MESSAGE,
+      createdAt: new Date(),
+      ...data,
+    }));
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+
+    expect((await post({ question: " Lunch? ", options: ["Pho", " Pizza "], multiple: true })).status).toBe(200);
+    const { data } = prisma.message.create.mock.calls[0][0];
+    expect(data.body).toBe("Lunch?");
+    expect(data.searchText).toBe("lunch?");
+    expect(data.poll.create).toEqual({
+      question: "Lunch?",
+      multiple: true,
+      options: [
+        { id: expect.stringMatching(/^[\w-]{8}$/), text: "Pho" },
+        { id: expect.stringMatching(/^[\w-]{8}$/), text: "Pizza" },
+      ],
+    });
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(
+      CONVERSATION,
+      "messages:new",
+      expect.objectContaining({ id: MESSAGE })
+    );
+  });
+
+  it("replaces the caller's votes, one option unless several are allowed", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(group(THIRD));
+    prisma.poll.findUnique.mockResolvedValue(stored());
+    prisma.message.findUnique.mockResolvedValue({ id: MESSAGE });
+
+    expect((await vote(["a", "b"])).status).toBe(400);
+    expect((await vote(["zzz"])).status).toBe(400);
+    expect((await vote(["b"])).status).toBe(200);
+    expect(prisma.pollVote.deleteMany).toHaveBeenCalledWith({ where: { pollId: POLL, userId: ME } });
+    expect(prisma.pollVote.create).toHaveBeenCalledWith({
+      data: { pollId: POLL, userId: ME, optionId: "b" },
+      select: { id: true },
+    });
+    expect(mocks.emitToConversation).toHaveBeenCalledWith(CONVERSATION, "messages:update", { id: MESSAGE });
+  });
+
+  it("refuses votes on a closed poll, and strangers", async () => {
+    prisma.poll.findUnique.mockResolvedValue(stored({ closedAt: new Date() }));
+    prisma.conversation.findFirst.mockResolvedValue(group(THIRD));
+    expect((await vote(["a"])).status).toBe(409);
+    prisma.conversation.findFirst.mockResolvedValue(null);
+    expect((await vote(["a"])).status).toBe(404);
+    expect(prisma.pollVote.create).not.toHaveBeenCalled();
+  });
+
+  it("is closed by whoever asked it or an admin only", async () => {
+    // asked by OTHER, ME is a plain member of THIRD's group
+    prisma.conversation.findFirst.mockResolvedValue(group(THIRD));
+    prisma.poll.findUnique.mockResolvedValue(stored());
+    expect((await close()).status).toBe(403);
+
+    prisma.poll.findUnique.mockResolvedValue(stored({}, ME));
+    prisma.message.findUnique.mockResolvedValue({ id: MESSAGE });
+    expect((await close()).status).toBe(200);
+    expect(prisma.poll.update).toHaveBeenCalledWith({
+      where: { id: POLL },
+      data: { closedAt: expect.any(Date) },
+      select: { id: true },
+    });
   });
 });
 

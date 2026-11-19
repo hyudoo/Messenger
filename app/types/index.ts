@@ -1,4 +1,5 @@
 import { CallType, Conversation, Message, User } from "@prisma/client";
+import type { PollView } from "@/app/libs/poll-rules";
 
 // What Prisma returns for a user: hashedPassword is omitted globally (app/libs/prismadb.ts).
 // a user row as queries return it (app/libs/prismadb.ts omits these fields)
@@ -34,6 +35,8 @@ export type FullMessageType = Message & {
   reactions?: MessageReaction[];
   // missing where only a preview is loaded (the conversation list)
   replyTo?: ReplyPreview | null;
+  // a group poll (its question is the body); missing where only a preview is loaded
+  poll?: PollView | null;
   // messages:new only: the sending tab's outbox id (app/hooks/useOutbox.ts)
   clientId?: string;
 };

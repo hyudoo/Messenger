@@ -65,6 +65,14 @@
       "no_special": "The password needs at least one special character"
     }
   },
+  "home": {
+    "tagline": "A web messenger for chatting with friends in real time, with voice and video calls.",
+    "feature_chat": "Real-time messages, photos, files and voice notes",
+    "feature_calls": "Voice and video calls, screen sharing",
+    "feature_groups": "Group chats, group calls and invite links",
+    "feature_privacy": "Privacy controls: hide activity and read receipts, block",
+    "google_data": "Signing in with Google or GitHub only uses your name, email address and profile photo, to create your account and show you to the people you chat with. See the Privacy Policy below."
+  },
   "conversations": {
     "title": "Inbox",
     "new_group": "New group chat",
@@ -171,7 +179,8 @@
     "pin_failed": "Couldn't pin the message!",
     "pin_limit": "You can pin at most 20 messages.",
     "delete_for_me": "Delete for you",
-    "delete_for_me_failed": "Couldn't delete the message!"
+    "delete_for_me_failed": "Couldn't delete the message!",
+    "new_poll": "New poll"
   },
   "profile": {
     "close": "Close panel",
@@ -608,5 +617,29 @@
         }
       ]
     }
+  },
+  "poll": {
+    "new_title": "New poll",
+    "question": "Question",
+    "question_placeholder": "Ask something…",
+    "options": "Options",
+    "option_label": "Option {number}",
+    "remove_option": "Remove option {number}",
+    "add_option": "Add option",
+    "allow_multiple": "Allow several answers",
+    "hint": "Between {min} and {max} different options.",
+    "cancel": "Cancel",
+    "create": "Create poll",
+    "create_failed": "Couldn't create the poll!",
+    "label_single": "Poll",
+    "label_multiple": "Poll · several answers",
+    "closed": "Closed",
+    "close": "Close poll",
+    "close_failed": "Couldn't close the poll!",
+    "voters": "{count, plural, =0 {No votes yet} one {# person voted} other {# people voted}}",
+    "someone": "Someone",
+    "vote_failed": "Couldn't save your vote!",
+    "closed_error": "This poll is closed.",
+    "too_fast": "You're going too fast, wait a moment and try again!"
   }
 }

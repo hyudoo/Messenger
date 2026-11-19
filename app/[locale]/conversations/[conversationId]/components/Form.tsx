@@ -2,7 +2,8 @@
 
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
-import { HiCheck, HiPaperAirplane, HiPaperClip, HiPhoto, HiXMark } from "react-icons/hi2";
+import { HiChartBar, HiCheck, HiPaperAirplane, HiPaperClip, HiPhoto, HiXMark } from "react-icons/hi2";
+import PollComposer from "./PollComposer";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 
@@ -59,6 +60,8 @@ interface FormProps {
 }
 
 const Form: React.FC<FormProps> = ({ members, isGroup }) => {
+  // groups: the "New poll" dialog
+  const [pollOpen, setPollOpen] = useState(false);
   const t = useTranslations("chat");
   const tUpload = useTranslations("upload");
   const { conversationId } = useConversation();
@@ -414,8 +417,25 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               <HiPaperClip size={24} aria-hidden />
             </button>
             <MicButton onClick={recorder.start} />
+            {isGroup && (
+              <button
+                type="button"
+                onClick={() => setPollOpen(true)}
+                aria-label={t("new_poll")}
+                title={t("new_poll")}
+                className="text-sky-500 transition hover:text-sky-600">
+                <HiChartBar size={24} aria-hidden />
+              </button>
+            )}
             <EmojiPicker onSelect={insertEmoji} />
           </div>
+        )}
+        {isGroup && (
+          <PollComposer
+            conversationId={conversationId}
+            isOpen={pollOpen}
+            onClose={() => setPollOpen(false)}
+          />
         )}
 
         <form

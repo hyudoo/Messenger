@@ -7,6 +7,8 @@ type Actionable = {
   systemType?: string | null;
   deletedAt?: Date | string | null;
   createdAt: Date | string;
+  // a poll message (its body is the question): not edited, not forwarded
+  poll?: unknown;
 };
 
 // like Messenger: a typo can be fixed for a while, not history rewritten later
@@ -21,6 +23,7 @@ export const canEditMessage = (message: Actionable, userId: string, now = Date.n
   isLive(message) &&
   message.senderId === userId &&
   !!message.body &&
+  !message.poll &&
   now - new Date(message.createdAt).getTime() <= EDIT_WINDOW_MS;
 
 // The sender's own message (text or image, not a call), at any time, once.
@@ -31,7 +34,7 @@ export const canRecallMessage = (message: Actionable, userId: string) =>
 // content (text, image, file or voice), to another conversation they are in.
 export const canForwardMessage = (
   message: Actionable & { image?: string | null; attachment?: unknown }
-) => isLive(message) && !!(message.body || message.image || message.attachment);
+) => isLive(message) && !message.poll && !!(message.body || message.image || message.attachment);
 
 // Anyone in the conversation may pin a person's message that is still there.
 export const canPinMessage = (message: Actionable) => isLive(message);

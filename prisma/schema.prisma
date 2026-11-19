@@ -50,6 +50,8 @@ model User {
   reactions         Reaction[]
   pushSubscriptions WebPushSubscription[]
 
+  pollVotes PollVote[]
+
   sentFriendRequests     FriendRequest[] @relation("FriendRequestFrom")
   receivedFriendRequests FriendRequest[] @relation("FriendRequestTo")
 }
@@ -195,6 +197,10 @@ model Message {
 
   reactions Reaction[]
 
+  // a group poll (app/libs/polls.ts): the body is its question, so search, the inbox preview and
+  // notifications work as for text
+  poll Poll?
+
   conversationId String       @db.ObjectId
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -284,4 +290,42 @@ enum CallStatus {
   declined
   missed
   ended
+}
+
+// A poll in a group (app/libs/polls.ts), one per message (its question is the message body).
+// Votes are rows of their own, one per voter and option, so two people voting at once can't
+// overwrite each other. Closed polls take no more votes.
+model Poll {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime     @default(now())
+  question  String
+  options   PollOption[]
+  // several options per voter (else one)
+  multiple  Boolean      @default(false)
+  closedAt  DateTime?
+
+  messageId String  @unique @db.ObjectId
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  votes PollVote[]
+}
+
+type PollOption {
+  // short random id, stable while the poll lives (votes point at it)
+  id   String
+  text String
+}
+
+model PollVote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  optionId  String
+
+  pollId String @db.ObjectId
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId, optionId])
+  @@index([pollId])
 }
