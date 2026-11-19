@@ -349,7 +349,9 @@
     "photo_removed": "{actor} đã xoá ảnh nhóm",
     "promoted": "{actor} đã cho {users} làm quản trị viên",
     "demoted": "{actor} đã bỏ quyền quản trị viên của {users}",
-    "joined": "{actor} đã tham gia nhóm qua link mời"
+    "joined": "{actor} đã tham gia nhóm qua link mời",
+    "nickname_set": "{actor} đã đặt biệt danh cho {users} là “{name}”",
+    "nickname_removed": "{actor} đã xoá biệt danh của {users}"
   },
   "presence": {
     "just_now": "Vừa mới hoạt động",
@@ -673,5 +675,14 @@
     "body": "Có người (hy vọng là bạn) yêu cầu đặt lại mật khẩu tài khoản Messenger của bạn. Mở link sau trong vòng {minutes} phút để chọn mật khẩu mới:",
     "button": "Chọn mật khẩu mới",
     "ignore": "Nếu bạn không yêu cầu, hãy bỏ qua email này: mật khẩu của bạn không đổi."
+  },
+  "nickname": {
+    "title": "Biệt danh",
+    "you": "{name} (bạn)",
+    "edit": "Đặt biệt danh cho {name}",
+    "field": "Biệt danh của {name}",
+    "save": "Lưu",
+    "cancel": "Huỷ",
+    "hint": "Mọi người trong cuộc trò chuyện đều thấy biệt danh. Để trống thì dùng tên thật."
   }
 }

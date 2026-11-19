@@ -25,6 +25,7 @@ export const emitGroupUpdate = async (conversation: ConversationWithUsers, to: S
         image: conversation.image ?? null,
         inviteCode: conversation.inviteCode ?? null,
         joinApproval: !!conversation.joinApproval,
+        nicknames: conversation.nicknames ?? [],
       });
     }
   });

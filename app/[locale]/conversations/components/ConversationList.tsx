@@ -16,6 +16,7 @@ import GroupChatModal from "@/app/components/modals/GroupChatModal";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import MessageSearchResults, { MIN_MESSAGE_QUERY } from "./MessageSearchResults";
 import { HiArchiveBox, HiChevronDown } from "react-icons/hi2";
+import { displayName } from "@/app/libs/nicknames";
 import NotificationPrompt from "@/app/components/NotificationPrompt";
 import ConversationBox from "./ConversationBox";
 import { ConversationSettings, ConversationUpdate, FullConversationType } from "@/app/types";
@@ -135,6 +136,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             inviteCode:
               conversation.inviteCode === undefined ? target.inviteCode : conversation.inviteCode,
             joinApproval: conversation.joinApproval ?? target.joinApproval,
+            nicknames: conversation.nicknames ?? target.nicknames,
             name: conversation.name ?? target.name,
           }),
           // something new: an archived conversation comes back (the server unarchives it too)
@@ -271,7 +273,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   // the names of who is typing in a conversation (the open chat shows its own indicator too)
   const typingNames = (item: FullConversationType) =>
     Object.keys(typing[item.id] ?? {})
-      .map((email) => item.users.find((user) => user.email === email)?.name)
+      .map((email) => displayName(item.users.find((user) => user.email === email), item.nicknames))
       .filter((name): name is string => !!name);
 
   return (

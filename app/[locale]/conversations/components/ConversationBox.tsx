@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { displayName } from "@/app/libs/nicknames";
 import { useTranslations } from "next-intl";
 import { format, isToday } from "date-fns";
 import { useSession } from "next-auth/react";
@@ -90,13 +91,14 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
     if (fromMe) {
       return t("last_from", { name: t("you"), text });
     }
-    if (data.isGroup && lastMessage?.sender?.name) {
-      return t("last_from", { name: lastMessage.sender.name, text });
+    const senderName = displayName(lastMessage?.sender, data.nicknames);
+    if (data.isGroup && senderName) {
+      return t("last_from", { name: senderName, text });
     }
     return text;
-  }, [lastMessage, t, userEmail, data.isGroup, systemText]);
+  }, [lastMessage, t, userEmail, data.isGroup, data.nicknames, systemText]);
 
-  const title = data.name || otherUser.name;
+  const title = data.name || displayName(otherUser, data.nicknames);
 
   return (
     <Link

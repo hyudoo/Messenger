@@ -14,6 +14,7 @@ import useStartCall from "@/app/hooks/useStartCall";
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
 import ProfileDrawer from "./ProfileDrawer";
+import { displayName } from "@/app/libs/nicknames";
 import type { Relation } from "@/app/libs/friends";
 import { Link } from "@/i18n/navigation";
 
@@ -98,7 +99,7 @@ const Header: React.FC<HeaderProps> = ({
             <Avatar user={otherUser} />
           )}
           <div className="flex flex-col">
-            <div>{conversation.name || otherUser.name}</div>
+            <div>{conversation.name || displayName(otherUser, conversation.nicknames)}</div>
             <div className="text-sm font-light text-muted-foreground">
               {statusText}
             </div>

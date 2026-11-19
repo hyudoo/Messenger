@@ -133,6 +133,9 @@ model Conversation {
   joinRequestIds String[] @db.ObjectId
   // messages pinned to the top of the chat, latest first (POST /api/messages/[id]/pin)
   pinnedMessageIds String[] @db.ObjectId
+  // what the members call each other here (PATCH /api/conversations/[id]/nicknames; any member
+  // sets anyone's), shown instead of their names in this conversation (app/libs/nicknames.ts)
+  nicknames ConversationNickname[]
 
   messages Message[]
 
@@ -238,6 +241,8 @@ enum SystemType {
   photo
   // the group photo was removed (no picture: AvatarGroup goes back to the members' faces)
   photo_removed
+  // a nickname set (systemName) or removed (no systemName) for systemUsers[0]
+  nickname
   promoted
   demoted
   joined
@@ -344,4 +349,9 @@ model PasswordReset {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+type ConversationNickname {
+  userId   String @db.ObjectId
+  nickname String
 }

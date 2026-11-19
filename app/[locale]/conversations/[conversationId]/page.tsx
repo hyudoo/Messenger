@@ -99,6 +99,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
           initialMessages={messages}
           initialHasMore={hasMore}
           members={conversation.users}
+          nicknames={conversation.nicknames ?? []}
           isGroup={!!conversation.isGroup}
           firstUnreadId={firstUnreadId}
           // hiding one's own read receipts also hides everyone else's

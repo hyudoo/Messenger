@@ -53,6 +53,7 @@ import {
 import { useForward } from "./ForwardDialog";
 import MessageMenuSheet from "./MessageMenuSheet";
 import PollCard from "./PollCard";
+import { useChatPeople } from "./ChatPeople";
 import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
 interface MessageBoxProps {
@@ -381,6 +382,8 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   });
 
   const systemText = useSystemText();
+  // the sender as this conversation calls them (nickname)
+  const { nameOf } = useChatPeople();
 
   // who has seen it besides its sender and the user (shown under the chat's last message)
   const seenBy = (data.seen || []).filter(
@@ -434,7 +437,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
       <div className={body}>
         {showHeader && (
           <div className="flex items-center gap-1">
-            <div className="text-sm text-muted-foreground">{data.sender.name}</div>
+            <div className="text-sm text-muted-foreground">{nameOf(data.sender)}</div>
             <div className="text-xs text-muted-foreground">
               {format(new Date(data.createdAt), "p", { locale: dateLocale })}
             </div>

@@ -349,7 +349,9 @@
     "photo_removed": "{actor} removed the group photo",
     "promoted": "{actor} made {users} an admin",
     "demoted": "{actor} removed {users} as admin",
-    "joined": "{actor} joined the group via the invite link"
+    "joined": "{actor} joined the group via the invite link",
+    "nickname_set": "{actor} set the nickname for {users} to “{name}”",
+    "nickname_removed": "{actor} removed the nickname of {users}"
   },
   "presence": {
     "just_now": "Active just now",
@@ -673,5 +675,14 @@
     "body": "Someone (hopefully you) asked to reset the password of your Messenger account. Open this link within {minutes} minutes to choose a new one:",
     "button": "Choose a new password",
     "ignore": "If you didn't ask for this, you can ignore this email: your password stays the same."
+  },
+  "nickname": {
+    "title": "Nicknames",
+    "you": "{name} (you)",
+    "edit": "Set a nickname for {name}",
+    "field": "Nickname for {name}",
+    "save": "Save",
+    "cancel": "Cancel",
+    "hint": "Everyone in this chat sees the nicknames. Leave it empty to use the name."
   }
 }

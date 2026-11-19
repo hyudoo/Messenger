@@ -90,6 +90,7 @@ import { GET as searchPeople } from "@/app/api/users/search/route";
 import { POST as createPoll } from "@/app/api/conversations/[conversationId]/polls/route";
 import { POST as votePoll } from "@/app/api/polls/[pollId]/votes/route";
 import { POST as closePoll } from "@/app/api/polls/[pollId]/close/route";
+import { PATCH as setNickname } from "@/app/api/conversations/[conversationId]/nicknames/route";
 
 import { POST as pinMessage } from "@/app/api/messages/[messageId]/pin/route";
 import { GET as pinnedMessages } from "@/app/api/conversations/[conversationId]/pins/route";
@@ -2566,6 +2567,71 @@ describe("polls", () => {
       data: { closedAt: expect.any(Date) },
       select: { id: true },
     });
+  });
+});
+
+describe("nicknames", () => {
+  const nick = (body: unknown) =>
+    setNickname(
+      jsonRequest(`/api/conversations/${CONVERSATION}/nicknames`, body, { method: "PATCH" }),
+      params({ conversationId: CONVERSATION })
+    );
+
+  it("sets a member's nickname, tells everyone and posts the event", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(THIRD), nicknames: [] });
+    prisma.conversation.update.mockImplementation(async ({ data }: any) => ({
+      ...group(THIRD),
+      nicknames: data.nicknames.set,
+    }));
+    prisma.message.create.mockResolvedValue({ id: "event", createdAt: new Date() });
+
+    const response = await nick({ userId: OTHER, nickname: "  Big   Bro " });
+    expect(await response.json()).toEqual({ nicknames: [{ userId: OTHER, nickname: "Big Bro" }] });
+    expect(prisma.conversation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { nicknames: { set: [{ userId: OTHER, nickname: "Big Bro" }] } } })
+    );
+    expect(mocks.emitToUser).toHaveBeenCalledWith(
+      third.email,
+      "conversation:update",
+      expect.objectContaining({ nicknames: [{ userId: OTHER, nickname: "Big Bro" }] })
+    );
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          systemType: "nickname",
+          systemName: "Big Bro",
+          senderId: ME,
+          systemUsers: [{ id: OTHER, name: other.name, email: other.email }],
+        }),
+      })
+    );
+  });
+
+  it("removes one with an empty value, and does nothing when unchanged", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      ...group(THIRD),
+      nicknames: [{ userId: OTHER, nickname: "Big Bro" }],
+    });
+    prisma.conversation.update.mockImplementation(async ({ data }: any) => ({
+      ...group(THIRD),
+      nicknames: data.nicknames.set,
+    }));
+    expect((await nick({ userId: OTHER, nickname: "Big Bro" })).status).toBe(200);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+
+    expect(await (await nick({ userId: OTHER, nickname: "" })).json()).toEqual({ nicknames: [] });
+    expect(prisma.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ systemType: "nickname" }) })
+    );
+  });
+
+  it("refuses non-members as targets, long nicknames and strangers", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({ ...group(THIRD), nicknames: [] });
+    expect((await nick({ userId: "eeeeeeeeeeeeeeeeeeeeeeee", nickname: "X" })).status).toBe(400);
+    expect((await nick({ userId: OTHER, nickname: "x".repeat(41) })).status).toBe(400);
+    prisma.conversation.findFirst.mockResolvedValue(null);
+    expect((await nick({ userId: OTHER, nickname: "X" })).status).toBe(404);
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
   });
 });
 

@@ -13,6 +13,7 @@ import {
   HiOutlineShieldCheck,
   HiPencil,
   HiShieldCheck,
+  HiTag,
   HiUserPlus,
   HiXMark,
 } from "react-icons/hi2";
@@ -29,6 +30,7 @@ import {
   canRemoveMember,
 } from "@/app/libs/conversation-permissions";
 import { invitePath } from "@/app/libs/invite-code";
+import { MAX_NICKNAME_LENGTH, nicknameOf } from "@/app/libs/nicknames";
 import { matchesSearch } from "@/app/libs/search";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
 import { getSocket } from "@/app/libs/socket-client";
@@ -588,5 +590,104 @@ const AddMembers: React.FC<AddMembersProps> = ({ conversation, users, busy, onAd
         )}
       </div>
     </div>
+  );
+};
+
+// Nicknames (1:1 and groups): every member, as called here, with a pencil to set or change what
+// they are called in this conversation (empty: back to their name). Anyone may set anyone's.
+export const Nicknames: React.FC<{ conversation: ConversationWithUsers; myId?: string }> = ({
+  conversation,
+  myId,
+}) => {
+  const t = useTranslations("nickname");
+  const { busy, run } = useGroupRequest();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [value, setValue] = useState("");
+  const nicknames = conversation.nicknames ?? [];
+
+  const save = async (userId: string) => {
+    if (
+      await run(() =>
+        axios.patch(`/api/conversations/${conversation.id}/nicknames`, { userId, nickname: value })
+      )
+    ) {
+      setEditing(null);
+    }
+  };
+
+  return (
+    <section className="mb-4 w-full rounded-xl border p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <HiTag size={16} aria-hidden />
+        {t("title")}
+      </h3>
+      <ul className="flex flex-col gap-1">
+        {conversation.users.map((user) => {
+          const nickname = nicknameOf(nicknames, user.id);
+          const label = user.id === myId ? t("you", { name: user.name ?? "" }) : user.name;
+          return (
+            <li key={user.id} className="flex items-center gap-2">
+              <Avatar user={user} />
+              {editing === user.id ? (
+                <form
+                  className="flex min-w-0 flex-1 items-center gap-1"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void save(user.id);
+                  }}>
+                  <input
+                    autoFocus
+                    value={value}
+                    maxLength={MAX_NICKNAME_LENGTH}
+                    onChange={(event) => setValue(event.target.value)}
+                    onKeyDown={(event) => event.key === "Escape" && setEditing(null)}
+                    placeholder={user.name ?? ""}
+                    aria-label={t("field", { name: user.name ?? "" })}
+                    className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    aria-label={t("save")}
+                    title={t("save")}
+                    className="rounded-full p-1 text-sky-500 transition hover:bg-muted disabled:opacity-50">
+                    <HiCheck size={18} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    aria-label={t("cancel")}
+                    title={t("cancel")}
+                    className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                    <HiXMark size={18} aria-hidden />
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-foreground">{nickname ?? label}</span>
+                    {nickname && (
+                      <span className="block truncate text-xs text-muted-foreground">{label}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setValue(nickname ?? "");
+                      setEditing(user.id);
+                    }}
+                    aria-label={t("edit", { name: user.name ?? "" })}
+                    title={t("edit", { name: user.name ?? "" })}
+                    className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                    <HiPencil size={16} aria-hidden />
+                  </button>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">{t("hint")}</p>
+    </section>
   );
 };

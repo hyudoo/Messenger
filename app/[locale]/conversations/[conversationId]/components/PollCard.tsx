@@ -2,17 +2,13 @@
 
 import axios from "axios";
 import clsx from "clsx";
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { HiCheck, HiChartBar, HiLockClosed } from "react-icons/hi2";
 
 import { PollView, nextPicks, tallyPoll } from "@/app/libs/poll-rules";
-import { SafeUser } from "@/app/types";
-
-// The chat's members (Body provides them), to name who voted for what.
-const ChatMembersContext = createContext<SafeUser[]>([]);
-export const ChatMembersProvider = ChatMembersContext.Provider;
+import { useChatPeople } from "./ChatPeople";
 
 interface PollCardProps {
   poll: PollView;
@@ -28,7 +24,7 @@ interface PollCardProps {
 // server's (messages:update); a failed vote drops them. Closed: results only.
 const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) => {
   const t = useTranslations("poll");
-  const members = useContext(ChatMembersContext);
+  const { members, nameOfId } = useChatPeople();
   const myId = members.find((member) => !!myEmail && member.email === myEmail)?.id;
   const canClose = !!myId && myId === senderId;
   const [busy, setBusy] = useState(false);
@@ -41,7 +37,7 @@ const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) =
     optimistic && optimistic.from === poll.votes ? { ...poll, votes: optimistic.value } : poll;
   const { counts, voters, mine } = tallyPoll(shown, myId);
   const closed = !!poll.closedAt;
-  const nameOf = (id: string) => members.find((member) => member.id === id)?.name ?? t("someone");
+  const nameOf = (id: string) => nameOfId(id) ?? t("someone");
 
   const vote = (optionId: string) => {
     if (!myId || closed || busy) {

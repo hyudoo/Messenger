@@ -1,7 +1,7 @@
 "use client";
 
 import axios from "axios";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
@@ -15,7 +15,8 @@ import useOutbox, { OutboxItem } from "@/app/hooks/useOutbox";
 import useDateLocale from "@/app/hooks/useDateLocale";
 import { startsGroup, startsNewDay } from "@/app/libs/message-groups";
 import { ImageViewerProvider } from "./ImageViewer";
-import { ChatMembersProvider } from "./PollCard";
+import { ChatPeopleProvider } from "./ChatPeople";
+import { Nickname, displayName } from "@/app/libs/nicknames";
 import ForwardDialog from "./ForwardDialog";
 import { flashMessage } from "./MessageReply";
 import useMessageJump, { onMessageJump } from "@/app/hooks/useMessageJump";
@@ -33,6 +34,8 @@ interface BodyProps {
   initialHasMore: boolean;
   // the conversation's members, for the names in "X is typing"
   members: SafeUser[];
+  // what they are called here (Conversation.nicknames)
+  nicknames?: Nickname[];
   // the first message the user hadn't read when opening the chat: a "new messages" divider goes
   // before it, and the chat opens there instead of at the bottom
   firstUnreadId?: string | null;
@@ -106,6 +109,7 @@ const Body: React.FC<BodyProps> = ({
   initialHasMore,
   firstUnreadId,
   members,
+  nicknames,
   showReceipts = true,
   isGroup = false,
 }) => {
@@ -135,6 +139,9 @@ const Body: React.FC<BodyProps> = ({
   const messagesRef = useRef(messages);
 
   const { conversationId } = useConversation();
+  // one object while the members and nicknames stay the same: every row reads it, and the
+  // memoized MessageBox must not re-render on each keystroke or new message
+  const people = useMemo(() => ({ members, nicknames: nicknames ?? [] }), [members, nicknames]);
   const sessionUser = useSession().data?.user;
   const myEmail = sessionUser?.email;
   const outbox = useOutbox((state) => state.items);
@@ -362,7 +369,7 @@ const Body: React.FC<BodyProps> = ({
   }, [typingCount]);
 
   const typingNames = Object.keys(typing)
-    .map((email) => members.find((member) => member.email === email)?.name)
+    .map((email) => displayName(members.find((member) => member.email === email), people.nicknames))
     .filter((name): name is string => !!name);
 
   // After older messages are prepended, shift the scroll position by the added
@@ -486,7 +493,7 @@ const Body: React.FC<BodyProps> = ({
     .map((message) => message.image!);
 
   return (
-    <ChatMembersProvider value={members}>
+    <ChatPeopleProvider value={people}>
     <ImageViewerProvider images={images}>
       <div className="relative flex-1 min-h-0">
         <div
@@ -586,7 +593,7 @@ const Body: React.FC<BodyProps> = ({
       </div>
       <ForwardDialog />
     </ImageViewerProvider>
-    </ChatMembersProvider>
+    </ChatPeopleProvider>
   );
 };
 

@@ -15,9 +15,9 @@ interface SystemMessageOptions {
   // who did it (the message's sender)
   actorId: string;
   type: SystemType;
-  // the group's name (created / renamed)
+  // the group's name (created / renamed), or the nickname set (nickname; none: removed)
   name?: string | null;
-  // who was added / removed
+  // who was added / removed (or whose nickname changed)
   users?: Person[];
   // members who see it as already read besides the actor: the people added, for whom it is the
   // read marker (so the history from before they joined doesn't count as unread for them)

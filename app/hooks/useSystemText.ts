@@ -46,6 +46,8 @@ const useSystemText = () => {
         return t("photo", { actor });
       case "photo_removed":
         return t("photo_removed", { actor });
+      case "nickname":
+        return name ? t("nickname_set", { actor, users, name }) : t("nickname_removed", { actor, users });
       case "promoted":
         return t("promoted", { actor, users });
       case "demoted":
