@@ -47,6 +47,7 @@ export const LIMITS = {
   conversation: { limit: 20, windowMs: 60_000 }, // per user: opening / creating chats
   settings: { limit: 10, windowMs: 60_000 }, // per user
   search: { limit: 30, windowMs: 60_000 }, // per user: searching in a conversation
+  gif: { limit: 60, windowMs: 60_000 }, // per user: GIPHY searches (the picker, debounced)
   // per user: every page load of every tab re-sends its push subscription
   push: { limit: 30, windowMs: 60_000 },
   // per user: every incoming message and tab focus marks seen, so this is generous

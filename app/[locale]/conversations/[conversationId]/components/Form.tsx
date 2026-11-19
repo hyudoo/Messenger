@@ -4,6 +4,8 @@ import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 import { HiChartBar, HiCheck, HiPaperAirplane, HiPaperClip, HiPhoto, HiXMark } from "react-icons/hi2";
 import PollComposer from "./PollComposer";
+import GifPicker from "./GifPicker";
+import type { GifData } from "@/app/libs/giphy";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 
@@ -38,6 +40,7 @@ const toPreview = (message: FullMessageType): ReplyPreview => ({
   body: message.body,
   image: message.image,
   attachment: message.attachment,
+  gif: message.gif,
   isCall: message.isCall,
   deletedAt: message.deletedAt,
   sender: { name: message.sender?.name ?? null, email: message.sender?.email ?? null },
@@ -58,9 +61,11 @@ interface FormProps {
   isGroup: boolean;
   // what the quick button sends here (Conversation.quickEmoji, else 👍)
   quickEmoji: string;
+  // GIPHY is configured: the "GIF" button
+  gifs?: boolean;
 }
 
-const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji }) => {
+const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji, gifs = false }) => {
   // groups: the "New poll" dialog
   const [pollOpen, setPollOpen] = useState(false);
   const t = useTranslations("chat");
@@ -210,6 +215,18 @@ const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji }) => {
     send(
       conversationId,
       { message: quickEmoji, ...(replyTo && { replyToId: replyTo.id }) },
+      replyTo ? toPreview(replyTo) : undefined
+    );
+    if (replyTo) {
+      composer.cancel();
+    }
+  };
+
+  // a GIF / sticker from the picker: sent at once, on its own (a reply goes on it)
+  const sendGif = (gif: GifData) => {
+    send(
+      conversationId,
+      { gif, ...(replyTo && { replyToId: replyTo.id }) },
       replyTo ? toPreview(replyTo) : undefined
     );
     if (replyTo) {
@@ -428,6 +445,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji }) => {
                 <HiChartBar size={24} aria-hidden />
               </button>
             )}
+            {gifs && <GifPicker onPick={sendGif} />}
             <EmojiPicker onSelect={insertEmoji} />
           </div>
         )}

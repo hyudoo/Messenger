@@ -82,6 +82,8 @@ const ConversationBox: React.FC<ConversationBoxProps> = ({
           ? t("last_voice")
           : lastMessage?.attachment
             ? t("last_file", { name: lastMessage.attachment.name })
+            : lastMessage?.gif
+              ? t(lastMessage.gif.kind === "sticker" ? "last_sticker" : "last_gif")
             : lastMessage?.poll && lastMessage.body
               ? t("last_poll", { question: lastMessage.body })
               : lastMessage?.body;

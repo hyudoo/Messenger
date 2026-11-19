@@ -100,7 +100,9 @@
     "pinned": "Pinned",
     "chats_heading": "Chats",
     "messages_heading": "Messages",
-    "archived_heading": "Archived ({count})"
+    "archived_heading": "Archived ({count})",
+    "last_gif": "Sent a GIF.",
+    "last_sticker": "Sent a sticker."
   },
   "chat": {
     "placeholder": "Write a message",
@@ -183,7 +185,10 @@
     "pin_limit": "You can pin at most 20 messages.",
     "delete_for_me": "Delete for you",
     "delete_for_me_failed": "Couldn't delete the message!",
-    "new_poll": "New poll"
+    "new_poll": "New poll",
+    "reply_gif": "GIF",
+    "reply_sticker": "Sticker",
+    "open_gifs": "GIFs and stickers"
   },
   "profile": {
     "close": "Close panel",
@@ -390,7 +395,9 @@
     "file": "Sent the file {name}.",
     "mentioned_you": "Mentioned you: {text}",
     "call_answer": "Answer",
-    "call_decline": "Decline"
+    "call_decline": "Decline",
+    "gif": "Sent a GIF.",
+    "sticker": "Sent a sticker."
   },
   "viewer": {
     "close": "Close",
@@ -760,6 +767,18 @@
       "teal": "Teal",
       "slate": "Slate"
     }
+  },
+  "gif": {
+    "tab_gifs": "GIFs",
+    "tab_stickers": "Stickers",
+    "search": "Search GIPHY",
+    "no_results": "Nothing found",
+    "failed": "Couldn't load, try again later",
+    "too_fast": "Searching too fast, wait a moment",
+    "load_more": "Load more",
+    "powered": "Powered by GIPHY",
+    "send": "Send {title}",
+    "untitled": "GIF"
   },
   "delete_account": {
     "title": "Delete account",

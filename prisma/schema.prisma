@@ -174,6 +174,8 @@ model Message {
   image     String?
   // a file or a voice message (uploaded like images; app/libs/upload.ts has the allowed types)
   attachment MessageAttachment?
+  // a GIF or sticker from GIPHY (app/libs/giphy.ts), on its own: the server looked it up by id
+  gif MessageGif?
   // a copy of another message (POST /api/messages/[messageId]/forward), shown "Forwarded"
   forwarded Boolean?
   // group members named as "@Name" in the body (app/libs/mentions.ts), as they were then
@@ -281,6 +283,22 @@ type MessageAttachment {
   type     String
   // voice only: length in ms
   duration Int?
+}
+
+enum GifKind {
+  gif
+  sticker
+}
+
+// GIPHY's copy of a GIF / sticker as the server found it by id (never a URL from the client):
+// shown straight from GIPHY's media hosts (next.config.js)
+type MessageGif {
+  id     String
+  kind   GifKind
+  url    String
+  width  Int
+  height Int
+  title  String?
 }
 
 type LinkPreviewData {

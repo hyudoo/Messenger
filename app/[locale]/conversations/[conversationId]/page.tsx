@@ -10,6 +10,7 @@ import { privacyOf } from "@/app/libs/privacy";
 import { relationsWith } from "@/app/libs/friends";
 import prisma from "@/app/libs/prismadb";
 import { chatThemeStyle, quickEmojiOf } from "@/app/libs/chat-theme";
+import { giphyEnabled } from "@/app/libs/giphy";
 
 import Header from "./components/Header";
 import Body from "./components/Body";
@@ -116,6 +117,7 @@ const ConversationId = async ({ params }: { params: Promise<IParams> }) => {
             members={conversation.users}
             isGroup={!!conversation.isGroup}
             quickEmoji={quickEmojiOf(conversation.quickEmoji)}
+            gifs={giphyEnabled()}
           />
         )}
       </div>

@@ -9,6 +9,7 @@ import { rateLimit, tooManyRequests } from "@/app/libs/rate-limit";
 import { logError } from "@/app/libs/log";
 import { deliverMessage } from "@/app/libs/message-delivery";
 import { parseAttachment } from "@/app/libs/attachment";
+import { findGiphy, giphyEnabled, isGifId, isGifKind } from "@/app/libs/giphy";
 import { searchTextOf } from "@/app/libs/search";
 import { findMentions } from "@/app/libs/mentions";
 import { isBlockedBetween } from "@/app/libs/blocks";
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       return tooManyRequests(limited.retryAfter);
     }
 
-    const { message, isCall, callType, image, attachment, conversationId, clientId, replyToId } =
+    const { message, isCall, callType, image, attachment, gif, conversationId, clientId, replyToId } =
       await request.json();
 
     const conversation = await getConversationForUser(
@@ -78,10 +79,17 @@ export async function POST(request: Request) {
     if (attachment !== undefined && (!file || image !== undefined || isCall)) {
       return new NextResponse("Invalid attachment", { status: 400 });
     }
+    // a GIPHY GIF / sticker, by id only (looked up below), on its own
+    if (
+      gif !== undefined &&
+      (!isGifId(gif?.id) || !isGifKind(gif?.kind) || body || image !== undefined || file || isCall)
+    ) {
+      return new NextResponse("Invalid GIF", { status: 400 });
+    }
     if (isCall === true && callType !== undefined && callType !== "audio" && callType !== "video") {
       return new NextResponse("Invalid call type", { status: 400 });
     }
-    if (!body && !image && !file && !isCall) {
+    if (!body && !image && !file && !isCall && gif === undefined) {
       return new NextResponse("Empty message", { status: 400 });
     }
     if (isCall === true) {
@@ -107,6 +115,10 @@ export async function POST(request: Request) {
         return new NextResponse("Invalid reply", { status: 400 });
       }
     }
+    const gifData = gif === undefined ? null : giphyEnabled() ? await findGiphy(gif.id, gif.kind) : null;
+    if (gif !== undefined && !gifData) {
+      return new NextResponse("GIF not found", { status: 400 });
+    }
     const uploaded = [image, file?.url].filter((url): url is string => !!url);
     if (uploaded.length > 0) {
       // keeps the files from the pending-upload expiry; fails if one was never uploaded
@@ -127,6 +139,7 @@ export async function POST(request: Request) {
         mentions: conversation.isGroup ? findMentions(body, conversation.users, currentUser.id) : [],
         image,
         attachment: file ?? undefined,
+        gif: gifData ?? undefined,
         isCall: isCall === true ? true : undefined,
         // video unless asked for audio (older clients send no callType)
         callType: isCall === true ? (callType === "audio" ? "audio" : "video") : undefined,

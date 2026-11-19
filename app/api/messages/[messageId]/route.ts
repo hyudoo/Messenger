@@ -113,7 +113,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<IPar
 }
 
 // DELETE: the sender recalls their message for everyone. The row stays (replies keep a target,
-// the chat shows "message recalled"); its text, image, attachment and reactions are removed.
+// the chat shows "message recalled"); its text, image, attachment, GIF and reactions are removed.
 export async function DELETE(request: Request, { params }: { params: Promise<IParams> }) {
   try {
     const currentUser = await getCurrentUser();
@@ -178,6 +178,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<IPa
           searchText: null,
           image: null,
           attachment: { unset: true },
+          gif: { unset: true },
           linkPreview: { unset: true },
           editedAt: null,
           deletedAt: new Date(),

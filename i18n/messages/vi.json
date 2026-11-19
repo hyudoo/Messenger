@@ -100,7 +100,9 @@
     "pinned": "Đã ghim",
     "chats_heading": "Cuộc trò chuyện",
     "messages_heading": "Tin nhắn",
-    "archived_heading": "Đã lưu trữ ({count})"
+    "archived_heading": "Đã lưu trữ ({count})",
+    "last_gif": "Đã gửi một GIF.",
+    "last_sticker": "Đã gửi một nhãn dán."
   },
   "chat": {
     "placeholder": "Nhập tin nhắn",
@@ -183,7 +185,10 @@
     "pin_limit": "Chỉ ghim được tối đa 20 tin nhắn.",
     "delete_for_me": "Xoá ở phía bạn",
     "delete_for_me_failed": "Không xoá được tin nhắn!",
-    "new_poll": "Tạo bình chọn"
+    "new_poll": "Tạo bình chọn",
+    "reply_gif": "GIF",
+    "reply_sticker": "Nhãn dán",
+    "open_gifs": "GIF và nhãn dán"
   },
   "profile": {
     "close": "Đóng bảng thông tin",
@@ -390,7 +395,9 @@
     "file": "Đã gửi tệp {name}.",
     "mentioned_you": "Đã nhắc đến bạn: {text}",
     "call_answer": "Trả lời",
-    "call_decline": "Từ chối"
+    "call_decline": "Từ chối",
+    "gif": "Đã gửi một GIF.",
+    "sticker": "Đã gửi một nhãn dán."
   },
   "viewer": {
     "close": "Đóng",
@@ -760,6 +767,18 @@
       "teal": "Xanh mòng két",
       "slate": "Xám đá"
     }
+  },
+  "gif": {
+    "tab_gifs": "GIF",
+    "tab_stickers": "Nhãn dán",
+    "search": "Tìm trên GIPHY",
+    "no_results": "Không tìm thấy gì",
+    "failed": "Không tải được, thử lại sau",
+    "too_fast": "Bạn tìm nhanh quá, chờ một chút",
+    "load_more": "Xem thêm",
+    "powered": "Cung cấp bởi GIPHY",
+    "send": "Gửi {title}",
+    "untitled": "GIF"
   },
   "delete_account": {
     "title": "Xoá tài khoản",

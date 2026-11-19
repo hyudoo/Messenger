@@ -80,6 +80,7 @@ const outboxMessage = (item: OutboxItem, me: Partial<SafeUser>): FullMessageType
     body: item.payload.message ?? null,
     image: item.payload.image ?? null,
     attachment: item.payload.attachment ? { duration: null, ...item.payload.attachment } : null,
+    gif: item.payload.gif ?? null,
     createdAt: item.createdAt,
     conversationId: item.conversationId,
     sender: me,

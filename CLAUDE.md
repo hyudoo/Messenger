@@ -34,6 +34,7 @@ Copy `.env.example` to `.env`.
   - `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS`: TURN for calls.
   - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`: "forgot password" and "verify your email" mails (see `.claude/rules/auth.md`); links use `NEXTAUTH_URL`. In production, signing up with a password needs them (503 without).
   - `TRUST_PROXY=true`: behind a proxy that sets `X-Real-IP`.
+  - `GIPHY_API_KEY`: GIFs and stickers in the composer (hidden without it).
   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: Web Push. Generate with `npx web-push generate-vapid-keys`; read at run time; keep the pair stable.
 - Production gets its `.env` from the CI variable `ENV_FILE`.
 

@@ -82,12 +82,14 @@ export const pushNewMessage = ({
   body,
   image,
   attachment,
+  gif,
   mentionedIds = [],
   ...push
 }: ConversationPush & {
   body: string | null;
   image: string | null;
   attachment?: { kind: string; name: string } | null;
+  gif?: { kind: string } | null;
   mentionedIds?: string[];
 }) => {
   const content = (t: Translate) => {
@@ -96,6 +98,9 @@ export const pushNewMessage = ({
     }
     if (attachment) {
       return attachment.kind === "voice" ? t("voice") : t("file", { name: attachment.name });
+    }
+    if (gif) {
+      return gif.kind === "sticker" ? t("sticker") : t("gif");
     }
     return body ?? "";
   };

@@ -53,6 +53,7 @@ import {
 import { useForward } from "./ForwardDialog";
 import MessageMenuSheet from "./MessageMenuSheet";
 import PollCard from "./PollCard";
+import { GifImage } from "./GifPicker";
 import { useChatPeople } from "./ChatPeople";
 import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
@@ -404,6 +405,14 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   const message = recalled
     ? // a placeholder, not a bubble of content: outlined, muted, italic
       "w-fit max-w-full rounded-2xl border px-3 py-2 text-sm italic text-muted-foreground"
+    : data.gif
+    ? // a GIF / sticker: no bubble (stickers are see-through), a GIF's own rounded corners
+      clsx(
+        "w-fit max-w-full transition-opacity",
+        pending?.status === "sending" && "opacity-60",
+        pending?.status === "failed" && "rounded-2xl ring-2 ring-rose-500",
+        data.gif.kind === "gif" && "overflow-hidden rounded-2xl"
+      )
     : jumbo
     ? clsx(
         "w-fit select-text leading-tight",
@@ -494,6 +503,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
                 />
               </button>
             )}
+            {data.gif && !recalled && <GifImage gif={data.gif} />}
             {data.attachment?.kind === "file" && (
               <FileCard
                 attachment={data.attachment}

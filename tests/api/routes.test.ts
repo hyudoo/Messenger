@@ -57,6 +57,7 @@ vi.mock("@/app/libs/message-push", () => ({
 vi.mock("bcrypt",() => ({ default: { hash: vi.fn().mockResolvedValue("hashed") } }));
 
 import { POST as sendMessage } from "@/app/api/messages/route";
+import { GET as searchGifs } from "@/app/api/gifs/route";
 import { POST as toggleReaction } from "@/app/api/messages/[messageId]/reactions/route";
 import {
   DELETE as recallMessage,
@@ -364,6 +365,137 @@ describe("POST /api/messages", () => {
     }
     expect(statuses.slice(0, 20).every((status) => status === 200)).toBe(true);
     expect(statuses[20]).toBe(429);
+  });
+});
+
+describe("POST /api/messages with a GIF", () => {
+  const send = (body: Record<string, unknown>) =>
+    sendMessage(jsonRequest("/api/messages", { conversationId: CONVERSATION, ...body }));
+  const giphyItem = {
+    id: "abc123",
+    title: "Party",
+    images: {
+      fixed_width: {
+        url: "https://media2.giphy.com/media/abc123/200w.gif",
+        webp: "https://media2.giphy.com/media/abc123/200w.webp",
+        width: "200",
+        height: "150",
+      },
+    },
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("GIPHY_API_KEY", "test-key");
+    prisma.message.create.mockImplementation(async ({ data }: any) => ({ id: MESSAGE, createdAt: new Date(), ...data }));
+    prisma.conversation.update.mockResolvedValue({ lastMessageAt: new Date() });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("looks the GIF up by id on GIPHY and stores what GIPHY says, never the client's URL", async () => {
+    asMember();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: giphyItem })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await send({ gif: { id: "abc123", kind: "gif", url: "https://evil.example/x.gif" } });
+    expect(response.status).toBe(200);
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain("/v1/gifs/abc123?api_key=test-key");
+    const { data } = prisma.message.create.mock.calls[0][0] as any;
+    expect(data.gif).toEqual({
+      id: "abc123",
+      kind: "gif",
+      url: "https://media2.giphy.com/media/abc123/200w.webp",
+      width: 200,
+      height: 150,
+      title: "Party",
+    });
+  });
+
+  it("refuses bad ids, a GIF with text, unknown GIFs and GIFs without GIPHY configured", async () => {
+    asMember();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
+    expect((await send({ gif: { id: "../x", kind: "gif" } })).status).toBe(400);
+    expect((await send({ gif: { id: "abc123", kind: "video" } })).status).toBe(400);
+    expect((await send({ gif: { id: "abc123", kind: "gif" }, message: "hi" })).status).toBe(400);
+    expect((await send({ gif: { id: "abc123", kind: "gif" } })).status).toBe(400);
+    vi.stubEnv("GIPHY_API_KEY", "");
+    expect((await send({ gif: { id: "abc123", kind: "gif" } })).status).toBe(400);
+    expect(prisma.message.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/gifs", () => {
+  const search = (query: string) => searchGifs(new Request(`http://localhost/api/gifs?${query}`));
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("answers 503 without GIPHY and 401 to strangers", async () => {
+    vi.stubEnv("GIPHY_API_KEY", "");
+    expect((await search("q=cat")).status).toBe(503);
+    mocks.currentUser.mockResolvedValue(null);
+    expect((await search("q=cat")).status).toBe(401);
+  });
+
+  it("searches stickers in the given language, trending without a query, and checks the input", async () => {
+    vi.stubEnv("GIPHY_API_KEY", "test-key");
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "s1",
+              title: "Hi",
+              images: {
+                fixed_width: { url: "https://media.giphy.com/s1.gif", width: "200", height: "200" },
+                fixed_width_small: { url: "https://media.giphy.com/s1-small.gif", width: "100", height: "100" },
+              },
+            },
+            // not on GIPHY's hosts: dropped
+            { id: "s2", images: { fixed_width: { url: "https://evil.example/s2.gif", width: "1", height: "1" } } },
+          ],
+          pagination: { total_count: 2 },
+        })
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await search("q=%20hello%20&kind=sticker&lang=en");
+    expect(await response.json()).toEqual({
+      results: [
+        {
+          id: "s1",
+          kind: "sticker",
+          url: "https://media.giphy.com/s1.gif",
+          width: 200,
+          height: 200,
+          title: "Hi",
+          preview: "https://media.giphy.com/s1-small.gif",
+        },
+      ],
+      next: null,
+    });
+    const url = new URL(String((fetchMock.mock.calls[0] as unknown[])[0]));
+    expect(url.pathname).toBe("/v1/stickers/search");
+    expect(url.searchParams.get("q")).toBe("hello");
+    expect(url.searchParams.get("lang")).toBe("en");
+    expect(url.searchParams.get("rating")).toBe("pg-13");
+
+    await search("");
+    expect(new URL(String((fetchMock.mock.calls[1] as unknown[])[0])).pathname).toBe("/v1/gifs/trending");
+
+    expect((await search("kind=video")).status).toBe(400);
+    expect((await search("offset=-1")).status).toBe(400);
+    expect((await search(`q=${"x".repeat(51)}`)).status).toBe(400);
+  });
+
+  it("answers 502 when GIPHY fails", async () => {
+    vi.stubEnv("GIPHY_API_KEY", "test-key");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 500 })));
+    expect((await search("q=cat")).status).toBe(502);
   });
 });
 
@@ -1875,6 +2007,7 @@ describe("PATCH / DELETE /api/messages/[id]", () => {
           searchText: null,
           image: null,
           attachment: { unset: true },
+          gif: { unset: true },
           linkPreview: { unset: true },
           editedAt: null,
           deletedAt: expect.any(Date),
