@@ -465,7 +465,7 @@
   },
   "legal": {
     "back": "Back",
-    "updated": "Last updated: November 18, 2026",
+    "updated": "Last updated: November 19, 2026",
     "privacy_link": "Privacy Policy",
     "terms_link": "Terms of Service",
     "agree": "By continuing, you agree to the Terms of Service and the Privacy Policy.",
@@ -519,7 +519,7 @@
           "title": "7. How long we keep it",
           "paragraphs": [
             "We keep your information while your account exists. When you recall a message or delete a conversation, its images and files are removed from storage once nothing else uses them. Uploads that were never sent are deleted automatically.",
-            "To have your account and data deleted, contact us (see below)."
+            "You can delete your account yourself at any time in Settings > Delete account. This permanently deletes your profile, the messages you sent (in groups too), your one-to-one chats, friends, friend requests, blocks, push subscriptions, your GitHub / Google link, and the files you uploaded once nothing else uses them. You can also contact us (see below) for help."
           ]
         },
         {
@@ -737,5 +737,25 @@
     "body": "Thanks for signing up for Messenger. Open this link within {hours} hours to verify your email and start using your account:",
     "button": "Verify email",
     "ignore": "If you didn't sign up, you can ignore this email: the account can't be used until it's verified."
+  },
+  "delete_account": {
+    "title": "Delete account",
+    "description": "Permanently delete your account and your data from Messenger.",
+    "start": "Delete account…",
+    "what_messages": "Every message you sent, in groups too, with your reactions and votes.",
+    "what_chats": "Your one-to-one chats (for the other person too). You leave every group; groups stay for the others.",
+    "what_friends": "Your friends, friend requests, blocks, push notifications and sign-ins.",
+    "what_files": "Your profile picture and the photos, files and voice messages you uploaded.",
+    "irreversible": "This cannot be undone.",
+    "password_label": "Enter your password to confirm",
+    "email_label": "Type your email address to confirm",
+    "confirm": "Delete permanently",
+    "deleting": "Deleting…",
+    "cancel": "Cancel",
+    "wrong_password": "Wrong password.",
+    "wrong_email": "That email doesn't match your account.",
+    "too_many": "Too many tries, wait a while and try again.",
+    "failed": "Couldn't delete the account, try again later.",
+    "deleted": "Your account has been deleted."
   }
 }

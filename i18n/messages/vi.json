@@ -465,7 +465,7 @@
   },
   "legal": {
     "back": "Quay lại",
-    "updated": "Cập nhật lần cuối: 18/11/2026",
+    "updated": "Cập nhật lần cuối: 19/11/2026",
     "privacy_link": "Chính sách quyền riêng tư",
     "terms_link": "Điều khoản dịch vụ",
     "agree": "Khi tiếp tục, bạn đồng ý với Điều khoản dịch vụ và Chính sách quyền riêng tư.",
@@ -519,7 +519,7 @@
           "title": "7. Thời gian lưu trữ",
           "paragraphs": [
             "Chúng tôi lưu thông tin của bạn trong suốt thời gian tài khoản còn tồn tại. Khi bạn thu hồi tin nhắn hoặc xóa cuộc trò chuyện, hình ảnh và tệp đi kèm sẽ bị xóa khỏi kho lưu trữ khi không còn nơi nào sử dụng. Các tệp đã tải lên nhưng chưa từng được gửi sẽ tự động bị xóa.",
-            "Để yêu cầu xóa tài khoản và dữ liệu, hãy liên hệ với chúng tôi (xem bên dưới)."
+            "Bạn có thể tự xóa tài khoản bất cứ lúc nào trong Cài đặt > Xoá tài khoản. Việc này xóa vĩnh viễn hồ sơ, tin nhắn bạn đã gửi (kể cả trong nhóm), các cuộc trò chuyện 1:1 của bạn, bạn bè, lời mời kết bạn, danh sách chặn, thông tin đăng ký thông báo, liên kết với GitHub / Google và các tệp bạn đã tải lên khi không còn nơi nào sử dụng. Bạn cũng có thể liên hệ với chúng tôi (xem bên dưới) để được hỗ trợ."
           ]
         },
         {
@@ -737,5 +737,25 @@
     "body": "Cảm ơn bạn đã đăng ký Messenger. Mở link này trong vòng {hours} giờ để xác minh email và bắt đầu dùng tài khoản:",
     "button": "Xác minh email",
     "ignore": "Nếu bạn không đăng ký, hãy bỏ qua email này: tài khoản sẽ không dùng được nếu chưa xác minh."
+  },
+  "delete_account": {
+    "title": "Xoá tài khoản",
+    "description": "Xoá vĩnh viễn tài khoản và dữ liệu của bạn khỏi Messenger.",
+    "start": "Xoá tài khoản…",
+    "what_messages": "Mọi tin nhắn bạn đã gửi, kể cả trong nhóm, cùng biểu cảm và bình chọn của bạn.",
+    "what_chats": "Các cuộc trò chuyện 1:1 của bạn (với cả người kia). Bạn rời khỏi mọi nhóm; nhóm vẫn còn cho những người khác.",
+    "what_friends": "Bạn bè, lời mời kết bạn, danh sách chặn, thông báo đẩy và các phiên đăng nhập.",
+    "what_files": "Ảnh đại diện, ảnh, tệp và tin nhắn thoại bạn đã tải lên.",
+    "irreversible": "Không thể hoàn tác.",
+    "password_label": "Nhập mật khẩu để xác nhận",
+    "email_label": "Nhập địa chỉ email của bạn để xác nhận",
+    "confirm": "Xoá vĩnh viễn",
+    "deleting": "Đang xoá…",
+    "cancel": "Huỷ",
+    "wrong_password": "Mật khẩu không đúng.",
+    "wrong_email": "Email không khớp với tài khoản.",
+    "too_many": "Bạn thử quá nhiều lần, chờ một lúc rồi thử lại.",
+    "failed": "Không xoá được tài khoản, thử lại sau.",
+    "deleted": "Tài khoản của bạn đã bị xoá."
   }
 }

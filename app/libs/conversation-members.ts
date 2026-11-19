@@ -38,7 +38,9 @@ export const emitGroupUpdate = async (conversation: ConversationWithUsers, to: S
 export const removeGroupMember = async (
   conversation: ConversationWithUsers,
   memberId: string,
-  actorId: string = memberId
+  actorId: string = memberId,
+  // false: no "left" / "removed" event (an account being deleted: the event's sender would go too)
+  { announce = true }: { announce?: boolean } = {}
 ) => {
   const member = conversation.users.find((user) => user.id === memberId);
   const remaining = conversation.users.filter((user) => user.id !== memberId);
@@ -72,6 +74,9 @@ export const removeGroupMember = async (
   await emitGroupUpdate(updated, updated.users);
   // presence: the one gone may no longer share a conversation with the others
   notifyContactsChanged(conversation.users.map((user) => user.email));
+  if (!announce) {
+    return updated;
+  }
   await postSystemMessage(
     actorId === memberId
       ? { conversation: updated, actorId, type: "left" }

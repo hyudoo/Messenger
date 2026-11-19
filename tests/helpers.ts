@@ -35,7 +35,7 @@ export const createPrismaMock = () => {
   return {
     user: model(),
     conversation: model(),
-    message: model(),
+    message: { ...model(), updateMany: vi.fn(), deleteMany: vi.fn() },
     reaction: { ...model(), upsert: vi.fn(), deleteMany: vi.fn() },
     friendRequest: { ...model(), deleteMany: vi.fn() },
     poll: { ...model(), deleteMany: vi.fn() },

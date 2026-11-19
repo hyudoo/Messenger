@@ -14,6 +14,7 @@ import { SafeUser } from "@/app/types";
 import ImageUploadButton from "../ImageUploadButton";
 import PrivacySettings from "./PrivacySettings";
 import SecuritySettings from "./SecuritySettings";
+import DeleteAccount from "./DeleteAccount";
 import Input from "../inputs/Input";
 import Modal from "../modals/Modal";
 import Button from "../Button";
@@ -281,6 +282,8 @@ const SettingModal: React.FC<SettingModalProps> = ({
           {isOpen && <PrivacySettings />}
 
           {isOpen && <SecuritySettings />}
+
+          {isOpen && <DeleteAccount />}
         </div>
 
         <div
