@@ -251,7 +251,7 @@
     "friends_heading": "{count, plural, =0 {Bạn bè} other {Bạn bè (#)}}",
     "no_friends": "Chưa có bạn bè. Tìm người theo tên hoặc email ở ô trên.",
     "requests_heading": "{count, plural, other {# lời mời kết bạn}}",
-    "sent_heading": "Lời mời đã gửi",
+    "sent_heading": "Lời mời đã gửi ({count})",
     "people_heading": "Mọi người",
     "searching": "Đang tìm…",
     "no_people": "Không tìm thấy ai.",

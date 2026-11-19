@@ -251,7 +251,7 @@
     "friends_heading": "{count, plural, =0 {Friends} other {Friends (#)}}",
     "no_friends": "No friends yet. Find people by name or email above.",
     "requests_heading": "{count, plural, one {# friend request} other {# friend requests}}",
-    "sent_heading": "Sent requests",
+    "sent_heading": "Sent requests ({count})",
     "people_heading": "People",
     "searching": "Searching…",
     "no_people": "Nobody found.",

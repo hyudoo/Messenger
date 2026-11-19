@@ -11,6 +11,7 @@ import { getSocket } from "@/app/libs/socket-client";
 import { matchesSearch } from "@/app/libs/search";
 import { useRouter } from "@/i18n/navigation";
 
+import CollapsibleSection from "./CollapsibleSection";
 import FriendRequests from "./FriendRequests";
 import PeopleSearch from "./PeopleSearch";
 import UserBox from "./UserBox";
@@ -75,15 +76,18 @@ const UserList: React.FC<UserListProps> = ({ items, incoming, outgoing }) => {
         <SearchInput value={query} onChange={setQuery} placeholder={t("search")} />
         {!trimmed && <FriendRequests incoming={incoming} outgoing={outgoing} />}
         {(visible.length > 0 || !trimmed) && (
-          <h3 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("friends_heading", { count: items.length })}
-          </h3>
-        )}
-        {visible.map((item) => (
-          <UserBox key={item.id} data={item} />
-        ))}
-        {!trimmed && items.length === 0 && (
-          <p className="px-3 py-4 text-sm text-muted-foreground">{t("no_friends")}</p>
+          // a search keeps it open, so matching friends never hide in a folded section
+          <CollapsibleSection
+            storageKey="friends"
+            title={t("friends_heading", { count: items.length })}
+            forceOpen={Boolean(trimmed)}>
+            {visible.map((item) => (
+              <UserBox key={item.id} data={item} />
+            ))}
+            {!trimmed && items.length === 0 && (
+              <p className="px-3 py-4 text-sm text-muted-foreground">{t("no_friends")}</p>
+            )}
+          </CollapsibleSection>
         )}
         <PeopleSearch query={trimmed} />
       </div>

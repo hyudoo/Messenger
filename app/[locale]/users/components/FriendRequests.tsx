@@ -9,6 +9,8 @@ import { useTranslations } from "next-intl";
 import type { FriendRequestItem } from "@/app/actions/getFriendRequests";
 import { useRouter } from "@/i18n/navigation";
 
+import CollapsibleSection from "./CollapsibleSection";
+
 interface FriendRequestsProps {
   incoming: FriendRequestItem[];
   outgoing: FriendRequestItem[];
@@ -63,10 +65,7 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ incoming, outgoing }) =
   return (
     <>
       {incoming.length > 0 && (
-        <section className="mb-2">
-          <h3 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("requests_heading", { count: incoming.length })}
-          </h3>
+        <CollapsibleSection storageKey="incoming" className="mb-2" title={t("requests_heading", { count: incoming.length })}>
           <ul className="flex flex-col">
             {incoming.map((request) =>
               row(
@@ -98,13 +97,10 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ incoming, outgoing }) =
               )
             )}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
       {outgoing.length > 0 && (
-        <section className="mb-2">
-          <h3 className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("sent_heading")}
-          </h3>
+        <CollapsibleSection storageKey="outgoing" className="mb-2" title={t("sent_heading", { count: outgoing.length })}>
           <ul className="flex flex-col">
             {outgoing.map((request) =>
               row(
@@ -121,7 +117,7 @@ const FriendRequests: React.FC<FriendRequestsProps> = ({ incoming, outgoing }) =
               )
             )}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
     </>
   );
