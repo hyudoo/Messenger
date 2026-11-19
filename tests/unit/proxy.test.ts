@@ -1,8 +1,12 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ getToken: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getToken: vi.fn(), isSessionCurrent: vi.fn() }));
 vi.mock("next-auth/jwt", () => ({ getToken: mocks.getToken }));
+vi.mock("@/app/libs/session-version", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/app/libs/session-version")>()),
+  isSessionCurrent: mocks.isSessionCurrent,
+}));
 
 import proxy from "@/proxy";
 
@@ -18,6 +22,8 @@ describe("proxy", () => {
   beforeEach(() => {
     mocks.getToken.mockReset();
     mocks.getToken.mockResolvedValue(null);
+    mocks.isSessionCurrent.mockReset();
+    mocks.isSessionCurrent.mockResolvedValue(true);
   });
 
   it("sends / to the default locale", async () => {
@@ -60,6 +66,14 @@ describe("proxy", () => {
     const response = await proxy(request("/en/conversations"));
     expect(location(response)).toBeNull();
     expect(response.status).toBe(200);
+  });
+
+  it("sends a revoked session (password changed elsewhere) to the login page and drops its cookie", async () => {
+    mocks.getToken.mockResolvedValue({ sub: "user-id", email: "me@example.com", sv: 0 });
+    mocks.isSessionCurrent.mockResolvedValue(false);
+    const response = await proxy(request("/en/conversations"));
+    expect(location(response)).toBe("/en");
+    expect(response.headers.get("set-cookie")).toMatch(/next-auth\.session-token=;/);
   });
 
   it("keeps the login page open to signed-out users", async () => {

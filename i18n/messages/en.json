@@ -684,5 +684,28 @@
     "save": "Save",
     "cancel": "Cancel",
     "hint": "Everyone in this chat sees the nicknames. Leave it empty to use the name."
+  },
+  "security": {
+    "title": "Security",
+    "description": "Change your password or sign out your other devices. Both end every other session; this device stays signed in.",
+    "change_title": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the new password",
+    "change_button": "Change password",
+    "current_required": "Enter your current password!",
+    "mismatch": "The passwords don't match!",
+    "wrong_password": "The current password is wrong!",
+    "too_many": "Too many tries, please wait a while and try again!",
+    "failed": "That didn't work, please try again!",
+    "changed": "Password changed. Your other devices were signed out.",
+    "no_password": "This account signs in with Google / GitHub, so it has no password yet.",
+    "set_password": "Set one by email",
+    "sessions_title": "Sessions",
+    "sessions_hint": "Sign out of every other browser and device, except this one.",
+    "sign_out_others": "Sign out other devices",
+    "sign_out_others_confirm": "Confirm sign out",
+    "cancel": "Cancel",
+    "signed_out_others": "Your other devices were signed out."
   }
 }

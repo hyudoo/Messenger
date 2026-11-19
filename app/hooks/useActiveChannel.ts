@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { getSession, signOut, useSession } from "next-auth/react";
+import { useLocale } from "next-intl";
 
 import { getSocket } from "../libs/socket-client";
 import useActiveList from "./useActiveList";
@@ -9,6 +10,7 @@ import useActiveList from "./useActiveList";
 const useActiveChannel = () => {
   const { set, add, remove } = useActiveList();
   const { status } = useSession();
+  const locale = useLocale();
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -22,6 +24,23 @@ const useActiveChannel = () => {
     socket.on("contacts:update", resync);
     socket.on("presence:online", add);
     socket.on("presence:offline", remove);
+    // Refused at (re)connect: this session may have been ended from another device (a password
+    // change or "sign out other devices", app/libs/session-version.ts). Signed out for real: go to
+    // the login page. Still signed in (e.g. this device's own new cookie arrived late): try again.
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const onConnectError = async (error: Error) => {
+      if (error.message !== "Unauthorized") {
+        return;
+      }
+      const session = await getSession().catch(() => undefined);
+      if (session === null) {
+        void signOut({ callbackUrl: `/${locale}` });
+      } else {
+        clearTimeout(retry);
+        retry = setTimeout(() => socket.connect(), 3000);
+      }
+    };
+    socket.on("connect_error", onConnectError);
     socket.connect();
 
     return () => {
@@ -29,9 +48,11 @@ const useActiveChannel = () => {
       socket.off("contacts:update", resync);
       socket.off("presence:online", add);
       socket.off("presence:offline", remove);
+      socket.off("connect_error", onConnectError);
+      clearTimeout(retry);
       socket.disconnect();
     };
-  }, [status, set, add, remove]);
+  }, [status, locale, set, add, remove]);
 };
 
 export default useActiveChannel;

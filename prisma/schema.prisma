@@ -17,6 +17,10 @@ model User {
   emailVerified  DateTime?
   image          String?
   hashedPassword String?
+  // bumped when the user changes their password or signs out their other devices
+  // (app/libs/sessions.ts): a session token (JWT, claim `sv`) from an older version is refused.
+  // Missing = 0. Private: omitted from every query (app/libs/prismadb.ts)
+  sessionVersion Int?
   createdAt      DateTime  @default(now())
   // when one of the user's sockets last disconnected ("active 5 minutes ago"; server/socket.ts)
   lastSeenAt     DateTime?

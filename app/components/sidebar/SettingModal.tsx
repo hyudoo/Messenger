@@ -13,6 +13,7 @@ import { routing } from "@/i18n/routing";
 import { SafeUser } from "@/app/types";
 import ImageUploadButton from "../ImageUploadButton";
 import PrivacySettings from "./PrivacySettings";
+import SecuritySettings from "./SecuritySettings";
 import Input from "../inputs/Input";
 import Modal from "../modals/Modal";
 import Button from "../Button";
@@ -278,6 +279,8 @@ const SettingModal: React.FC<SettingModalProps> = ({
           </div>
 
           {isOpen && <PrivacySettings />}
+
+          {isOpen && <SecuritySettings />}
         </div>
 
         <div

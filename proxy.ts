@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { routing } from "./i18n/routing";
 import { safeNextPath } from "./app/libs/invite-code";
+import { isSessionCurrent, sessionCookieName } from "./app/libs/session-version";
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -27,7 +28,9 @@ export default async function proxy(req: NextRequest) {
 
   if (isProtected) {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token) {
+    // revoked = the password changed or the user signed out their other devices since
+    const revoked = !!token && !(await isSessionCurrent(token));
+    if (!token || revoked) {
       const url = req.nextUrl.clone();
       url.pathname = `/${localeOf(req)}`;
       url.search = "";
@@ -36,7 +39,11 @@ export default async function proxy(req: NextRequest) {
       if (next) {
         url.searchParams.set("next", next);
       }
-      return NextResponse.redirect(url);
+      const response = NextResponse.redirect(url);
+      if (revoked) {
+        response.cookies.delete(sessionCookieName());
+      }
+      return response;
     }
   }
 

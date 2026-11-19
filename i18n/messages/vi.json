@@ -684,5 +684,28 @@
     "save": "Lưu",
     "cancel": "Huỷ",
     "hint": "Mọi người trong cuộc trò chuyện đều thấy biệt danh. Để trống thì dùng tên thật."
+  },
+  "security": {
+    "title": "Bảo mật",
+    "description": "Đổi mật khẩu hoặc đăng xuất các thiết bị khác. Cả hai đều kết thúc mọi phiên đăng nhập khác; thiết bị này vẫn đăng nhập.",
+    "change_title": "Đổi mật khẩu",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Nhập lại mật khẩu mới",
+    "change_button": "Đổi mật khẩu",
+    "current_required": "Hãy nhập mật khẩu hiện tại!",
+    "mismatch": "Mật khẩu nhập lại không khớp!",
+    "wrong_password": "Mật khẩu hiện tại không đúng!",
+    "too_many": "Thử quá nhiều lần, hãy đợi một lúc rồi thử lại!",
+    "failed": "Không thực hiện được, hãy thử lại!",
+    "changed": "Đã đổi mật khẩu. Các thiết bị khác đã bị đăng xuất.",
+    "no_password": "Tài khoản này đăng nhập bằng Google / GitHub nên chưa có mật khẩu.",
+    "set_password": "Đặt mật khẩu qua email",
+    "sessions_title": "Phiên đăng nhập",
+    "sessions_hint": "Đăng xuất khỏi mọi trình duyệt và thiết bị khác, trừ thiết bị này.",
+    "sign_out_others": "Đăng xuất các thiết bị khác",
+    "sign_out_others_confirm": "Xác nhận đăng xuất",
+    "cancel": "Huỷ",
+    "signed_out_others": "Đã đăng xuất các thiết bị khác."
   }
 }
