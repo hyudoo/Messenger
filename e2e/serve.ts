@@ -11,7 +11,7 @@ import bcrypt from "bcrypt";
 import { PrismaClient } from "@prisma/client";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 
-import { E2E_PASSWORD, E2E_PORT, E2E_USERS, USERS_FILE } from "./config";
+import { E2E_PASSWORD, E2E_PORT, E2E_USERS, MAIL_OUTBOX, USERS_FILE } from "./config";
 
 // The dev server's build folder for these runs. Emptied on every start: a cache left from an
 // older version of the code made the first page visit reload over and over (hundreds of loads of
@@ -40,9 +40,11 @@ const main = async () => {
     // no Web Push
     VAPID_PUBLIC_KEY: "",
     VAPID_PRIVATE_KEY: "",
-    // no mail: a reset link is printed in this console instead (app/api/password/forgot)
+    // no mail: links (password reset, email verification) go to this console and to the outbox
+    // file the tests read them from (app/libs/account-mail.ts)
     SMTP_HOST: "",
     SMTP_FROM: "",
+    MAIL_OUTBOX_FILE: MAIL_OUTBOX,
     // its own build folder, so it can run next to `npm run dev` (next.config.js)
     NEXT_DIST_DIR: DIST_DIR,
   });
@@ -66,6 +68,7 @@ const main = async () => {
   // the tests read the seeded ids (e.g. to create a group through the API)
   mkdirSync(path.dirname(USERS_FILE), { recursive: true });
   writeFileSync(USERS_FILE, JSON.stringify(ids, null, 2));
+  writeFileSync(MAIL_OUTBOX, "");
 
   // mongod is a child process: stop it with the app
   const stop = () => {

@@ -64,7 +64,8 @@
       "no_digit": "Mật khẩu phải chứa ít nhất một số",
       "no_special": "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
     },
-    "forgot_password": "Quên mật khẩu?"
+    "forgot_password": "Quên mật khẩu?",
+    "register_unavailable": "Hiện chưa thể đăng ký bằng email, hãy đăng nhập bằng Google / GitHub."
   },
   "home": {
     "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video.",
@@ -708,5 +709,33 @@
     "sign_out_others_confirm": "Xác nhận đăng xuất",
     "cancel": "Huỷ",
     "signed_out_others": "Đã đăng xuất các thiết bị khác."
+  },
+  "verify": {
+    "sent_title": "Kiểm tra hộp thư của bạn",
+    "sent_body": "Chúng tôi đã gửi link xác minh tới {email}. Mở link trong mail để hoàn tất đăng ký, rồi đăng nhập.",
+    "unverified_title": "Email chưa được xác minh",
+    "unverified_body": "Tài khoản {email} cần xác minh email trước khi đăng nhập. Mở link trong mail chúng tôi đã gửi, hoặc gửi lại mail mới.",
+    "spam_hint": "Không thấy mail? Hãy xem thư mục Spam. Link dùng được trong 24 giờ.",
+    "resend": "Gửi lại email xác minh",
+    "resent": "Đã gửi lại email xác minh!",
+    "resend_failed": "Không gửi được email, hãy thử lại!",
+    "too_many": "Gửi quá nhiều lần, hãy đợi một lúc rồi thử lại!",
+    "back": "Quay lại đăng nhập",
+    "page_title": "Xác minh email",
+    "page_intro": "Bấm nút bên dưới để xác minh email của tài khoản.",
+    "confirm": "Xác minh email",
+    "done": "Email đã được xác minh. Giờ bạn có thể đăng nhập.",
+    "sign_in": "Đăng nhập",
+    "invalid": "Link không hợp lệ hoặc đã hết hạn. Hãy đăng nhập để gửi lại link mới.",
+    "failed": "Không xác minh được, hãy thử lại!",
+    "too_fast": "Thử quá nhiều lần, hãy đợi một lúc rồi thử lại.",
+    "to_sign_in": "Về trang đăng nhập"
+  },
+  "verify_mail": {
+    "subject": "Xác minh email cho tài khoản Messenger",
+    "greeting": "Chào {name},",
+    "body": "Cảm ơn bạn đã đăng ký Messenger. Mở link này trong vòng {hours} giờ để xác minh email và bắt đầu dùng tài khoản:",
+    "button": "Xác minh email",
+    "ignore": "Nếu bạn không đăng ký, hãy bỏ qua email này: tài khoản sẽ không dùng được nếu chưa xác minh."
   }
 }

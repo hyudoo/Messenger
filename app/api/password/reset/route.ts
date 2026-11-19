@@ -27,7 +27,11 @@ export async function POST(request: Request) {
       return new NextResponse("invalid_token", { status: 400 });
     }
 
-    await revokeSessions(userId, { hashedPassword: await bcrypt.hash(password, 12) });
+    // the link came by mail, so it also proves the address (an unverified account can sign in now)
+    await revokeSessions(userId, {
+      hashedPassword: await bcrypt.hash(password, 12),
+      emailVerified: new Date(),
+    });
     await clearResetTokens(userId);
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -15,6 +15,10 @@ model User {
   name           String?
   email          String?   @unique
   emailVerified  DateTime?
+  // set on accounts registered with a password (POST /api/register): they sign in only once
+  // emailVerified is set (app/libs/email-verification.ts). Missing on older accounts and OAuth
+  // ones, which aren't held back. Private: omitted from every query (app/libs/prismadb.ts)
+  mustVerifyEmail Boolean?
   image          String?
   hashedPassword String?
   // bumped when the user changes their password or signs out their other devices
@@ -56,6 +60,7 @@ model User {
 
   pollVotes PollVote[]
   passwordResets PasswordReset[]
+  emailVerifications EmailVerification[]
 
   sentFriendRequests     FriendRequest[] @relation("FriendRequestFrom")
   receivedFriendRequests FriendRequest[] @relation("FriendRequestTo")
@@ -344,6 +349,21 @@ model PollVote {
 // stored, so the database alone can't be used to reset anyone's password. Usable once, until
 // expiresAt; asking again replaces the user's earlier ones.
 model PasswordReset {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  createdAt DateTime @default(now())
+  tokenHash String   @unique
+  expiresAt DateTime
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// A "verify your email" link (app/libs/email-verification.ts), like PasswordReset: only the SHA-256
+// of its random token is stored, usable once until expiresAt, and sending a new one replaces the
+// user's earlier ones.
+model EmailVerification {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   createdAt DateTime @default(now())
   tokenHash String   @unique

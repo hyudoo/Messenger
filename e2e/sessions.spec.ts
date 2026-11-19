@@ -1,4 +1,6 @@
-import { Browser, Page, expect, test } from "@playwright/test";
+import { APIRequestContext, Browser, Page, expect, test } from "@playwright/test";
+
+import { mailedLink } from "./fixtures";
 
 // A user of its own: changing the password ends every session of the user, which would sign the
 // seeded users' saved sessions out for the other specs.
@@ -9,6 +11,16 @@ const NEW_PASSWORD = "N3w-Passw0rd!";
 // the sidebar's Settings avatar sits under the Next dev tools button (bottom left in dev mode)
 const openSettings = (page: Page) =>
   page.getByRole("button", { name: "Settings" }).first().dispatchEvent("click");
+
+// a new password account, verified through its mailed link (it can't sign in before)
+const registerVerified = async (request: APIRequestContext, email: string, name: string) => {
+  const registered = await request.post("/api/register", {
+    data: { email, name, password: OLD_PASSWORD, locale: "en" },
+  });
+  expect(registered.ok()).toBeTruthy();
+  const token = new URL(await mailedLink(email, "/verify-email"), "http://x").searchParams.get("token");
+  expect((await request.post("/api/email/verify", { data: { token } })).ok()).toBeTruthy();
+};
 
 const signIn = async (browser: Browser, email: string, password: string) => {
   const context = await browser.newContext();
@@ -25,10 +37,7 @@ test("changing the password signs out the other devices and keeps this one signe
   browser,
   request,
 }) => {
-  const registered = await request.post("/api/register", {
-    data: { email: EMAIL, name: "Sessions E2E", password: OLD_PASSWORD },
-  });
-  expect(registered.ok()).toBeTruthy();
+  await registerVerified(request, EMAIL, "Sessions E2E");
 
   const here = await signIn(browser, EMAIL, OLD_PASSWORD);
   const elsewhere = await signIn(browser, EMAIL, OLD_PASSWORD);
@@ -60,9 +69,7 @@ test("changing the password signs out the other devices and keeps this one signe
 
 test("signing out other devices keeps only this one", async ({ browser, request }) => {
   const email = `others-${Date.now()}@e2e.test`;
-  expect(
-    (await request.post("/api/register", { data: { email, name: "Others E2E", password: OLD_PASSWORD } })).ok()
-  ).toBeTruthy();
+  await registerVerified(request, email, "Others E2E");
   const here = await signIn(browser, email, OLD_PASSWORD);
   const elsewhere = await signIn(browser, email, OLD_PASSWORD);
 

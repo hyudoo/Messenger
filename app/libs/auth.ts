@@ -7,7 +7,8 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
 
 import prisma from "@/app/libs/prismadb"
-import { TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors"
+import { EMAIL_NOT_VERIFIED, TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors"
+import { needsEmailVerification } from "@/app/libs/email-verification"
 import { clientIp, rateLimit } from "@/app/libs/rate-limit"
 import { currentSessionVersion, isSessionCurrent } from "@/app/libs/session-version"
 
@@ -48,7 +49,7 @@ export const authOptions: AuthOptions = {
           where: {
             email: credentials.email
           },
-          omit: { hashedPassword: false }
+          omit: { hashedPassword: false, mustVerifyEmail: false }
         });
 
         if (!user || !user?.hashedPassword) {
@@ -64,7 +65,12 @@ export const authOptions: AuthOptions = {
           throw new Error('Invalid credentials');
         }
 
-        const { hashedPassword, ...safeUser } = user;
+        // only after the password: an unverified account is no secret to someone who knows it
+        if (needsEmailVerification(user)) {
+          throw new Error(EMAIL_NOT_VERIFIED);
+        }
+
+        const { hashedPassword, mustVerifyEmail, ...safeUser } = user;
         return safeUser;
       }
     })

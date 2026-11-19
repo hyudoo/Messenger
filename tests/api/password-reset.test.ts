@@ -111,6 +111,8 @@ describe("POST /api/password/reset", () => {
     expect(data.hashedPassword).toMatch(/^\$2[aby]\$12\$/);
     expect(data.hashedPassword).not.toContain("New-passw0rd!");
     expect(data.sessionVersion).toBe(5);
+    // the mailed link proves the address too
+    expect(data.emailVerified).toBeInstanceOf(Date);
     expect(prisma.passwordReset.deleteMany).toHaveBeenCalledWith({ where: { userId: ME } });
   });
 

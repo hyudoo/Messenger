@@ -5,14 +5,15 @@ import { signIn, useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { BsGithub, BsGoogle } from "react-icons/bs";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Link, useRouter } from "@/i18n/navigation";
 
 import Input from "@/app/components/inputs/Input";
 import AuthSocialButton from "./AuthSocialButton";
 import Button from "@/app/components/Button";
-import { TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors";
+import { EMAIL_NOT_VERIFIED, TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors";
+import VerifyEmailNotice from "./VerifyEmailNotice";
 import { validatePassword } from "@/app/libs/password";
 import { toast } from "react-hot-toast";
 
@@ -25,6 +26,7 @@ interface AuthFormProps {
 
 const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
   const t = useTranslations("auth");
+  const locale = useLocale();
   const session = useSession();
   const router = useRouter();
   const target = next ?? "/conversations";
@@ -33,6 +35,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
     error === TOO_MANY_ATTEMPTS ? t("login_too_many") : t("login_failed");
   const [variant, setVariant] = useState<Variant>("LOGIN");
   const [isLoading, setIsLoading] = useState(false);
+  // an account that has to verify its email first: just registered ("sent") or tried to sign in
+  // ("unverified"); the form makes way for the notice
+  const [verifying, setVerifying] = useState<{ email: string; reason: "sent" | "unverified" } | null>(
+    null
+  );
 
   useEffect(() => {
     if (session?.status === "authenticated") {
@@ -77,28 +84,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
         setIsLoading(false);
         return;
       }
+      // the account signs in once its email is verified (the mailed link)
       await axios
-        .post("/api/register", data)
-        .then(() =>
-          signIn("credentials", {
-            ...data,
-            redirect: false,
-          })
-        )
-        .then((callback) => {
-          if (callback?.error) {
-            toast.error(loginErrorMessage(callback.error));
-          }
-          if (callback?.ok) {
-            router.push(target);
-          }
-        })
+        .post("/api/register", { ...data, locale })
+        .then(() => setVerifying({ email: data.email, reason: "sent" }))
         .catch((error) =>
           toast.error(
             error?.response?.status === 409
               ? t("email_taken")
               : error?.response?.status === 429
               ? t("register_too_many")
+              : error?.response?.status === 503
+              ? t("register_unavailable")
               : t("register_failed")
           )
         )
@@ -111,7 +108,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
         redirect: false,
       })
         .then((callback) => {
-          if (callback?.error) {
+          if (callback?.error === EMAIL_NOT_VERIFIED) {
+            setVerifying({ email: data.email, reason: "unverified" });
+          } else if (callback?.error) {
             toast.error(loginErrorMessage(callback.error));
           }
 
@@ -139,6 +138,19 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
       })
       .finally(() => setIsLoading(false));
   };
+
+  if (verifying) {
+    return (
+      <VerifyEmailNotice
+        email={verifying.email}
+        reason={verifying.reason}
+        onBack={() => {
+          setVerifying(null);
+          setVariant("LOGIN");
+        }}
+      />
+    );
+  }
 
   return (
     <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

@@ -35,6 +35,10 @@ export const LIMITS = {
   // "forgot password": per IP, and per email address (so one inbox isn't flooded from many IPs)
   passwordReset: { limit: 5, windowMs: 15 * 60_000 },
   passwordResetEmail: { limit: 3, windowMs: 60 * 60_000 },
+  // "verify your email": opening links per IP; asking for a new mail per IP and per address
+  emailVerify: { limit: 10, windowMs: 15 * 60_000 },
+  verifyMail: { limit: 5, windowMs: 15 * 60_000 },
+  verifyMailAddress: { limit: 3, windowMs: 60 * 60_000 },
   // per user: changing the password (each try checks the current one) and "sign out other devices"
   passwordChange: { limit: 5, windowMs: 15 * 60_000 },
   message: { limit: 20, windowMs: 10_000 }, // per user

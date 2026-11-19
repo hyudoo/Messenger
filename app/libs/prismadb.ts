@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 // hashedPassword is never returned unless a query opts back in with
 // `omit: { hashedPassword: false }` (only the credentials login does). The muted / pinned
-// conversation lists, the session version, the blocked users, the friends and the privacy settings are the user's own business: user rows go to other members, so they are
+// conversation lists, the session version, whether the email must be verified, the blocked users, the friends and the privacy settings are the user's own business: user rows go to other members, so they are
 // read only where needed (`select`).
 const createClient = () =>
   new PrismaClient({
@@ -10,6 +10,7 @@ const createClient = () =>
       user: {
         hashedPassword: true,
         sessionVersion: true,
+        mustVerifyEmail: true,
         mutedConversationIds: true,
         pinnedConversationIds: true,
         archivedConversationIds: true,

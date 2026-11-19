@@ -41,6 +41,7 @@ export const createPrismaMock = () => {
     poll: { ...model(), deleteMany: vi.fn() },
     pollVote: { ...model(), deleteMany: vi.fn() },
     passwordReset: { ...model(), deleteMany: vi.fn() },
+    emailVerification: { ...model(), deleteMany: vi.fn() },
     webPushSubscription: { ...model(), upsert: vi.fn(), deleteMany: vi.fn() },
     $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     $runCommandRaw: vi.fn().mockResolvedValue({ ok: 1 }),
