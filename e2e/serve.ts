@@ -2,7 +2,7 @@
 // an in-memory MongoDB replica set (Prisma needs one; no Docker), the schema pushed to it,
 // a few seeded users, then server.ts itself in this process on E2E_PORT.
 //
-// Everything that would reach real services is switched off here (Redis, Web Push); the values
+// Everything that would reach real services is switched off here (Redis, Web Push, mail); the values
 // set below win over .env, which Next only reads for variables not set yet.
 import { execSync } from "child_process";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
@@ -40,6 +40,9 @@ const main = async () => {
     // no Web Push
     VAPID_PUBLIC_KEY: "",
     VAPID_PRIVATE_KEY: "",
+    // no mail: a reset link is printed in this console instead (app/api/password/forgot)
+    SMTP_HOST: "",
+    SMTP_FROM: "",
     // its own build folder, so it can run next to `npm run dev` (next.config.js)
     NEXT_DIST_DIR: DIST_DIR,
   });

@@ -63,7 +63,8 @@
       "no_uppercase": "The password needs at least one uppercase letter",
       "no_digit": "The password needs at least one digit",
       "no_special": "The password needs at least one special character"
-    }
+    },
+    "forgot_password": "Forgot password?"
   },
   "home": {
     "tagline": "A web messenger for chatting with friends in real time, with voice and video calls.",
@@ -641,5 +642,36 @@
     "vote_failed": "Couldn't save your vote!",
     "closed_error": "This poll is closed.",
     "too_fast": "You're going too fast, wait a moment and try again!"
+  },
+  "forgot": {
+    "title": "Forgot your password?",
+    "intro": "Enter the email address of your account and we'll send you a link to choose a new password.",
+    "email": "Email",
+    "send": "Send reset link",
+    "sent": "If {email} has an account, a link to reset its password is on its way. Check your inbox (and the spam folder).",
+    "failed": "Couldn't send the link, try again!",
+    "too_fast": "Too many attempts. Wait a while and try again.",
+    "not_available": "Resetting a password by email isn't available right now.",
+    "back": "Back to sign in"
+  },
+  "reset": {
+    "title": "Choose a new password",
+    "intro": "Pick a new password for your account.",
+    "password": "New password",
+    "repeat": "Confirm new password",
+    "save": "Save new password",
+    "done": "Your password has been changed. You can sign in with it now.",
+    "sign_in": "Sign in",
+    "invalid": "This link is invalid or has expired. Ask for a new one.",
+    "new_link": "Get a new link",
+    "failed": "Couldn't change the password, try again!",
+    "too_fast": "Too many attempts. Wait a while and try again."
+  },
+  "reset_mail": {
+    "subject": "Reset your Messenger password",
+    "greeting": "Hi {name},",
+    "body": "Someone (hopefully you) asked to reset the password of your Messenger account. Open this link within {minutes} minutes to choose a new one:",
+    "button": "Choose a new password",
+    "ignore": "If you didn't ask for this, you can ignore this email: your password stays the same."
   }
 }

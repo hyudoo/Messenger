@@ -32,6 +32,9 @@ export const LIMITS = {
   register: { limit: 5, windowMs: 15 * 60_000 }, // per IP
   login: { limit: 10, windowMs: 15 * 60_000 }, // per IP + email
   loginIp: { limit: 50, windowMs: 15 * 60_000 }, // per IP, any email
+  // "forgot password": per IP, and per email address (so one inbox isn't flooded from many IPs)
+  passwordReset: { limit: 5, windowMs: 15 * 60_000 },
+  passwordResetEmail: { limit: 3, windowMs: 60 * 60_000 },
   message: { limit: 20, windowMs: 10_000 }, // per user
   reaction: { limit: 30, windowMs: 10_000 }, // per user
   upload: { limit: 20, windowMs: 60_000 }, // per user

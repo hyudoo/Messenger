@@ -32,6 +32,7 @@ Copy `.env.example` to `.env`.
 - **Optional:**
   - Redis for several instances: `REDIS_URL`, or `REDIS_HOST` / `REDIS_PORT` / `REDIS_USERNAME` / `REDIS_PASSWORD` (or `REDIS_PASSWORD_FILE`, a Docker / Kubernetes secret) (`getRedisUrl()` in `app/libs/redis-url.ts`; `REDIS_URL` wins).
   - `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS`: TURN for calls.
+  - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`: "forgot password" mails (see `.claude/rules/auth.md`); links use `NEXTAUTH_URL`.
   - `TRUST_PROXY=true`: behind a proxy that sets `X-Real-IP`.
   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: Web Push. Generate with `npx web-push generate-vapid-keys`; read at run time; keep the pair stable.
 - Production gets its `.env` from the CI variable `ENV_FILE`.

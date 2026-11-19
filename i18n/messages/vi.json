@@ -63,7 +63,8 @@
       "no_uppercase": "Mật khẩu phải chứa ít nhất một chữ cái viết hoa",
       "no_digit": "Mật khẩu phải chứa ít nhất một số",
       "no_special": "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
-    }
+    },
+    "forgot_password": "Quên mật khẩu?"
   },
   "home": {
     "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video.",
@@ -641,5 +642,36 @@
     "vote_failed": "Không lưu được lựa chọn của bạn!",
     "closed_error": "Bình chọn này đã đóng.",
     "too_fast": "Bạn thao tác quá nhanh, chờ một lát rồi thử lại!"
+  },
+  "forgot": {
+    "title": "Quên mật khẩu?",
+    "intro": "Nhập email của tài khoản, chúng tôi sẽ gửi cho bạn một link để đặt mật khẩu mới.",
+    "email": "Email",
+    "send": "Gửi link đặt lại",
+    "sent": "Nếu {email} có tài khoản, link đặt lại mật khẩu đang được gửi tới. Hãy kiểm tra hộp thư (cả mục thư rác).",
+    "failed": "Không gửi được link, thử lại nhé!",
+    "too_fast": "Bạn đã thử quá nhiều lần. Chờ một lúc rồi thử lại.",
+    "not_available": "Hiện chưa thể đặt lại mật khẩu qua email.",
+    "back": "Về trang đăng nhập"
+  },
+  "reset": {
+    "title": "Đặt mật khẩu mới",
+    "intro": "Chọn mật khẩu mới cho tài khoản của bạn.",
+    "password": "Mật khẩu mới",
+    "repeat": "Nhập lại mật khẩu mới",
+    "save": "Lưu mật khẩu mới",
+    "done": "Đã đổi mật khẩu. Bạn có thể đăng nhập bằng mật khẩu mới ngay.",
+    "sign_in": "Đăng nhập",
+    "invalid": "Link này không hợp lệ hoặc đã hết hạn. Hãy xin link mới.",
+    "new_link": "Xin link mới",
+    "failed": "Không đổi được mật khẩu, thử lại nhé!",
+    "too_fast": "Bạn đã thử quá nhiều lần. Chờ một lúc rồi thử lại."
+  },
+  "reset_mail": {
+    "subject": "Đặt lại mật khẩu Messenger",
+    "greeting": "Chào {name},",
+    "body": "Có người (hy vọng là bạn) yêu cầu đặt lại mật khẩu tài khoản Messenger của bạn. Mở link sau trong vòng {minutes} phút để chọn mật khẩu mới:",
+    "button": "Chọn mật khẩu mới",
+    "ignore": "Nếu bạn không yêu cầu, hãy bỏ qua email này: mật khẩu của bạn không đổi."
   }
 }

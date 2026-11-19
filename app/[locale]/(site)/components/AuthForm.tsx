@@ -7,7 +7,7 @@ import { BsGithub, BsGoogle } from "react-icons/bs";
 import { FieldValues, SubmitHandler, useForm } from "react-hook-form";
 import { useTranslations } from "next-intl";
 
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 
 import Input from "@/app/components/inputs/Input";
 import AuthSocialButton from "./AuthSocialButton";
@@ -174,6 +174,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
             label={t("password")}
             type="password"
           />
+          {variant === "LOGIN" && (
+            <div className="-mt-3 text-right text-sm">
+              <Link href="/forgot-password" className="font-medium text-sky-500 hover:underline">
+                {t("forgot_password")}
+              </Link>
+            </div>
+          )}
           {variant === "REGISTER" && (
             <Input
               disabled={isLoading}
