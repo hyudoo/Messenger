@@ -39,6 +39,7 @@
   },
   "auth": {
     "title": "Đăng nhập vào tài khoản",
+    "title_register": "Tạo tài khoản của bạn",
     "name": "Họ và tên",
     "email": "Email",
     "password": "Mật khẩu",
@@ -65,7 +66,16 @@
       "no_special": "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
     },
     "forgot_password": "Quên mật khẩu?",
-    "register_unavailable": "Hiện chưa thể đăng ký bằng email, hãy đăng nhập bằng Google / GitHub."
+    "register_unavailable": "Hiện chưa thể đăng ký bằng email, hãy đăng nhập bằng Google / GitHub.",
+    "show_password": "Hiện mật khẩu",
+    "hide_password": "Ẩn mật khẩu",
+    "password_checks": {
+      "length": "Từ 8 đến 72 ký tự",
+      "lowercase": "Một chữ thường",
+      "uppercase": "Một chữ hoa",
+      "digit": "Một chữ số",
+      "special": "Một ký tự đặc biệt"
+    }
   },
   "home": {
     "tagline": "Ứng dụng nhắn tin trên web để trò chuyện với bạn bè theo thời gian thực, có gọi thoại và gọi video."
@@ -472,7 +482,7 @@
     "updated": "Cập nhật lần cuối: 19/11/2026",
     "privacy_link": "Chính sách quyền riêng tư",
     "terms_link": "Điều khoản dịch vụ",
-    "agree": "Khi tiếp tục, bạn đồng ý với Điều khoản dịch vụ và Chính sách quyền riêng tư.",
+    "agree": "Khi tiếp tục, bạn đồng ý với <terms>Điều khoản dịch vụ</terms> và <privacy>Chính sách quyền riêng tư</privacy>.",
     "privacy": {
       "title": "Chính sách quyền riêng tư",
       "intro": "Chính sách này giải thích Messenger thu thập những thông tin nào khi bạn sử dụng, cách thông tin đó được dùng và lưu trữ, và những lựa chọn mà bạn có.",
@@ -656,11 +666,15 @@
     "intro": "Nhập email của tài khoản, chúng tôi sẽ gửi cho bạn một link để đặt mật khẩu mới.",
     "email": "Email",
     "send": "Gửi link đặt lại",
-    "sent": "Nếu {email} có tài khoản, link đặt lại mật khẩu đang được gửi tới. Hãy kiểm tra hộp thư (cả mục thư rác).",
+    "sent": "Nếu <b>{email}</b> có tài khoản, link đặt lại mật khẩu đang được gửi tới.",
     "failed": "Không gửi được link, thử lại nhé!",
     "too_fast": "Bạn đã thử quá nhiều lần. Chờ một lúc rồi thử lại.",
     "not_available": "Hiện chưa thể đặt lại mật khẩu qua email.",
-    "back": "Về trang đăng nhập"
+    "back": "Về trang đăng nhập",
+    "sent_title": "Kiểm tra email của bạn",
+    "sent_hint": "Link có hiệu lực trong {minutes} phút. Vài phút chưa thấy mail? Hãy xem mục Thư rác, hoặc kiểm tra lại địa chỉ rồi thử lại.",
+    "other_email": "Dùng email khác",
+    "sending": "Đang gửi…"
   },
   "reset": {
     "title": "Đặt mật khẩu mới",
@@ -673,7 +687,12 @@
     "invalid": "Link này không hợp lệ hoặc đã hết hạn. Hãy xin link mới.",
     "new_link": "Xin link mới",
     "failed": "Không đổi được mật khẩu, thử lại nhé!",
-    "too_fast": "Bạn đã thử quá nhiều lần. Chờ một lúc rồi thử lại."
+    "too_fast": "Bạn đã thử quá nhiều lần. Chờ một lúc rồi thử lại.",
+    "done_title": "Đã đổi mật khẩu",
+    "invalid_title": "Link đã hết hạn",
+    "saving": "Đang lưu…",
+    "check_ok": "đạt",
+    "back": "Về trang đăng nhập"
   },
   "reset_mail": {
     "subject": "Đặt lại mật khẩu Messenger",
@@ -733,7 +752,10 @@
     "invalid": "Link không hợp lệ hoặc đã hết hạn. Hãy đăng nhập để gửi lại link mới.",
     "failed": "Không xác minh được, hãy thử lại!",
     "too_fast": "Thử quá nhiều lần, hãy đợi một lúc rồi thử lại.",
-    "to_sign_in": "Về trang đăng nhập"
+    "to_sign_in": "Về trang đăng nhập",
+    "done_title": "Đã xác minh email",
+    "invalid_title": "Link đã hết hạn",
+    "verifying": "Đang xác minh…"
   },
   "verify_mail": {
     "subject": "Xác minh email cho tài khoản Messenger",
@@ -794,5 +816,9 @@
     "too_many": "Bạn thử quá nhiều lần, chờ một lúc rồi thử lại.",
     "failed": "Không xoá được tài khoản, thử lại sau.",
     "deleted": "Tài khoản của bạn đã bị xoá."
+  },
+  "mail": {
+    "fallback": "Nút không hoạt động? Sao chép link này vào trình duyệt:",
+    "footer": "Bạn nhận được email này vì có yêu cầu trên tài khoản Messenger của bạn. Đây là thư tự động, vui lòng không trả lời."
   }
 }

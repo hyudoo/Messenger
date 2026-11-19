@@ -31,3 +31,15 @@ export const validatePassword = (password: unknown): PasswordError | null => {
   }
   return null;
 };
+
+// The same rules as a checklist, for showing them live under a "new password" field
+// (auth.password_checks.<code>). validatePassword stays the source of truth.
+export type PasswordCheck = "length" | "lowercase" | "uppercase" | "digit" | "special";
+
+export const passwordChecks = (password: string): { code: PasswordCheck; ok: boolean }[] => [
+  { code: "length", ok: password.length >= 8 && password.length <= 72 },
+  { code: "lowercase", ok: /[a-z]/.test(password) },
+  { code: "uppercase", ok: /[A-Z]/.test(password) },
+  { code: "digit", ok: /\d/.test(password) },
+  { code: "special", ok: /[\W_]/.test(password) },
+];

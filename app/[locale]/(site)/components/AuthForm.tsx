@@ -153,9 +153,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
   }
 
   return (
-    <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div className="bg-background py-8 px-4 shadow sm:rounded-lg sm:px-10">
-        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+    <div className="mt-8 rounded-2xl border border-border bg-background p-6 shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)] sm:p-8">
+        <h2 className="mb-6 text-lg font-semibold tracking-tight text-foreground">
+          {variant === "LOGIN" ? t("title") : t("title_register")}
+        </h2>
+        <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
           {variant === "REGISTER" && (
             <Input
               disabled={isLoading}
@@ -187,8 +189,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
             type="password"
           />
           {variant === "LOGIN" && (
-            <div className="-mt-3 text-right text-sm">
-              <Link href="/forgot-password" className="font-medium text-sky-500 hover:underline">
+            <div className="-mt-2 text-right text-sm">
+              <Link
+                href="/forgot-password"
+                className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400">
                 {t("forgot_password")}
               </Link>
             </div>
@@ -204,60 +208,43 @@ const AuthForm: React.FC<AuthFormProps> = ({ next }) => {
               type="password"
             />
           )}
-          <div>
+          <div className="pt-1">
             <Button disabled={isLoading} fullWidth type="submit">
               {variant === "LOGIN" ? t("login") : t("register")}
             </Button>
           </div>
         </form>
 
-        <div className="mt-6">
-          <div className="relative">
-            <div
-              className="
-              absolute
-              inset-0
-              flex
-              items-center
-             ">
-              <div className="w-full border-t border-border"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="bg-background px-2 text-muted-foreground">
-                {t("or_continue_with")}
-              </span>
-            </div>
-          </div>
+        <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="h-px flex-1 bg-border" />
+          {t("or_continue_with")}
+          <span className="h-px flex-1 bg-border" />
+        </div>
 
-          <div className="mt-6 flex gap-2">
-            <AuthSocialButton
-              icon={BsGithub}
-              onClick={() => socialAction("github")}
-            />
-            <AuthSocialButton
-              icon={BsGoogle}
-              onClick={() => socialAction("google")}
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <AuthSocialButton
+            icon={BsGithub}
+            label="GitHub"
+            disabled={isLoading}
+            onClick={() => socialAction("github")}
+          />
+          <AuthSocialButton
+            icon={BsGoogle}
+            label="Google"
+            disabled={isLoading}
+            onClick={() => socialAction("google")}
+          />
         </div>
-        <div
-          className="
-            flex
-            gap-2
-            justify-center
-            text-sm
-            mt-6
-            px-2
-            text-muted-foreground
-          ">
-          <div>
-            {variant === "LOGIN" ? t("no_account") : t("have_account")}
-          </div>
-          <div onClick={toggleVarriant} className="underline cursor-pointer">
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          {variant === "LOGIN" ? t("no_account") : t("have_account")}{" "}
+          <button
+            type="button"
+            onClick={toggleVarriant}
+            className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400">
             {variant === "LOGIN" ? t("create_account") : t("login")}
-          </div>
-        </div>
-      </div>
+          </button>
+        </p>
     </div>
   );
 };

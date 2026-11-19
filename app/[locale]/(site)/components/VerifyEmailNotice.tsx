@@ -33,8 +33,8 @@ const VerifyEmailNotice: React.FC<VerifyEmailNoticeProps> = ({ email, reason, on
   };
 
   return (
-    <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div className="space-y-4 bg-background px-4 py-8 shadow sm:rounded-lg sm:px-10">
+    <div className="mt-8">
+      <div className="space-y-4 rounded-2xl border border-border bg-background p-6 shadow-[0_8px_24px_-12px_rgb(0_0_0/0.12)] sm:p-8">
         <h2 className="text-lg font-semibold text-foreground">
           {reason === "sent" ? t("sent_title") : t("unverified_title")}
         </h2>

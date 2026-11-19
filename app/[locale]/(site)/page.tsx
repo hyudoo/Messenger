@@ -7,12 +7,13 @@ import { safeNextPath } from "@/app/libs/invite-code";
 import { Link } from "@/i18n/navigation";
 import AuthForm from "./components/AuthForm";
 
+const POLICY_LINK = "whitespace-nowrap font-medium text-foreground underline underline-offset-2 hover:text-sky-600";
+
 export default async function Home({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string | string[]; deleted?: string | string[] }>;
 }) {
-  const t = await getTranslations("auth");
   const tHome = await getTranslations("home");
   const tLegal = await getTranslations("legal");
   // where to go after signing in: an invite link the visitor opened signed out (proxy.ts)
@@ -23,64 +24,45 @@ export default async function Home({
   const tDeleted = await getTranslations("delete_account");
 
   return (
-    <div
-      className="
-        relative
-        flex
-        min-h-full
-        flex-col
-        justify-center
-        py-12
-        sm:px-6
-        lg:px-8
-        bg-muted
-    ">
+    <div className="relative flex min-h-full flex-col items-center justify-center bg-muted px-4 py-16">
       <div className="absolute right-4 top-4 flex gap-2">
         <LanguageToggle />
         <ThemeToggle />
       </div>
-      <div className="sm:mx-auto sm:v-full sm:max-w-md">
-        <Image
-          alt="Logo"
-          height="48"
-          width="48"
-          className="mx-auto w-auto"
-          src="/images/logo.png"
-        />
-        {/* what the app is, for visitors (and Google's OAuth branding review: the home page must
-            say what the app does and how it uses Google data) */}
-        <section className="mt-4 px-4 text-center" aria-labelledby="home-title">
-          <h1 id="home-title" className="text-2xl font-bold tracking-tight text-foreground">
-            Messenger
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">{tHome("tagline")}</p>
-        </section>
-        <h2 className="mt-8 text-center text-3xl font-bold tracking-tight text-foreground">
-          {t("title")}
-        </h2>
-      </div>
 
-      {deleted && (
-        <p
-          role="status"
-          className="mx-4 mt-6 rounded-lg bg-background px-4 py-3 text-center text-sm text-foreground sm:mx-auto sm:w-full sm:max-w-md">
-          {tDeleted("deleted")}
+      <div className="w-full max-w-sm">
+        {/* what the app is, for visitors (and Google's OAuth branding review) */}
+        <header className="flex flex-col items-center text-center">
+          <Image alt="" height="44" width="44" src="/images/logo.png" priority />
+          <h1 className="mt-3 text-xl font-semibold tracking-tight text-foreground">Messenger</h1>
+          <p className="mt-1 text-balance text-sm text-muted-foreground">{tHome("tagline")}</p>
+        </header>
+
+        {deleted && (
+          <p
+            role="status"
+            className="mt-6 rounded-xl border border-border bg-background px-4 py-3 text-center text-sm text-foreground">
+            {tDeleted("deleted")}
+          </p>
+        )}
+
+        <AuthForm next={next} />
+
+        <p className="mt-6 text-balance text-center text-xs leading-5 text-muted-foreground">
+          {tLegal.rich("agree", {
+            terms: (chunks) => (
+              <Link href="/terms" className={POLICY_LINK}>
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link href="/privacy" className={POLICY_LINK}>
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
-      )}
-
-      <AuthForm next={next} />
-
-      <p className="mt-6 px-4 text-center text-xs text-muted-foreground">
-        {tLegal("agree")}
-        <span className="mt-1 flex justify-center gap-3">
-          <Link href="/terms" className="underline hover:text-foreground">
-            {tLegal("terms_link")}
-          </Link>
-          <Link href="/privacy" className="underline hover:text-foreground">
-            {tLegal("privacy_link")}
-          </Link>
-        </span>
-      </p>
+      </div>
     </div>
   );
 }

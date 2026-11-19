@@ -39,6 +39,7 @@
   },
   "auth": {
     "title": "Sign in to your account",
+    "title_register": "Create your account",
     "name": "Full name",
     "email": "Email",
     "password": "Password",
@@ -65,7 +66,16 @@
       "no_special": "The password needs at least one special character"
     },
     "forgot_password": "Forgot password?",
-    "register_unavailable": "Signing up with an email isn't available right now; sign in with Google / GitHub."
+    "register_unavailable": "Signing up with an email isn't available right now; sign in with Google / GitHub.",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "password_checks": {
+      "length": "8 to 72 characters",
+      "lowercase": "A lowercase letter",
+      "uppercase": "An uppercase letter",
+      "digit": "A digit",
+      "special": "A special character"
+    }
   },
   "home": {
     "tagline": "A web messenger for chatting with friends in real time, with voice and video calls."
@@ -472,7 +482,7 @@
     "updated": "Last updated: November 19, 2026",
     "privacy_link": "Privacy Policy",
     "terms_link": "Terms of Service",
-    "agree": "By continuing, you agree to the Terms of Service and the Privacy Policy.",
+    "agree": "By continuing, you agree to the <terms>Terms of Service</terms> and the <privacy>Privacy Policy</privacy>.",
     "privacy": {
       "title": "Privacy Policy",
       "intro": "This policy explains what information Messenger collects when you use it, how that information is used and stored, and the choices you have.",
@@ -656,11 +666,15 @@
     "intro": "Enter the email address of your account and we'll send you a link to choose a new password.",
     "email": "Email",
     "send": "Send reset link",
-    "sent": "If {email} has an account, a link to reset its password is on its way. Check your inbox (and the spam folder).",
+    "sent": "If <b>{email}</b> has an account, a link to reset its password is on its way.",
     "failed": "Couldn't send the link, try again!",
     "too_fast": "Too many attempts. Wait a while and try again.",
     "not_available": "Resetting a password by email isn't available right now.",
-    "back": "Back to sign in"
+    "back": "Back to sign in",
+    "sent_title": "Check your email",
+    "sent_hint": "The link works for {minutes} minutes. No mail after a few minutes? Look in your Spam folder, or check the address and try again.",
+    "other_email": "Use another email",
+    "sending": "Sending…"
   },
   "reset": {
     "title": "Choose a new password",
@@ -673,7 +687,12 @@
     "invalid": "This link is invalid or has expired. Ask for a new one.",
     "new_link": "Get a new link",
     "failed": "Couldn't change the password, try again!",
-    "too_fast": "Too many attempts. Wait a while and try again."
+    "too_fast": "Too many attempts. Wait a while and try again.",
+    "done_title": "Password changed",
+    "invalid_title": "Link expired",
+    "saving": "Saving…",
+    "check_ok": "done",
+    "back": "Back to sign in"
   },
   "reset_mail": {
     "subject": "Reset your Messenger password",
@@ -733,7 +752,10 @@
     "invalid": "This link is invalid or has expired. Sign in to get a new one.",
     "failed": "Couldn't verify, try again!",
     "too_fast": "Too many attempts. Wait a while and try again.",
-    "to_sign_in": "Back to sign in"
+    "to_sign_in": "Back to sign in",
+    "done_title": "Email verified",
+    "invalid_title": "Link expired",
+    "verifying": "Verifying…"
   },
   "verify_mail": {
     "subject": "Verify the email of your Messenger account",
@@ -794,5 +816,9 @@
     "too_many": "Too many tries, wait a while and try again.",
     "failed": "Couldn't delete the account, try again later.",
     "deleted": "Your account has been deleted."
+  },
+  "mail": {
+    "fallback": "Button not working? Copy this link into your browser:",
+    "footer": "You got this email because of a request on your Messenger account. This is an automated message, please don't reply."
   }
 }
