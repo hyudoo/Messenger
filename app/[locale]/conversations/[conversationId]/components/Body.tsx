@@ -43,6 +43,9 @@ interface BodyProps {
   showReceipts?: boolean;
   // a group: a call going on can be joined from its call message
   isGroup?: boolean;
+  // the group's owner and admins (who may close anyone's poll)
+  ownerId?: string | null;
+  adminIds?: string[] | null;
 }
 
 // "typing" events refresh every few seconds while someone types (Form); without one for this
@@ -112,6 +115,8 @@ const Body: React.FC<BodyProps> = ({
   nicknames,
   showReceipts = true,
   isGroup = false,
+  ownerId,
+  adminIds,
 }) => {
   const t = useTranslations("chat");
   const tCommon = useTranslations("common");
@@ -141,7 +146,10 @@ const Body: React.FC<BodyProps> = ({
   const { conversationId } = useConversation();
   // one object while the members and nicknames stay the same: every row reads it, and the
   // memoized MessageBox must not re-render on each keystroke or new message
-  const people = useMemo(() => ({ members, nicknames: nicknames ?? [] }), [members, nicknames]);
+  const people = useMemo(
+    () => ({ members, nicknames: nicknames ?? [], roles: { isGroup: !!isGroup, ownerId, adminIds } }),
+    [members, nicknames, isGroup, ownerId, adminIds]
+  );
   const sessionUser = useSession().data?.user;
   const myEmail = sessionUser?.email;
   const outbox = useOutbox((state) => state.items);

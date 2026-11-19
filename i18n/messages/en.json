@@ -94,6 +94,7 @@
     "last_recalled": "Message unsent.",
     "last_voice": "Sent a voice message.",
     "last_file": "Sent the file {name}.",
+    "last_poll": "📊 Poll: {question}",
     "muted": "Muted",
     "pinned": "Pinned",
     "chats_heading": "Chats",

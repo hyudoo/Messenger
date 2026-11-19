@@ -94,6 +94,7 @@
     "last_recalled": "Tin nhắn đã được thu hồi.",
     "last_voice": "Đã gửi một tin nhắn thoại.",
     "last_file": "Đã gửi tệp {name}.",
+    "last_poll": "📊 Bình chọn: {question}",
     "muted": "Đã tắt thông báo",
     "pinned": "Đã ghim",
     "chats_heading": "Cuộc trò chuyện",

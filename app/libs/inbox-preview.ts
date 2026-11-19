@@ -1,5 +1,13 @@
 import prisma from "@/app/libs/prismadb";
 
+// What the inbox needs of a conversation's last message: the sender ("Name: …"), who saw it (unread)
+// and whether it is a poll (the 📊 in the preview; the whole poll is only loaded by the chat).
+export const INBOX_MESSAGE_INCLUDE = {
+  sender: true,
+  seen: true,
+  poll: { select: { id: true } },
+} as const;
+
 // The inbox preview of a conversation for one user: its newest message the user hasn't deleted
 // for themselves (Message.hiddenForIds), with what ConversationBox shows. null when every message
 // is hidden for them (or there are none).
@@ -16,7 +24,7 @@ export const lastVisibleMessage = async (conversationId: string, userId: string)
       ...(hidden.length > 0 && { id: { notIn: hidden.map((message) => message.id) } }),
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    include: { sender: true, seen: true },
+    include: INBOX_MESSAGE_INCLUDE,
   });
 };
 

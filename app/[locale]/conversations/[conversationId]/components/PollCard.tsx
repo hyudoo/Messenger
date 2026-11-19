@@ -7,14 +7,14 @@ import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { HiCheck, HiChartBar, HiLockClosed } from "react-icons/hi2";
 
-import { PollView, nextPicks, tallyPoll } from "@/app/libs/poll-rules";
+import { PollView, canClosePoll, nextPicks, tallyPoll } from "@/app/libs/poll-rules";
 import { useChatPeople } from "./ChatPeople";
 
 interface PollCardProps {
   poll: PollView;
   isOwn: boolean;
   myEmail?: string | null;
-  // who asked it: they may close it (the server also lets group admins)
+  // who asked it: they may close it, and so may the group's admins
   senderId: string;
 }
 
@@ -24,9 +24,9 @@ interface PollCardProps {
 // server's (messages:update); a failed vote drops them. Closed: results only.
 const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) => {
   const t = useTranslations("poll");
-  const { members, nameOfId } = useChatPeople();
+  const { members, nameOfId, roles } = useChatPeople();
   const myId = members.find((member) => !!myEmail && member.email === myEmail)?.id;
-  const canClose = !!myId && myId === senderId;
+  const canClose = !!myId && canClosePoll(roles, { senderId }, myId);
   const [busy, setBusy] = useState(false);
   // optimistic votes, kept only while poll.votes is still the list they were made from
   const [optimistic, setOptimistic] = useState<{

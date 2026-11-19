@@ -41,9 +41,15 @@ export type FullMessageType = Message & {
   clientId?: string;
 };
 
+// The inbox's copy of a conversation's last message: loaded with only the poll's id (enough for
+// the 📊 in the preview, app/libs/inbox-preview.ts); socket updates bring the whole message.
+export type InboxMessageType = Omit<FullMessageType, "poll"> & {
+  poll?: PollView | { id: string } | null;
+};
+
 export type FullConversationType = Conversation & {
   users: SafeUser[];
-  messages: FullMessageType[];
+  messages: InboxMessageType[];
   // messages from others the user hasn't seen (inbox only; missing on socket payloads)
   unreadCount?: number;
   // the user's own settings (inbox only): no notifications / kept at the top

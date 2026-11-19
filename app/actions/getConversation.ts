@@ -3,7 +3,7 @@ import { UNREAD_SCAN_LIMIT, countUnread } from "@/app/libs/unread";
 import getCurrentUser from "./getCurrentUser";
 import { blockPartnersOf, hideLastSeen } from "@/app/libs/blocks";
 import { activityHiddenAmong } from "@/app/libs/privacy";
-import { hiddenAmong, lastVisibleMessage } from "@/app/libs/inbox-preview";
+import { INBOX_MESSAGE_INCLUDE, hiddenAmong, lastVisibleMessage } from "@/app/libs/inbox-preview";
 
 // Unread count of one conversation: scans its newest messages (index conversationId + createdAt)
 // back to the user's read marker, at most UNREAD_SCAN_LIMIT of them.
@@ -45,10 +45,7 @@ export const findConversationsForUser = async (userId: string) => {
           createdAt: "desc",
         },
         take: 1,
-        include: {
-          sender: true,
-          seen: true,
-        },
+        include: INBOX_MESSAGE_INCLUDE,
       },
     },
   });
