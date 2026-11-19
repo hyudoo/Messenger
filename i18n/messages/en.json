@@ -64,7 +64,8 @@
       "no_digit": "The password needs at least one digit",
       "no_special": "The password needs at least one special character"
     },
-    "forgot_password": "Forgot password?"
+    "forgot_password": "Forgot password?",
+    "register_unavailable": "Signing up with an email isn't available right now; sign in with Google / GitHub."
   },
   "home": {
     "tagline": "A web messenger for chatting with friends in real time, with voice and video calls.",
@@ -94,11 +95,14 @@
     "last_recalled": "Message unsent.",
     "last_voice": "Sent a voice message.",
     "last_file": "Sent the file {name}.",
+    "last_poll": "📊 Poll: {question}",
     "muted": "Muted",
     "pinned": "Pinned",
     "chats_heading": "Chats",
     "messages_heading": "Messages",
-    "archived_heading": "Archived ({count})"
+    "archived_heading": "Archived ({count})",
+    "last_gif": "Sent a GIF.",
+    "last_sticker": "Sent a sticker."
   },
   "chat": {
     "placeholder": "Write a message",
@@ -181,7 +185,10 @@
     "pin_limit": "You can pin at most 20 messages.",
     "delete_for_me": "Delete for you",
     "delete_for_me_failed": "Couldn't delete the message!",
-    "new_poll": "New poll"
+    "new_poll": "New poll",
+    "reply_gif": "GIF",
+    "reply_sticker": "Sticker",
+    "open_gifs": "GIFs and stickers"
   },
   "profile": {
     "close": "Close panel",
@@ -249,7 +256,7 @@
     "friends_heading": "{count, plural, =0 {Friends} other {Friends (#)}}",
     "no_friends": "No friends yet. Find people by name or email above.",
     "requests_heading": "{count, plural, one {# friend request} other {# friend requests}}",
-    "sent_heading": "Sent requests",
+    "sent_heading": "Sent requests ({count})",
     "people_heading": "People",
     "searching": "Searching…",
     "no_people": "Nobody found.",
@@ -351,7 +358,9 @@
     "demoted": "{actor} removed {users} as admin",
     "joined": "{actor} joined the group via the invite link",
     "nickname_set": "{actor} set the nickname for {users} to “{name}”",
-    "nickname_removed": "{actor} removed the nickname of {users}"
+    "nickname_removed": "{actor} removed the nickname of {users}",
+    "theme": "{actor} changed the theme to {color}",
+    "quick_emoji": "{actor} set the quick reaction to {emoji}"
   },
   "presence": {
     "just_now": "Active just now",
@@ -386,7 +395,9 @@
     "file": "Sent the file {name}.",
     "mentioned_you": "Mentioned you: {text}",
     "call_answer": "Answer",
-    "call_decline": "Decline"
+    "call_decline": "Decline",
+    "gif": "Sent a GIF.",
+    "sticker": "Sent a sticker."
   },
   "viewer": {
     "close": "Close",
@@ -463,7 +474,7 @@
   },
   "legal": {
     "back": "Back",
-    "updated": "Last updated: November 18, 2026",
+    "updated": "Last updated: November 19, 2026",
     "privacy_link": "Privacy Policy",
     "terms_link": "Terms of Service",
     "agree": "By continuing, you agree to the Terms of Service and the Privacy Policy.",
@@ -517,7 +528,7 @@
           "title": "7. How long we keep it",
           "paragraphs": [
             "We keep your information while your account exists. When you recall a message or delete a conversation, its images and files are removed from storage once nothing else uses them. Uploads that were never sent are deleted automatically.",
-            "To have your account and data deleted, contact us (see below)."
+            "You can delete your account yourself at any time in Settings > Delete account. This permanently deletes your profile, the messages you sent (in groups too), your one-to-one chats, friends, friend requests, blocks, push subscriptions, your GitHub / Google link, and the files you uploaded once nothing else uses them. You can also contact us (see below) for help."
           ]
         },
         {
@@ -684,5 +695,109 @@
     "save": "Save",
     "cancel": "Cancel",
     "hint": "Everyone in this chat sees the nicknames. Leave it empty to use the name."
+  },
+  "security": {
+    "title": "Security",
+    "description": "Change your password or sign out your other devices. Both end every other session; this device stays signed in.",
+    "change_title": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Repeat the new password",
+    "change_button": "Change password",
+    "current_required": "Enter your current password!",
+    "mismatch": "The passwords don't match!",
+    "wrong_password": "The current password is wrong!",
+    "too_many": "Too many tries, please wait a while and try again!",
+    "failed": "That didn't work, please try again!",
+    "changed": "Password changed. Your other devices were signed out.",
+    "no_password": "This account signs in with Google / GitHub, so it has no password yet.",
+    "set_password": "Set one by email",
+    "sessions_title": "Sessions",
+    "sessions_hint": "Sign out of every other browser and device, except this one.",
+    "sign_out_others": "Sign out other devices",
+    "sign_out_others_confirm": "Confirm sign out",
+    "cancel": "Cancel",
+    "signed_out_others": "Your other devices were signed out."
+  },
+  "verify": {
+    "sent_title": "Check your inbox",
+    "sent_body": "We sent a verification link to {email}. Open it to finish signing up, then sign in.",
+    "unverified_title": "Email not verified yet",
+    "unverified_body": "The account {email} has to verify its email before signing in. Open the link in the mail we sent, or get a new one.",
+    "spam_hint": "No mail? Look in your Spam folder. The link works for 24 hours.",
+    "resend": "Resend the verification email",
+    "resent": "Verification email sent again!",
+    "resend_failed": "Couldn't send the email, try again!",
+    "too_many": "Too many tries, please wait a while and try again!",
+    "back": "Back to sign in",
+    "page_title": "Verify your email",
+    "page_intro": "Press the button below to verify your account's email.",
+    "confirm": "Verify email",
+    "done": "Your email is verified. You can sign in now.",
+    "sign_in": "Sign in",
+    "invalid": "This link is invalid or has expired. Sign in to get a new one.",
+    "failed": "Couldn't verify, try again!",
+    "too_fast": "Too many attempts. Wait a while and try again.",
+    "to_sign_in": "Back to sign in"
+  },
+  "verify_mail": {
+    "subject": "Verify the email of your Messenger account",
+    "greeting": "Hi {name},",
+    "body": "Thanks for signing up for Messenger. Open this link within {hours} hours to verify your email and start using your account:",
+    "button": "Verify email",
+    "ignore": "If you didn't sign up, you can ignore this email: the account can't be used until it's verified."
+  },
+  "chat_theme": {
+    "title": "Theme",
+    "color": "Color",
+    "pick_color": "Use {color}",
+    "emoji": "Quick reaction",
+    "pick_emoji": "Use {emoji}",
+    "more_emoji": "Other emoji",
+    "hint": "Everyone in the conversation sees the color and quick reaction.",
+    "colors": {
+      "sky": "Sky",
+      "blue": "Blue",
+      "indigo": "Indigo",
+      "violet": "Violet",
+      "pink": "Pink",
+      "rose": "Rose",
+      "orange": "Orange",
+      "emerald": "Emerald",
+      "teal": "Teal",
+      "slate": "Slate"
+    }
+  },
+  "gif": {
+    "tab_gifs": "GIFs",
+    "tab_stickers": "Stickers",
+    "search": "Search GIPHY",
+    "no_results": "Nothing found",
+    "failed": "Couldn't load, try again later",
+    "too_fast": "Searching too fast, wait a moment",
+    "load_more": "Load more",
+    "powered": "Powered by GIPHY",
+    "send": "Send {title}",
+    "untitled": "GIF"
+  },
+  "delete_account": {
+    "title": "Delete account",
+    "description": "Permanently delete your account and your data from Messenger.",
+    "start": "Delete account…",
+    "what_messages": "Every message you sent, in groups too, with your reactions and votes.",
+    "what_chats": "Your one-to-one chats (for the other person too). You leave every group; groups stay for the others.",
+    "what_friends": "Your friends, friend requests, blocks, push notifications and sign-ins.",
+    "what_files": "Your profile picture and the photos, files and voice messages you uploaded.",
+    "irreversible": "This cannot be undone.",
+    "password_label": "Enter your password to confirm",
+    "email_label": "Type your email address to confirm",
+    "confirm": "Delete permanently",
+    "deleting": "Deleting…",
+    "cancel": "Cancel",
+    "wrong_password": "Wrong password.",
+    "wrong_email": "That email doesn't match your account.",
+    "too_many": "Too many tries, wait a while and try again.",
+    "failed": "Couldn't delete the account, try again later.",
+    "deleted": "Your account has been deleted."
   }
 }

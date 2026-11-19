@@ -45,3 +45,40 @@ test("a group poll is created, voted on live, and closed", async ({ browser }) =
   await expect(bob.getByText("Closed", { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(pho(bob)).toBeDisabled();
 });
+
+// The owner (an admin) may close a poll someone else asked, and the inbox shows a poll as one.
+test("a group admin closes another member's poll; the inbox marks it as a poll", async ({ browser }) => {
+  const ids = userIds();
+  const alice = await pageAs(browser, "alice");
+  const bob = await pageAs(browser, "bob");
+
+  const created = await alice.request.post("/api/conversations", {
+    data: { isGroup: true, name: "E2E Poll Admin", members: [{ value: ids.bob }, { value: ids.carol }] },
+  });
+  expect(created.ok()).toBeTruthy();
+  const groupId = ((await created.json()) as { id: string }).id;
+  const asked = await bob.request.post(`/api/conversations/${groupId}/polls`, {
+    data: { question: "Movie night?", options: ["Friday", "Saturday"] },
+  });
+  expect(asked.ok()).toBeTruthy();
+
+  // a fresh inbox load (the preview comes from the server, not a socket update)
+  await alice.goto(`/en/conversations/${groupId}`);
+  await expect(alice.getByText("Bob E2E: 📊 Poll: Movie night?")).toBeVisible();
+
+  // Carol is neither the asker nor an admin
+  const carol = await pageAs(browser, "carol");
+  await carol.goto(`/en/conversations/${groupId}`);
+  await expect(carol.getByText("Movie night?").first()).toBeVisible();
+  await expect(carol.getByRole("button", { name: "Close poll" })).toHaveCount(0);
+
+  await bob.goto(`/en/conversations/${groupId}`);
+  await expect(bob.getByText("Movie night?").first()).toBeVisible();
+  await alice.getByRole("button", { name: "Close poll" }).click();
+  await expect(alice.getByText("Closed", { exact: true })).toBeVisible({ timeout: 10_000 });
+  // Bob's open chat gets it live (or, had his socket not joined the room yet, on a reload)
+  await expect(async () => {
+    await bob.reload();
+    await expect(bob.getByText("Closed", { exact: true })).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 20_000 });
+});

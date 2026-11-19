@@ -31,10 +31,13 @@ export const canRecallMessage = (message: Actionable, userId: string) =>
   isLive(message) && message.senderId === userId;
 
 // Anyone in the conversation may forward a person's message that is still there and has
-// content (text, image, file or voice), to another conversation they are in.
+// content (text, image, file, voice or GIF), to another conversation they are in.
 export const canForwardMessage = (
-  message: Actionable & { image?: string | null; attachment?: unknown }
-) => isLive(message) && !message.poll && !!(message.body || message.image || message.attachment);
+  message: Actionable & { image?: string | null; attachment?: unknown; gif?: unknown }
+) =>
+  isLive(message) &&
+  !message.poll &&
+  !!(message.body || message.image || message.attachment || message.gif);
 
 // Anyone in the conversation may pin a person's message that is still there.
 export const canPinMessage = (message: Actionable) => isLive(message);

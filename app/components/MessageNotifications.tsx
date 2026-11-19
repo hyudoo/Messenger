@@ -85,7 +85,9 @@ const MessageNotifications = () => {
           ? translate("voice")
           : message.attachment
             ? translate("file", { name: message.attachment.name })
-            : (message.body ?? "");
+            : message.gif
+              ? translate(message.gif.kind === "sticker" ? "sticker" : "gif")
+              : (message.body ?? "");
       const text = update.mentioned ? translate("mentioned_you", { text: content }) : content;
       const notification = new Notification(
         update.isGroup && update.name ? update.name : sender,

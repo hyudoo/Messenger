@@ -92,6 +92,7 @@ export const deliverMessage = async ({ conversation, sender, message, clientId }
       body: message.body,
       image: message.image,
       attachment: message.attachment,
+      gif: message.gif,
     });
   }
 };

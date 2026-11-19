@@ -23,7 +23,7 @@ export type MessageReaction = {
 // The replied-to message as shown above a reply (REPLY_PREVIEW_SELECT, app/libs/message-include.ts).
 export type ReplyPreview = Pick<
   Message,
-  "id" | "body" | "image" | "attachment" | "isCall" | "deletedAt"
+  "id" | "body" | "image" | "attachment" | "gif" | "isCall" | "deletedAt"
 > & {
   sender: { name: string | null; email: string | null };
 };
@@ -41,9 +41,15 @@ export type FullMessageType = Message & {
   clientId?: string;
 };
 
+// The inbox's copy of a conversation's last message: loaded with only the poll's id (enough for
+// the 📊 in the preview, app/libs/inbox-preview.ts); socket updates bring the whole message.
+export type InboxMessageType = Omit<FullMessageType, "poll"> & {
+  poll?: PollView | { id: string } | null;
+};
+
 export type FullConversationType = Conversation & {
   users: SafeUser[];
-  messages: FullMessageType[];
+  messages: InboxMessageType[];
   // messages from others the user hasn't seen (inbox only; missing on socket payloads)
   unreadCount?: number;
   // the user's own settings (inbox only): no notifications / kept at the top
@@ -57,7 +63,7 @@ export type ConversationSettings = { id: string; muted: boolean; pinned: boolean
 
 // Payload of "conversation:update": a new message (with lastMessageAt; name / isGroup for
 // notifications), a seen update (messages only) or a group change (users with name / ownerId /
-// adminIds / image / inviteCode / joinApproval / nicknames: renamed, new photo, members or admins changed, someone left).
+// adminIds / image / inviteCode / joinApproval / nicknames / themeColor / quickEmoji: renamed, new photo, members or admins changed, someone left).
 export type ConversationUpdate = Pick<FullConversationType, "id"> &
   Partial<
     Pick<
@@ -71,6 +77,8 @@ export type ConversationUpdate = Pick<FullConversationType, "id"> &
       | "inviteCode"
       | "joinApproval"
       | "nicknames"
+      | "themeColor"
+      | "quickEmoji"
       | "name"
       | "isGroup"
     >

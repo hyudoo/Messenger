@@ -18,4 +18,6 @@ export type E2EUser = keyof typeof E2E_USERS;
 // written by e2e/serve.ts, read by the tests
 const STATE_DIR = path.join(__dirname, ".state");
 export const USERS_FILE = path.join(STATE_DIR, "users.json");
+// the mails the app would have sent (app/libs/account-mail.ts: MAIL_OUTBOX_FILE, set by serve.ts)
+export const MAIL_OUTBOX = path.join(STATE_DIR, "mail.jsonl");
 export const storageStateOf = (user: E2EUser) => path.join(STATE_DIR, `${user}.json`);

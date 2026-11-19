@@ -7,14 +7,14 @@ import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { HiCheck, HiChartBar, HiLockClosed } from "react-icons/hi2";
 
-import { PollView, nextPicks, tallyPoll } from "@/app/libs/poll-rules";
+import { PollView, canClosePoll, nextPicks, tallyPoll } from "@/app/libs/poll-rules";
 import { useChatPeople } from "./ChatPeople";
 
 interface PollCardProps {
   poll: PollView;
   isOwn: boolean;
   myEmail?: string | null;
-  // who asked it: they may close it (the server also lets group admins)
+  // who asked it: they may close it, and so may the group's admins
   senderId: string;
 }
 
@@ -24,9 +24,9 @@ interface PollCardProps {
 // server's (messages:update); a failed vote drops them. Closed: results only.
 const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) => {
   const t = useTranslations("poll");
-  const { members, nameOfId } = useChatPeople();
+  const { members, nameOfId, roles } = useChatPeople();
   const myId = members.find((member) => !!myEmail && member.email === myEmail)?.id;
-  const canClose = !!myId && myId === senderId;
+  const canClose = !!myId && canClosePoll(roles, { senderId }, myId);
   const [busy, setBusy] = useState(false);
   // optimistic votes, kept only while poll.votes is still the list they were made from
   const [optimistic, setOptimistic] = useState<{
@@ -77,7 +77,7 @@ const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) =
 
   return (
     <div className="mt-1 flex w-64 max-w-full flex-col gap-2 sm:w-72">
-      <p className={clsx("flex items-center gap-1.5 text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+      <p className={clsx("flex items-center gap-1.5 text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
         <HiChartBar size={14} aria-hidden />
         {poll.multiple ? t("label_multiple") : t("label_single")}
         {closed && (
@@ -136,7 +136,7 @@ const PollCard: React.FC<PollCardProps> = ({ poll, isOwn, myEmail, senderId }) =
           );
         })}
       </ul>
-      <p className={clsx("flex items-center justify-between gap-2 text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+      <p className={clsx("flex items-center justify-between gap-2 text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
         <span>{t("voters", { count: voters })}</span>
         {canClose && !closed && (
           <button

@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt"
-import { AuthOptions } from "next-auth"
+import { AuthOptions, Session } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GithubProvider from "next-auth/providers/github"
 import GoogleProvider from "next-auth/providers/google"
@@ -7,8 +7,10 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
 
 import prisma from "@/app/libs/prismadb"
-import { TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors"
+import { EMAIL_NOT_VERIFIED, TOO_MANY_ATTEMPTS } from "@/app/libs/auth-errors"
+import { needsEmailVerification } from "@/app/libs/email-verification"
 import { clientIp, rateLimit } from "@/app/libs/rate-limit"
+import { currentSessionVersion, isSessionCurrent } from "@/app/libs/session-version"
 
 export const authOptions: AuthOptions = {
   // the adapter's types predate client options like `omit`; at runtime it only calls CRUD methods
@@ -47,7 +49,7 @@ export const authOptions: AuthOptions = {
           where: {
             email: credentials.email
           },
-          omit: { hashedPassword: false }
+          omit: { hashedPassword: false, mustVerifyEmail: false }
         });
 
         if (!user || !user?.hashedPassword) {
@@ -63,7 +65,12 @@ export const authOptions: AuthOptions = {
           throw new Error('Invalid credentials');
         }
 
-        const { hashedPassword, ...safeUser } = user;
+        // only after the password: an unverified account is no secret to someone who knows it
+        if (needsEmailVerification(user)) {
+          throw new Error(EMAIL_NOT_VERIFIED);
+        }
+
+        const { hashedPassword, mustVerifyEmail, ...safeUser } = user;
         return safeUser;
       }
     })
@@ -71,6 +78,24 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV === 'development',
   session: {
     strategy: "jwt",
+  },
+  callbacks: {
+    // a new session remembers the user's session version (app/libs/session-version.ts)
+    async jwt({ token, user }) {
+      if (user) {
+        token.sv = (await currentSessionVersion(user.id, { fresh: true })) ?? 0
+      }
+      return token
+    },
+    // A token from before a password change / "sign out other devices" (or of a deleted user) gives
+    // no session: an empty one makes getServerSession return null and useSession "unauthenticated".
+    // proxy.ts also deletes its cookie on protected pages.
+    async session({ session, token }) {
+      if (!(await isSessionCurrent(token))) {
+        return {} as Session
+      }
+      return session
+    },
   },
   secret: process.env.NEXTAUTH_SECRET,
 }

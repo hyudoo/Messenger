@@ -17,6 +17,7 @@ export const REPLY_PREVIEW_SELECT = {
   body: true,
   image: true,
   attachment: true,
+  gif: true,
   isCall: true,
   deletedAt: true,
   sender: { select: { name: true, email: true } },

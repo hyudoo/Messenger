@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 
+import { chatThemeOf, quickEmojiOf } from "@/app/libs/chat-theme";
 import { FullMessageType } from "@/app/types";
 
 type SystemMessage = Pick<FullMessageType, "systemType" | "systemName" | "systemUsers"> & {
@@ -13,6 +14,7 @@ type SystemMessage = Pick<FullMessageType, "systemType" | "systemName" | "system
 // "You" / "you" for the reader. Empty for a person's message.
 const useSystemText = () => {
   const t = useTranslations("system");
+  const tTheme = useTranslations("chat_theme");
   const myEmail = useSession().data?.user?.email;
 
   return (message: SystemMessage) => {
@@ -48,6 +50,10 @@ const useSystemText = () => {
         return t("photo_removed", { actor });
       case "nickname":
         return name ? t("nickname_set", { actor, users, name }) : t("nickname_removed", { actor, users });
+      case "theme":
+        return t("theme", { actor, color: tTheme(`colors.${chatThemeOf(name)}`) });
+      case "quick_emoji":
+        return t("quick_emoji", { actor, emoji: quickEmojiOf(name) });
       case "promoted":
         return t("promoted", { actor, users });
       case "demoted":

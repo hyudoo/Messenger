@@ -39,7 +39,7 @@ export const FileCard: React.FC<Props & { messageId?: string }> = ({ attachment,
       </span>
       <span className="min-w-0">
         <span className="block truncate font-medium">{attachment.name}</span>
-        <span className={clsx("block text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+        <span className={clsx("block text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
           {[extension, formatFileSize(attachment.size)].filter(Boolean).join(" · ")}
         </span>
       </span>
@@ -78,13 +78,13 @@ export const LinkPreviewCard: React.FC<{
     )}
     <span className="block px-3 py-2">
       {preview.siteName && (
-        <span className={clsx("block truncate text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+        <span className={clsx("block truncate text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
           {preview.siteName}
         </span>
       )}
       <span className="line-clamp-2 block font-medium">{preview.title}</span>
       {preview.description && (
-        <span className={clsx("line-clamp-2 block text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+        <span className={clsx("line-clamp-2 block text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
           {preview.description}
         </span>
       )}
@@ -149,7 +149,7 @@ export const VoicePlayer: React.FC<Props> = ({ attachment, isOwn }) => {
         aria-label={playing ? t("pause") : t("play")}
         className={clsx(
           "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-          isOwn ? "bg-white text-sky-500" : "bg-sky-500 text-white"
+          isOwn ? "bg-white text-chat" : "bg-sky-500 text-white"
         )}>
         {playing ? <HiPause size={16} aria-hidden /> : <HiPlay size={16} aria-hidden className="ml-0.5" />}
       </button>
@@ -162,7 +162,7 @@ export const VoicePlayer: React.FC<Props> = ({ attachment, isOwn }) => {
         aria-label={t("seek")}
         className={clsx("h-1 min-w-0 flex-1 cursor-pointer", isOwn ? "accent-white" : "accent-sky-500")}
       />
-      <span className={clsx("w-9 shrink-0 text-right text-xs tabular-nums", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+      <span className={clsx("w-9 shrink-0 text-right text-xs tabular-nums", isOwn ? "text-white/80" : "text-muted-foreground")}>
         {formatClock(playing || position > 0 ? length - position : length)}
       </span>
     </div>

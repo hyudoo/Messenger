@@ -35,12 +35,19 @@ export const LIMITS = {
   // "forgot password": per IP, and per email address (so one inbox isn't flooded from many IPs)
   passwordReset: { limit: 5, windowMs: 15 * 60_000 },
   passwordResetEmail: { limit: 3, windowMs: 60 * 60_000 },
+  // "verify your email": opening links per IP; asking for a new mail per IP and per address
+  emailVerify: { limit: 10, windowMs: 15 * 60_000 },
+  verifyMail: { limit: 5, windowMs: 15 * 60_000 },
+  verifyMailAddress: { limit: 3, windowMs: 60 * 60_000 },
+  // per user: changing the password (each try checks the current one) and "sign out other devices"
+  passwordChange: { limit: 5, windowMs: 15 * 60_000 },
   message: { limit: 20, windowMs: 10_000 }, // per user
   reaction: { limit: 30, windowMs: 10_000 }, // per user
   upload: { limit: 20, windowMs: 60_000 }, // per user
   conversation: { limit: 20, windowMs: 60_000 }, // per user: opening / creating chats
   settings: { limit: 10, windowMs: 60_000 }, // per user
   search: { limit: 30, windowMs: 60_000 }, // per user: searching in a conversation
+  gif: { limit: 60, windowMs: 60_000 }, // per user: GIPHY searches (the picker, debounced)
   // per user: every page load of every tab re-sends its push subscription
   push: { limit: 30, windowMs: 60_000 },
   // per user: every incoming message and tab focus marks seen, so this is generous

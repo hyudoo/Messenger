@@ -32,8 +32,9 @@ Copy `.env.example` to `.env`.
 - **Optional:**
   - Redis for several instances: `REDIS_URL`, or `REDIS_HOST` / `REDIS_PORT` / `REDIS_USERNAME` / `REDIS_PASSWORD` (or `REDIS_PASSWORD_FILE`, a Docker / Kubernetes secret) (`getRedisUrl()` in `app/libs/redis-url.ts`; `REDIS_URL` wins).
   - `TURN_URLS` / `TURN_SECRET` / `TURN_TTL_SECONDS`: TURN for calls.
-  - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`: "forgot password" mails (see `.claude/rules/auth.md`); links use `NEXTAUTH_URL`.
+  - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM`: "forgot password" and "verify your email" mails (see `.claude/rules/auth.md`); links use `NEXTAUTH_URL`. In production, signing up with a password needs them (503 without).
   - `TRUST_PROXY=true`: behind a proxy that sets `X-Real-IP`.
+  - `GIPHY_API_KEY`: GIFs and stickers in the composer (hidden without it).
   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`: Web Push. Generate with `npx web-push generate-vapid-keys`; read at run time; keep the pair stable.
 - Production gets its `.env` from the CI variable `ENV_FILE`.
 
@@ -51,7 +52,7 @@ Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex
 - **Theme:** use the color tokens (`bg-background`, `text-foreground`, `bg-muted`, `text-muted-foreground`, `border-border`), not raw grays/white/black. The call screen is the exception.
 - **Membership:** anything keyed by a conversation id goes through `getConversationForUser(id, userId)`, which returns null for "missing" and "not a member" alike.
 - **Messages:** every message sent to the chat view uses `MESSAGE_INCLUDE` (`app/libs/message-include.ts`). A `messages:update` replaces the client's copy, so a message without `reactions` / `replyTo` would wipe them.
-- **Users:** `app/libs/prismadb.ts` globally omits `hashedPassword` and the user's private `mutedConversationIds` / `pinnedConversationIds` / `blockedUserIds` / `friendIds` / `hideActivity` / `hideReadReceipts`, so user rows are safe to send to clients (read those with an explicit `select`). It also omits the messages' server-side `hiddenForIds` / `privateSeenIds` / `searchText`. Type them on the client as `SafeUser`, not Prisma's `User`.
+- **Users:** `app/libs/prismadb.ts` globally omits `hashedPassword`, `sessionVersion`, `mustVerifyEmail` and the user's private `mutedConversationIds` / `pinnedConversationIds` / `blockedUserIds` / `friendIds` / `hideActivity` / `hideReadReceipts`, so user rows are safe to send to clients (read those with an explicit `select`). It also omits the messages' server-side `hiddenForIds` / `privateSeenIds` / `searchText`. Type them on the client as `SafeUser`, not Prisma's `User`.
 - **After a DB write:** route handlers emit over socket.io. Socket data is plain JSON, so dates arrive as ISO strings. Server components may pass `Date`s.
 - **Errors:** log with `logError(tag, error, context?)` (`app/libs/log.ts`), never with secrets or message text in the context.
 - **Rate limiting:** key on `x-client-ip` (set by `server.ts`), never on `X-Forwarded-For`.
@@ -70,7 +71,7 @@ Next.js 16 App Router messenger (React 19), TypeScript (ES5 target: no `u` regex
 | `calls.md` | WebRTC calls: audio / video, group mesh, ringing, joining late, decline / cancel, call log, ICE / TURN |
 | `notifications.md` | desktop notifications, Web Push for messages and calls, `sw.js` |
 | `uploads.md` | S3 presigned uploads, pending tag, ownership, cleanup, image hosts |
-| `auth.md` | NextAuth, `proxy.ts`, passwords, rate limits |
+| `auth.md` | NextAuth, `proxy.ts`, passwords, email verification, session revocation, rate limits |
 | `i18n-theme.md` | next-intl details, navigation, dates, theme provider and tokens |
 | `ci-deploy.md` | GitLab CI, Docker image, health check, rollback, security headers |
 | `testing.md` | test layout, mocks, Redis tests, Vitest quirks |

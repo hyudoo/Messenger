@@ -125,3 +125,28 @@ export const notifyActivityPrivacyChanged = (email: string, hidden: boolean) => 
   globalThis.onActivityPrivacyChanged?.(email);
   emitToUser(email, "block:update", {});
 };
+
+// Closes the transport of this user's sockets on this instance: each client reconnects on its own
+// and the auth middleware checks its session cookie again (refused once the session was revoked).
+export const closeLocalUserSockets = (io: Server, email: string) => {
+  const ids = io.sockets.adapter.rooms.get(userRoom(email));
+  Array.from(ids ?? []).forEach((id) => io.sockets.sockets.get(id)?.conn.close());
+};
+
+// After the user's sessions were revoked (app/libs/sessions.ts): every instance forgets the cached
+// session version ("sessions:revoked") and drops the user's sockets, so devices signed out reconnect
+// into a refusal. The device that asked has its new cookie by the time its socket reconnects.
+export const notifySessionsRevoked = (userId: string, email: string) => {
+  const io = getIO();
+  if (!io) {
+    return;
+  }
+  if (globalThis.ioClustered) {
+    try {
+      io.serverSideEmit("sessions:revoked", { userId, email });
+    } catch {
+      // the others' caches expire on their own; their sockets close when their tokens expire
+    }
+  }
+  closeLocalUserSockets(io, email);
+};

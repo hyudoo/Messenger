@@ -53,6 +53,7 @@ import {
 import { useForward } from "./ForwardDialog";
 import MessageMenuSheet from "./MessageMenuSheet";
 import PollCard from "./PollCard";
+import { GifImage } from "./GifPicker";
 import { useChatPeople } from "./ChatPeople";
 import useMessageGestures, { SWIPE_TRIGGER } from "./useMessageGestures";
 
@@ -145,14 +146,14 @@ const CallSummary: React.FC<{ call: FullMessageType; isOwn: boolean; joinable: b
       <div
         className={clsx(
           "p-1 rounded-full",
-          failed ? "bg-rose-500" : isOwn ? "bg-sky-600" : "bg-muted-foreground"
+          failed ? "bg-rose-500" : isOwn ? "bg-black/20" : "bg-muted-foreground"
         )}>
         <Icon size={10} className="text-white" aria-hidden />
       </div>
       <div className="flex flex-col">
         <span>{label}</span>
         {duration !== null && (
-          <span className={clsx("text-xs", isOwn ? "text-sky-100" : "text-muted-foreground")}>
+          <span className={clsx("text-xs", isOwn ? "text-white/80" : "text-muted-foreground")}>
             {t("call_duration", { duration: formatCallDuration(duration) })}
           </span>
         )}
@@ -404,6 +405,14 @@ const MessageBox: React.FC<MessageBoxProps> = ({
   const message = recalled
     ? // a placeholder, not a bubble of content: outlined, muted, italic
       "w-fit max-w-full rounded-2xl border px-3 py-2 text-sm italic text-muted-foreground"
+    : data.gif
+    ? // a GIF / sticker: no bubble (stickers are see-through), a GIF's own rounded corners
+      clsx(
+        "w-fit max-w-full transition-opacity",
+        pending?.status === "sending" && "opacity-60",
+        pending?.status === "failed" && "rounded-2xl ring-2 ring-rose-500",
+        data.gif.kind === "gif" && "overflow-hidden rounded-2xl"
+      )
     : jumbo
     ? clsx(
         "w-fit select-text leading-tight",
@@ -413,7 +422,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
         "text-sm w-fit max-w-full overflow-hidden transition-opacity",
         pending?.status === "sending" && "opacity-60",
         pending?.status === "failed" && "ring-2 ring-rose-500",
-        isOwn ? "bg-sky-500 text-white" : "bg-muted",
+        isOwn ? "bg-chat text-white" : "bg-muted",
         // rounded-2xl, not rounded-full: a pill shape breaks once a message wraps
         data.image ? "rounded-md p-0" : "rounded-2xl py-2 px-3"
       );
@@ -494,6 +503,7 @@ const MessageBox: React.FC<MessageBoxProps> = ({
                 />
               </button>
             )}
+            {data.gif && !recalled && <GifImage gif={data.gif} />}
             {data.attachment?.kind === "file" && (
               <FileCard
                 attachment={data.attachment}

@@ -64,7 +64,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect }) => {
       <PopoverButton
         aria-label={t("open")}
         title={t("open")}
-        className="rounded-full text-sky-500 transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+        className="rounded-full text-chat transition hover:text-chat/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-chat">
         <HiOutlineFaceSmile size={28} />
       </PopoverButton>
       <PopoverPanel

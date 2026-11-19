@@ -20,6 +20,11 @@ const s3UploadHost =
     : null;
 const isProd = process.env.NODE_ENV === "production";
 
+// where GIPHY serves GIF / sticker files (app/libs/giphy.ts accepts only these)
+const GIPHY_HOSTS = ["media", "media0", "media1", "media2", "media3", "media4", "i"].map(
+  (name) => `${name}.giphy.com`
+);
+
 const imageSources = [
   "'self'",
   "data:",
@@ -30,6 +35,8 @@ const imageSources = [
   // emoji-picker-react draws its emoji from the emoji-datasource images on jsDelivr
   "https://cdn.jsdelivr.net",
   // link preview images come through /api/messages/[id]/preview-image ('self')
+  // GIFs / stickers (app/libs/giphy.ts), shown straight from GIPHY's media hosts
+  ...GIPHY_HOSTS.map((host) => `https://${host}`),
 ];
 
 // Enforced: only directives that cannot break the app (no framing = no clickjacking, no plugins,
@@ -99,6 +106,8 @@ const nextConfig = {
       ...(s3PublicHost ? [{ protocol: "https", hostname: s3PublicHost }] : []),
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
+      // GIFs are shown unoptimized (the optimizer would stop the animation); listed for completeness
+      ...GIPHY_HOSTS.map((hostname) => ({ protocol: "https", hostname })),
     ],
   },
 };

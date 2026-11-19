@@ -1,6 +1,7 @@
 import axios from "axios";
 import { create } from "zustand";
 
+import type { GifData } from "@/app/libs/giphy";
 import { FullMessageType, ReplyPreview } from "@/app/types";
 
 // Messages the user sent from this tab, shown at once instead of after the server's round trip.
@@ -14,6 +15,8 @@ export interface OutboxPayload {
   image?: string;
   // a file or voice message (already uploaded)
   attachment?: OutboxAttachment;
+  // a GIPHY GIF / sticker: the server looks it up by id and kind; the rest draws it meanwhile
+  gif?: GifData;
   replyToId?: string;
 }
 

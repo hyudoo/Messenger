@@ -10,6 +10,7 @@ import { scrollIntoViewSettled } from "@/app/libs/message-window";
 
 type Snippetable = Pick<ReplyPreview, "body" | "image" | "isCall" | "deletedAt"> & {
   attachment?: ReplyPreview["attachment"];
+  gif?: ReplyPreview["gif"];
 };
 
 // One line standing for a message: its text, or what it was (image, call, recalled).
@@ -32,6 +33,9 @@ export const MessageSnippet: React.FC<{ message: Snippetable }> = ({ message }) 
           : t("reply_file", { name: message.attachment.name })}
       </>
     );
+  }
+  if (message.gif) {
+    return <>{message.gif.kind === "sticker" ? t("reply_sticker") : t("reply_gif")}</>;
   }
   return <>{message.body}</>;
 };

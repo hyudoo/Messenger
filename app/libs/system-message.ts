@@ -15,7 +15,8 @@ interface SystemMessageOptions {
   // who did it (the message's sender)
   actorId: string;
   type: SystemType;
-  // the group's name (created / renamed), or the nickname set (nickname; none: removed)
+  // the group's name (created / renamed), the nickname set (nickname; none: removed), the color
+  // key (theme) or the emoji (quick_emoji) chosen (none: back to the default)
   name?: string | null;
   // who was added / removed (or whose nickname changed)
   users?: Person[];

@@ -95,11 +95,13 @@ describe("POST /api/password/forgot", () => {
 describe("POST /api/password/reset", () => {
   const TOKEN = "A".repeat(43);
 
-  it("sets the new password once, and every link of the user stops working", async () => {
+  it("sets the new password once, every link stops working and every session ends", async () => {
     prisma.passwordReset.findUnique.mockResolvedValue({
       userId: ME,
       expiresAt: new Date(Date.now() + 60_000),
     });
+    prisma.user.findUnique.mockResolvedValue({ sessionVersion: 4 });
+    prisma.user.update.mockResolvedValue(me);
 
     expect((await set({ token: TOKEN, password: "New-passw0rd!" })).status).toBe(200);
     expect(prisma.passwordReset.findUnique).toHaveBeenCalledWith(
@@ -108,6 +110,9 @@ describe("POST /api/password/reset", () => {
     const { data } = prisma.user.update.mock.calls[0][0];
     expect(data.hashedPassword).toMatch(/^\$2[aby]\$12\$/);
     expect(data.hashedPassword).not.toContain("New-passw0rd!");
+    expect(data.sessionVersion).toBe(5);
+    // the mailed link proves the address too
+    expect(data.emailVerified).toBeInstanceOf(Date);
     expect(prisma.passwordReset.deleteMany).toHaveBeenCalledWith({ where: { userId: ME } });
   });
 

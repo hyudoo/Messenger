@@ -4,6 +4,8 @@ import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 import { HiChartBar, HiCheck, HiPaperAirplane, HiPaperClip, HiPhoto, HiXMark } from "react-icons/hi2";
 import PollComposer from "./PollComposer";
+import GifPicker from "./GifPicker";
+import type { GifData } from "@/app/libs/giphy";
 import { toast } from "react-hot-toast";
 import { useTranslations } from "next-intl";
 
@@ -16,7 +18,6 @@ import useComposer from "@/app/hooks/useComposer";
 import useConversation from "@/app/hooks/useConversation";
 import useOutbox, { OutboxPayload } from "@/app/hooks/useOutbox";
 import useDrafts from "@/app/hooks/useDrafts";
-import { QUICK_EMOJI } from "@/app/libs/emoji";
 import { getSocket } from "@/app/libs/socket-client";
 import {
   AUDIO_TYPES,
@@ -39,6 +40,7 @@ const toPreview = (message: FullMessageType): ReplyPreview => ({
   body: message.body,
   image: message.image,
   attachment: message.attachment,
+  gif: message.gif,
   isCall: message.isCall,
   deletedAt: message.deletedAt,
   sender: { name: message.sender?.name ?? null, email: message.sender?.email ?? null },
@@ -57,9 +59,13 @@ interface FormProps {
   // the conversation's members (a group's "@" picker)
   members: SafeUser[];
   isGroup: boolean;
+  // what the quick button sends here (Conversation.quickEmoji, else 👍)
+  quickEmoji: string;
+  // GIPHY is configured: the "GIF" button
+  gifs?: boolean;
 }
 
-const Form: React.FC<FormProps> = ({ members, isGroup }) => {
+const Form: React.FC<FormProps> = ({ members, isGroup, quickEmoji, gifs = false }) => {
   // groups: the "New poll" dialog
   const [pollOpen, setPollOpen] = useState(false);
   const t = useTranslations("chat");
@@ -204,11 +210,23 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
     inputRef.current?.focus();
   };
 
-  // empty input: the send button sends a 👍 straight away
+  // empty input: the send button sends the conversation's quick emoji straight away
   const sendQuickEmoji = () => {
     send(
       conversationId,
-      { message: QUICK_EMOJI, ...(replyTo && { replyToId: replyTo.id }) },
+      { message: quickEmoji, ...(replyTo && { replyToId: replyTo.id }) },
+      replyTo ? toPreview(replyTo) : undefined
+    );
+    if (replyTo) {
+      composer.cancel();
+    }
+  };
+
+  // a GIF / sticker from the picker: sent at once, on its own (a reply goes on it)
+  const sendGif = (gif: GifData) => {
+    send(
+      conversationId,
+      { gif, ...(replyTo && { replyToId: replyTo.id }) },
       replyTo ? toPreview(replyTo) : undefined
     );
     if (replyTo) {
@@ -346,7 +364,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
   return (
     <div className="relative w-full border-t bg-background" {...dropProps}>
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-sky-500 bg-background/90 text-sm font-medium text-sky-500">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center border-2 border-dashed border-chat bg-background/90 text-sm font-medium text-chat">
           {t("drop_files")}
         </div>
       )}
@@ -405,7 +423,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               onClick={() => imageInputRef.current?.click()}
               aria-label={t("attach_image")}
               title={t("attach_image")}
-              className="text-sky-500 transition hover:text-sky-600">
+              className="text-chat transition hover:text-chat/80">
               <HiPhoto size={30} aria-hidden />
             </button>
             <button
@@ -413,7 +431,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               onClick={() => fileInputRef.current?.click()}
               aria-label={t("attach_file")}
               title={t("attach_file")}
-              className="text-sky-500 transition hover:text-sky-600">
+              className="text-chat transition hover:text-chat/80">
               <HiPaperClip size={24} aria-hidden />
             </button>
             <MicButton onClick={recorder.start} />
@@ -423,10 +441,11 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                 onClick={() => setPollOpen(true)}
                 aria-label={t("new_poll")}
                 title={t("new_poll")}
-                className="text-sky-500 transition hover:text-sky-600">
+                className="text-chat transition hover:text-chat/80">
                 <HiChartBar size={24} aria-hidden />
               </button>
             )}
+            {gifs && <GifPicker onPick={sendGif} />}
             <EmojiPicker onSelect={insertEmoji} />
           </div>
         )}
@@ -469,8 +488,8 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
               <button
                 type="button"
                 onClick={sendQuickEmoji}
-                aria-label={t("send_quick", { emoji: QUICK_EMOJI })}
-                title={t("send_quick", { emoji: QUICK_EMOJI })}
+                aria-label={t("send_quick", { emoji: quickEmoji })}
+                title={t("send_quick", { emoji: quickEmoji })}
                 className="
                   flex
                   h-[34px]
@@ -484,7 +503,7 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                   hover:scale-110
                   active:scale-95
                   ">
-                {QUICK_EMOJI}
+                {quickEmoji}
               </button>
             ) : (
               <button
@@ -495,9 +514,9 @@ const Form: React.FC<FormProps> = ({ members, isGroup }) => {
                 className="
                   rounded-full
                   p-2
-                  bg-sky-500
+                  bg-chat
                   cursor-pointer
-                  hover:bg-sky-600
+                  hover:bg-chat/90
                   disabled:opacity-50
                   transition
                   ">

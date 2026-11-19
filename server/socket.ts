@@ -11,7 +11,13 @@ import { CALL_RING_TIMEOUT_MS } from "../app/libs/call";
 import { declineCall, moveCallSafely } from "./call-log";
 import { maxCallPeers, type CallPeer } from "../app/libs/call-mesh";
 import { getRedisUrl } from "../app/libs/redis-url";
-import { activityCache, blockCache, contactCache, setIO } from "../app/libs/socket-server";
+import {
+  activityCache,
+  blockCache,
+  closeLocalUserSockets,
+  contactCache,
+  setIO,
+} from "../app/libs/socket-server";
 import { blockPartnersOf } from "../app/libs/blocks";
 import {
   callRoom,
@@ -19,6 +25,7 @@ import {
   userRoom,
 } from "../app/libs/socket-rooms";
 import { logError } from "../app/libs/log";
+import { forgetSessionVersion, isSessionCurrent } from "../app/libs/session-version";
 import { createPresence, type Presence } from "./presence";
 import { ACTIVITY_HIDDEN_ROOM } from "../app/libs/socket-rooms";
 
@@ -63,6 +70,10 @@ const authenticate = async (req: IncomingMessage) => {
   });
 
   if (!token?.email || !token.sub) {
+    return null;
+  }
+  // signed out by a password change / "sign out other devices" (app/libs/session-version.ts)
+  if (!(await isSessionCurrent(token, { fresh: true }))) {
     return null;
   }
   return {
@@ -432,6 +443,16 @@ export const initSocketServer = async (httpServer: HttpServer) => {
   io.on("contacts:changed", (emails: unknown) => {
     if (Array.isArray(emails)) {
       emails.forEach((email) => typeof email === "string" && contactCache().delete(email));
+    }
+  });
+  // a user's sessions were revoked on another instance: forget their version, drop their sockets here
+  io.on("sessions:revoked", (payload: unknown) => {
+    const { userId, email } = (payload ?? {}) as { userId?: unknown; email?: unknown };
+    if (typeof userId === "string") {
+      forgetSessionVersion(userId);
+    }
+    if (typeof email === "string") {
+      closeLocalUserSockets(io, email);
     }
   });
   // a block / unblock on another instance

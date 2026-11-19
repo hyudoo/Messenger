@@ -6,13 +6,16 @@ import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "react-hot-toast";
 import { useLocale, useTranslations } from "next-intl";
+import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import {
   HiCamera,
   HiCheck,
   HiLink,
   HiOutlineShieldCheck,
   HiPencil,
+  HiPlus,
   HiShieldCheck,
+  HiSwatch,
   HiTag,
   HiUserPlus,
   HiXMark,
@@ -20,6 +23,7 @@ import {
 
 import Avatar from "@/app/components/Avatar";
 import AvatarGroup from "@/app/components/AvatarGroup";
+import { EmojiPickerPanel } from "@/app/components/EmojiPicker";
 import ImageUploadButton from "@/app/components/ImageUploadButton";
 import SearchInput from "@/app/components/inputs/SearchInput";
 import {
@@ -30,6 +34,13 @@ import {
   canRemoveMember,
 } from "@/app/libs/conversation-permissions";
 import { invitePath } from "@/app/libs/invite-code";
+import {
+  CHAT_THEMES,
+  CHAT_THEME_NAMES,
+  ChatTheme,
+  chatThemeOf,
+  quickEmojiOf,
+} from "@/app/libs/chat-theme";
 import { MAX_NICKNAME_LENGTH, nicknameOf } from "@/app/libs/nicknames";
 import { matchesSearch } from "@/app/libs/search";
 import { ConversationWithUsers, SafeUser } from "@/app/types";
@@ -687,6 +698,96 @@ export const Nicknames: React.FC<{ conversation: ConversationWithUsers; myId?: s
           );
         })}
       </ul>
+      <p className="mt-2 text-xs text-muted-foreground">{t("hint")}</p>
+    </section>
+  );
+};
+
+// quick emoji offered without opening the full picker
+const QUICK_EMOJI_CHOICES = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👏"];
+
+// The conversation's look (1:1 and groups, any member, for everyone): the color of one's own
+// bubbles and the composer, and the emoji its quick button sends. Each change posts an event.
+export const ChatAppearance: React.FC<{ conversation: ConversationWithUsers }> = ({ conversation }) => {
+  const t = useTranslations("chat_theme");
+  const { busy, run } = useGroupRequest();
+  const theme = chatThemeOf(conversation.themeColor);
+  const emoji = quickEmojiOf(conversation.quickEmoji);
+  const choices = QUICK_EMOJI_CHOICES.includes(emoji) ? QUICK_EMOJI_CHOICES : [...QUICK_EMOJI_CHOICES, emoji];
+
+  const save = (data: { themeColor?: ChatTheme; quickEmoji?: string }) =>
+    run(() => axios.patch(`/api/conversations/${conversation.id}/appearance`, data));
+
+  return (
+    <section className="mb-4 w-full rounded-xl border p-3">
+      <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <HiSwatch size={16} aria-hidden />
+        {t("title")}
+      </h3>
+      <p className="mb-1 text-xs text-muted-foreground">{t("color")}</p>
+      <div className="mb-3 flex flex-wrap gap-2" role="radiogroup" aria-label={t("color")}>
+        {CHAT_THEME_NAMES.map((name) => {
+          const label = t(`colors.${name}`);
+          return (
+            <button
+              key={name}
+              type="button"
+              role="radio"
+              aria-checked={theme === name}
+              disabled={busy}
+              onClick={() => theme !== name && void save({ themeColor: name })}
+              aria-label={t("pick_color", { color: label })}
+              title={label}
+              style={{ backgroundColor: `rgb(${CHAT_THEMES[name]})` }}
+              className={clsx(
+                "flex h-7 w-7 items-center justify-center rounded-full text-white transition hover:scale-110 disabled:opacity-50",
+                theme === name && "ring-2 ring-foreground ring-offset-2 ring-offset-background"
+              )}>
+              {theme === name && <HiCheck size={14} aria-hidden />}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mb-1 text-xs text-muted-foreground">{t("emoji")}</p>
+      <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label={t("emoji")}>
+        {choices.map((choice) => (
+          <button
+            key={choice}
+            type="button"
+            role="radio"
+            aria-checked={emoji === choice}
+            disabled={busy}
+            onClick={() => emoji !== choice && void save({ quickEmoji: choice })}
+            aria-label={t("pick_emoji", { emoji: choice })}
+            className={clsx(
+              "flex h-9 w-9 items-center justify-center rounded-full text-xl leading-none transition hover:bg-muted disabled:opacity-50",
+              emoji === choice && "bg-muted ring-2 ring-sky-500"
+            )}>
+            {choice}
+          </button>
+        ))}
+        <Popover className="relative flex">
+          <PopoverButton
+            disabled={busy}
+            aria-label={t("more_emoji")}
+            title={t("more_emoji")}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+            <HiPlus size={18} aria-hidden />
+          </PopoverButton>
+          <PopoverPanel anchor={{ to: "bottom end", gap: 8 }} className="z-50 rounded-lg shadow-xl">
+            {({ close }) => (
+              <EmojiPickerPanel
+                onSelect={(picked) => {
+                  close();
+                  if (picked !== emoji) {
+                    void save({ quickEmoji: picked });
+                  }
+                }}
+              />
+            )}
+          </PopoverPanel>
+        </Popover>
+      </div>
       <p className="mt-2 text-xs text-muted-foreground">{t("hint")}</p>
     </section>
   );

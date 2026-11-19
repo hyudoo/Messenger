@@ -24,13 +24,17 @@ const FEATURES = [
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; deleted?: string | string[] }>;
 }) {
   const t = await getTranslations("auth");
   const tHome = await getTranslations("home");
   const tLegal = await getTranslations("legal");
   // where to go after signing in: an invite link the visitor opened signed out (proxy.ts)
-  const next = safeNextPath((await searchParams).next);
+  const params = await searchParams;
+  const next = safeNextPath(params.next);
+  // just deleted their account (DeleteAccount signs out to here)
+  const deleted = params.deleted === "1";
+  const tDeleted = await getTranslations("delete_account");
 
   return (
     <div
@@ -78,6 +82,14 @@ export default async function Home({
           {t("title")}
         </h2>
       </div>
+
+      {deleted && (
+        <p
+          role="status"
+          className="mx-4 mt-6 rounded-lg bg-background px-4 py-3 text-center text-sm text-foreground sm:mx-auto sm:w-full sm:max-w-md">
+          {tDeleted("deleted")}
+        </p>
+      )}
 
       <AuthForm next={next} />
 

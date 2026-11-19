@@ -14,6 +14,8 @@ const GROUP = "abababababababababababab";
 const BLOCKS: Record<string, string[]> = {};
 // user id -> their friends (User.friendIds, both sides)
 const FRIENDS: Record<string, string[]> = {};
+// user id -> User.sessionVersion (tokens here carry none, i.e. version 0)
+const SESSION_VERSIONS: Record<string, number> = {};
 const ALL_IDS = () => [ME, OTHER, THIRD, STRANGER];
 
 // conversation id -> member ids
@@ -128,6 +130,7 @@ vi.mock("@/app/libs/prismadb", () => ({
           return id ? { id, hideActivity: HIDERS.has(id), friendIds: FRIENDS[id] ?? [] } : null;
         }
         return {
+          sessionVersion: SESSION_VERSIONS[where.id] ?? null,
           conversationIds: Object.keys(MEMBERS).filter((id) => MEMBERS[id].includes(where.id)),
           blockedUserIds: BLOCKS[where.id] ?? [],
         };
@@ -153,6 +156,7 @@ import { closeSocketServer, initSocketServer } from "@/server/socket";
 import {
   emitToConversation,
   notifyActivityPrivacyChanged,
+  notifySessionsRevoked,
   notifyContactsChanged,
   removeUserFromConversationRoom,
 } from "@/app/libs/socket-server";
@@ -227,6 +231,22 @@ describe("socket server", () => {
     const { url } = await startServer();
     const error = await next<Error>(client(url), "connect_error");
     expect(error.message).toBe("Unauthorized");
+  });
+
+  it("drops a user's sockets when their sessions are revoked, and refuses the old token after", async () => {
+    const { url } = await startServer();
+    const { socket } = await connected(url, ME);
+    const other = await connected(url, OTHER);
+
+    SESSION_VERSIONS[ME] = 1;
+    const dropped = next<string>(socket, "disconnect");
+    notifySessionsRevoked(ME, emailOf(ME));
+    expect(await dropped).toBe("transport close");
+    expect(other.socket.connected).toBe(true);
+
+    const error = await next<Error>(client(url, ME), "connect_error");
+    expect(error.message).toBe("Unauthorized");
+    delete SESSION_VERSIONS[ME];
   });
 
   it("tracks presence across users and tabs", async () => {
