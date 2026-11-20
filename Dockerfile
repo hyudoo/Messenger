@@ -26,13 +26,12 @@ ENV AWS_REGION=$AWS_REGION \
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
-RUN --mount=type=cache,id=messenger-npm,target=/root/.npm,sharing=locked \
-    npm ci --no-audit --no-fund
+# No BuildKit cache mounts: Railway rejects any cache id not prefixed with its own service id
+RUN npm ci --no-audit --no-fund
 
 COPY . .
 
-RUN --mount=type=cache,id=messenger-next,target=/app/.next/cache,sharing=locked \
-    npm run build
+RUN npm run build
 
 # Keeps the generated Prisma client and the prisma CLI (a dependency, for `prisma db push` at deploy)
 RUN npm prune --omit=dev --no-audit --no-fund
